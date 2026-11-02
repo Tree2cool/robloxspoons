@@ -8,6 +8,7 @@
 local fs = require("@lune/fs")
 local process = require("@lune/process")
 
+local Fuzz = require("./harness/Fuzz")
 local Test = require("./harness/Test")
 
 local SPEC_SUFFIX = ".spec.luau"
@@ -113,7 +114,7 @@ for _, path in specs do
 		continue
 	end
 
-	local runner = Test.new({ seed = seed })
+	local runner = Test.new({ seed = seed, fuzzDriver = Fuzz.driver })
 	local regOk, regErr = pcall(specOrErr :: (Test.Runner) -> any, runner)
 	if not regOk then
 		fail(`{path}::<register>`, tostring(regErr))
