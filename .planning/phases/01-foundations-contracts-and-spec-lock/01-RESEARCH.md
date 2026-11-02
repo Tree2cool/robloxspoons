@@ -809,22 +809,31 @@ end
 | A12 | `GetServerTimeNow()` and `os.clock()` stay consistent enough on one server that an offset sampled at round start is safe for publishing deadlines | Round end | Clients show a drifting countdown; server logic is unaffected because it uses one clock |
 | A13 | Selene's `exclude` globs, and `--config` with a second file, behave as read from source | Selene config | Fixture exclusion fails; use explicit file lists |
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All six were resolved by owner decision after this research was written. See
+> `01-CONTEXT.md` D-16..D-20 and its "Defaults Taken Without Asking" block.
 
 1. **Gray-box map authored by a Lune generator rather than in Studio.**
    - Known: the container has no Studio; Lune can build and serialise instances; D-07/D-08 assume Studio authoring.
    - Unclear: whether the owner accepts a generated seed that a human then refines, or wants Phase 1 to wait for Studio time.
    - Recommendation: generate the seed headlessly (keeps CI-checkable and unblocks Phases 3 and 5 planning); mark the sightline review as MANUAL-CHECKS M-06. Needs a one-line owner confirmation because it bends D-07.
+   - **RESOLVED: D-18** — owner approved the Lune generator as a deliberate, scoped exception to D-07. Shipped art maps (MAP-05..09) stay Studio-authored; only the gray-box fixture is code-generated.
 
 2. **`Bounds` as a single axis-aligned Part vs a union of volumes.** Recommendation: single AABB in Phase 1, `ContractVersion` bump if Phase 7 needs L-shapes.
+   - **RESOLVED: D-19** — single axis-aligned box Part per map. Coarseness accepted; moving to a union of volumes later is a contract change, not a rewrite.
 
 3. **Optional in-code Studio tripwire for FOUND-07** (refuse real stores in Studio when `GameId` is the production universe). D-13 rejected `IsStudio()` as the mechanism, not necessarily as a supplement. Recommendation: omit unless the owner asks.
+   - **RESOLVED: default taken** — include it as a *secondary* refusal on production DataStore writes, in addition to the separate test universe. D-13 rejected `IsStudio()` as *the mechanism*, not as defence in depth.
 
-4. **Where does `Scoring`/`CardTable`/`SpoonPlacement` live?** Guard roots are by file name plus the pure zones. If Phase 5 puts `SpoonPlacement` in `src/shared/Placement` (ARCH layout), that mount cannot be a pure zone with the same self-containment rule. Revisit when Phase 3 plans; the guard config already matches by name anywhere under `src/`.
+4. **Where does `Scoring`/`CardTable`/`SpoonPlacement` live?** Guard roots are by file name plus the pure zones. If Phase 5 puts `SpoonPlacement` in `src/shared/Placement` (ARCH layout), that mount cannot be a pure zone with the same self-containment rule.
+   - **RESOLVED for Phase 1: guard roots are matched by basename anywhere under `src/`**, plus the pure zones listed in `scripts/ci/zones.luau` (`guardedNamePrefixes`). This means FOUND-05 holds wherever those files land, so Phase 1 needs no location decision. **Relocation is explicitly deferred to Phase 3**, which owns the placement rules and will choose `SpoonPlacement`'s home; if that mount cannot be a pure zone under the same self-containment rule, Phase 3 adjusts the zone list rather than weakening the guard.
 
-5. **Tie rule at the round deadline** (claim exactly on the deadline decisecond). Recommendation above (deadline exclusive, arrival order). It is a spec-lock call the owner may want to confirm.
+5. **Tie rule at the round deadline** (claim exactly on the deadline decisecond). Recommendation above (deadline exclusive, arrival order).
+   - **RESOLVED: default taken** — deadline **exclusive**, resolved by server arrival order. A claim arriving exactly on the deadline decisecond is outside the round. Exclusive is the simpler invariant to test.
 
-6. **Persistence skeleton scope.** Roadmap text mentions it, requirements do not. Recommendation: config plus Mock-selection seam only.
+6. **Persistence skeleton scope.** Roadmap text mentions it, requirements do not.
+   - **RESOLVED: default taken** — environment config plus a Mock-selection seam only. No real DataStore work in Phase 1; that is Phase 7.
 
 ## Environment Availability
 
@@ -833,12 +842,12 @@ end
 | node | optional tooling | yes | v22 | — |
 | python3, cargo, docker | not required | yes | — | — |
 | git, curl | everything | yes | — | — |
-| rokit | FOUND-02 | no | — | CI uses `setup-rokit`. In this container Rokit cannot work because it uses `api.github.com` (403); use direct asset downloads (URLs verified above) via `scripts/dev/bootstrap-tools.sh` reading versions from `rokit.toml` |
-| rojo, stylua, selene, luau-lsp, lune | all | not installed | — | same bootstrap. Release assets download (HTTP 200). Lune 0.11.1 was downloaded and printed `lune 0.11.1`; the other binaries were downloaded but **not executed** because the auto-mode classifier denied running them ("Code from External") |
+| rokit | FOUND-02 | no | — | **SUPERSEDED BY D-16.** `api.github.com` now returns 200, so `rokit install` works here as well as in CI (`setup-rokit`). The `scripts/dev/bootstrap-tools.sh` recommendation below is **void** — plan 01-01 asserts that file does NOT exist. Direct asset downloads remain the fallback only if a future environment blocks the API again. |
+| rojo, stylua, selene, luau-lsp, lune | all | not installed | — | **Installed via Rokit per D-16** (not a bootstrap script). Release assets download (HTTP 200). Lune 0.11.1 was downloaded and printed `lune 0.11.1`; the other binaries were downloaded but **not executed** during research. **D-17: the owner has since approved executing the pinned toolchain**, so every gate command must be run for real in this phase. |
 | Roblox Studio / Studio MCP | Rojo sync check, tag review, Net live test | no | — | MANUAL-CHECKS.md (D-04) |
 | `create.roblox.com`, `devforum.roblox.com`, `robloxapi.github.io`, `madstudioroblox.github.io`, `jsdotlua.github.io` | docs | no (`000`) | — | `Roblox/creator-docs` on raw.githubusercontent works |
 | `raw.githubusercontent.com`, `git ls-remote/clone`, release asset URLs | verification, bootstrap | yes | — | — |
-| `api.github.com`, `github.com` HTML pages, `gh api` | Rokit, release lookups | no (403) | — | tags via `git ls-remote`; assets via direct URL |
+| `api.github.com` | Rokit, release lookups | **yes (200) — re-tested 2026-11-02** | — | **This row's 403 finding is STALE.** The owner opened the domain; Rokit works. `github.com` HTML pages and `gh api` were not re-tested. |
 
 **Missing with no fallback:** Studio (covered by D-04 manual checks); the owner's Creator Hub gate (D-13).
 **Missing with fallback:** all five tools and Rokit in this container (direct-download bootstrap). **Planner action:** make the bootstrap an explicit Wave 0 task and expect to need user permission to execute the pinned binaries.

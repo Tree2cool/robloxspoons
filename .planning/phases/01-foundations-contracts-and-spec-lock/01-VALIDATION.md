@@ -2,7 +2,7 @@
 phase: 1
 slug: foundations-contracts-and-spec-lock
 status: draft
-nyquist_compliant: false
+nyquist_compliant: false  # flip to true once plans pass the checker and Wave 0 lands
 wave_0_complete: false
 created: 2026-11-02
 ---
@@ -62,7 +62,7 @@ created: 2026-11-02
 
 ## Wave 0 Requirements
 
-- [ ] `scripts/dev/bootstrap-tools.sh` — direct-download pinned tools (**`api.github.com` returns 403 in this container, so `rokit install` cannot work here**) + permission to execute them
+- [ ] ~~`scripts/dev/bootstrap-tools.sh`~~ — **STRUCK, superseded by D-16.** `api.github.com` now returns 200 (re-tested 2026-11-02), so `rokit install` works here as it does in CI. Plan 01-01 asserts this file does NOT exist. Replaced by: `rokit install` plus `lune setup`, with the owner's D-17 approval to execute the pinned binaries.
 - [ ] `rokit.toml`, `stylua.toml`, `selene.toml`, `selene.pure.toml`, `.luaurc`, `.styluaignore`, `.gitattributes`, `.gitignore`
 - [ ] `tools/types/globalTypes.None.d.luau` (vendored, pinned by sha256 — `luau-lsp analyze` never downloads type definitions), `roblox.yml` via `selene generate-roblox-std`
 - [ ] `tests/run.luau`, `tests/harness/{Test,Fuzz,FakeClock,FakeScheduler}.luau`, plus a harness meta-test
