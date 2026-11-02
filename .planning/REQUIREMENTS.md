@@ -11,8 +11,10 @@ Requirements for initial release. Each maps to exactly one roadmap phase.
 
 ### Foundations
 
-- [ ] **FOUND-01**: Rojo project syncs to Studio with git as source of truth, with `$ignoreUnknownInstances` on Workspace so Studio-authored maps are not deleted on sync
-- [ ] **FOUND-02**: Toolchain is pinned via Rokit (StyLua, Selene, luau-lsp) and every Luau file is `--!strict`
+- [x] **FOUND-01
+**: Rojo project syncs to Studio with git as source of truth, with `$ignoreUnknownInstances` on Workspace so Studio-authored maps are not deleted on sync
+- [x] **FOUND-02
+**: Toolchain is pinned via Rokit (StyLua, Selene, luau-lsp) and every Luau file is `--!strict`
 - [ ] **FOUND-03**: Engine tests and the fuzz suite run headless outside Studio in CI
 - [ ] **FOUND-04**: Every client-to-server message passes a single typed gateway that validates arguments (including NaN) and rate-limits per player
 - [ ] **FOUND-05**: The build fails if `Scoring`, `CardTable` or `SpoonPlacement` gain an import path to any cosmetics or shop module

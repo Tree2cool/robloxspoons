@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Phase 1 context gathered
-last_updated: "2026-11-02T22:12:49.089Z"
-last_activity: 2026-11-02 -- Phase 1 execution started
+stopped_at: Completed 01-01-PLAN.md
+last_updated: "2026-11-02T22:43:19.671Z"
+last_activity: 2026-11-02
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 12
-  completed_plans: 0
-  percent: 0
+  completed_plans: 1
+  percent: 8
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-11-02)
 ## Current Position
 
 Phase: 1 (Foundations, Contracts and Spec Lock) — EXECUTING
-Plan: 1 of 12
-Status: Executing Phase 1
-Last activity: 2026-11-02 -- Phase 1 execution started
+Plan: 2 of 12
+Status: Ready to execute
+Last activity: 2026-11-02
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█░░░░░░░░░] 8%
 
 ## Performance Metrics
 
@@ -52,6 +52,7 @@ Progress: [░░░░░░░░░░] 0%
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 01 P01 | multi-session | 3 tasks | 16 files |
 
 ## Accumulated Context
 
@@ -68,6 +69,9 @@ Recent decisions affecting current work:
 - [Roadmap]: Engine lives in `server/engine/`, tested headless (Lune or `luau` CLI), not Jest-Lua (research Contradiction 1, follows ARCHITECTURE).
 - [Roadmap]: Phase 7 holds two independent tracks (maps 7a, cosmetics/shop 7b); the planner may split it without changing requirement mapping.
 - [Roadmap]: CARD-18, SCORE-09, MATCH-04, MATCH-05 sit in Phase 7 because they need cosmetic content; Phase 4 and Phase 6 build the hooks and baseline.
+- [Phase 1 01-01]: D-16 corrected - tools installed by direct release-archive download (api.github.com 403); rokit.toml remains version source of truth for CI
+- [Phase 1 01-01]: D-21 - roblox.yml must be generated outside the container (selene rustls cannot trust egress proxy CA); owner-generated, committed 4f011f1
+- [Phase 1 01-01]: Fourth exit-code trap - luau-lsp exits 0 when sourcemap fails to load; sourcemap load must be asserted in every gate chain (01-10, 01-11)
 
 ### Pending Todos
 
@@ -81,7 +85,6 @@ None yet.
 - Owner decisions still open: match tiebreak (OQ 5, default: higher best-round then earlier four-of-a-kind placement), avatar normalisation scope (OQ 12, Phase 3), VIP route (OQ 14, Phase 7b), Game Pass versus Developer Product switch point (OQ 15, Phase 7b), rejoin policy confirmation (OQ 18, derived default in MATCH-08), cold-start and bot-fill decision (OQ 13, Phase 8 on telemetry).
 - Cold start below the 3-player minimum is an existential risk that code alone cannot fix; bot-fill decision is deferred to Phase 8 on telemetry.
 - First true 9 to 10 player human playtest needs a published place (human gate); Studio multi-client is capped.
-- 01-01: roblox.yml cannot be generated here - selene generate-roblox-std fails (rustls webpki roots reject egress-proxy CA, ignores SSL_CERT_FILE); static.crates.io 403 so no source build. 'selene src' (pinned std) cannot run. Needs roblox.yml generated on a machine with direct network, then committed.
 
 ## Deferred Items
 
@@ -93,8 +96,8 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: --stopped-at
-Stopped at: Phase 1 context gathered
-Resume file: --resume-file
+Last session: 2026-11-02T22:43:19.655Z
+Stopped at: Completed 01-01-PLAN.md
+Resume file: None
 
 **Planned Phase:** 1 (Foundations, Contracts and Spec Lock) — 12 plans — 2026-11-02T21:28:46.598Z

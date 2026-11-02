@@ -52,7 +52,7 @@ P1 (sequential)
   5. A gray-box reference map loads through the shared map contract with no per-map code branch, the server refuses an 11th player and refuses to start under 3, and an injected-clock test shows round end firing exactly once even when a stale callback from an earlier round fires at the boundary
 **Plans**: 12 plans in 7 waves
 Plans:
-- [ ] 01-01-PLAN.md — Toolchain, pinned configs, vendored types, Rojo project, first green run (wave 1)
+- [x] 01-01-PLAN.md — Toolchain, pinned configs, vendored types, Rojo project, first green run (wave 1)
 - [ ] 01-02-PLAN.md — Headless test harness, fuzz helper, Rng, require spike, project-shape spec (wave 2)
 - [ ] 01-03-PLAN.md — check-guards: strict headers, FOUND-05 import closure, Net hygiene, secret names (wave 3)
 - [ ] 01-04-PLAN.md — Engine-purity allow-list fixtures and the three exit-code trap proofs (wave 3)
@@ -186,7 +186,7 @@ Phases execute in numeric order, with parallel pairs: 2 and 3, then 4 and 5, wit
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundations, Contracts and Spec Lock | 0/TBD | Not started | - |
+| 1. Foundations, Contracts and Spec Lock | 1/12 | In progress | - |
 | 2. Card Engine and Pacing Simulator | 0/TBD | Not started | - |
 | 3. Placement Rules, Map Pipeline and Validator | 0/TBD | Not started | - |
 | 4. Live Card Table | 0/TBD | Not started | - |
