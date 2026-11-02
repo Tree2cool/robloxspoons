@@ -119,6 +119,33 @@ directory, in both `sourcemap` and `build`. Fixed with a committed `src/shared/.
 
 ---
 
+## The `luau-lsp analyze` detector, settled (waves 1, 3/01-04 and 3/01-05)
+
+Three plans hit this from different directions and each found the obvious detector wrong.
+**Plans 01-10 and 01-11 must implement exactly this.**
+
+What `luau-lsp analyze` actually does:
+
+| Condition | Exit | Output marker |
+|---|---|---|
+| Real type error | **1** | `TypeError:` — **no `[ERROR]` line** |
+| Lint finding (with `lintErrors: true`) | **1** | `LocalUnused:` etc. |
+| Sourcemap **missing** | **0** | `[ERROR] Failed to load sourcemap.json for workspace 'CLI'` |
+| Sourcemap **malformed** | **0** | `Sourcemap parsing failed, sourcemap is not loaded:` — **no `[ERROR]` line** |
+| `--formatter plain`, any error | **0** | `(W0) TypeError...` |
+
+So:
+
+- **Counting `[ERROR]` lines is wrong twice over.** It misses malformed sourcemaps (01-04) *and*
+  it misses genuine type errors, which do not print `[ERROR]` at all (01-05 reported this gave it
+  a false green).
+- **Exit code alone is wrong too** — both sourcemap failures exit 0.
+
+**The correct gate is: exit code 0 AND the output contains neither `Failed to load` nor
+`Sourcemap parsing failed`.** The exit code catches type and lint errors; the string match catches
+the two silent-degradation paths. Neither check subsumes the other, and `--formatter plain` must
+never appear in a gate because it defeats the exit code entirely.
+
 ## Rule for every failure-expecting test (added after wave 2)
 
 **Assert the REASON, not just the exit code.**
