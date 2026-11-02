@@ -75,6 +75,8 @@ created: 2026-11-02
 
 ## Exit-Code Traps (must be honoured or the hard-fail gate silently passes)
 
+> **Four traps, not three.** The fourth was found by running the commands, not by reading docs.
+
 D-01 makes every check hard-fail. Research found three ways that promise breaks silently:
 
 1. **`.luaurc` must set `"lintErrors": true`** — without it, luau-lsp lint warnings exit 0.
@@ -83,8 +85,25 @@ D-01 makes every check hard-fail. Research found three ways that promise breaks 
    definitions** — the vendored `globalTypes.None.d.luau` is load-bearing, and the
    engine-purity run needs `--platform standard` to catch type-only `Instance` references.
 
+4. **A FAILED SOURCEMAP LOAD DOES NOT FAIL `luau-lsp analyze`** — discovered by execution in
+   plan 01-01, not predicted by research. With `src/shared/` missing, `rojo sourcemap` had not
+   produced a usable file and `luau-lsp analyze --platform roblox` printed
+   `[ERROR] Failed to load sourcemap.json for workspace 'CLI'` and still **exited 0**. A missing
+   or stale sourcemap therefore silently degrades the entire type check while reporting green.
+   **The sourcemap step must be a hard prerequisite in every gate chain** — assert the file
+   exists and is newer than the sources, or grep the analyze output for `Failed to load
+   sourcemap` and fail on it. This is the most dangerous of the four traps because it degrades
+   a check that still appears to run.
+
 Also: **Selene 0.32.0's `luau` std lacks `math.isfinite` / `isnan` / `isinf`**, so FOUND-04's
 NaN check must be hand-written portably rather than relying on a stdlib helper.
+
+Also: **`rojo build -o build/spoons.rbxl` does not create the output directory** — it fails with
+"No such file or directory" unless `mkdir -p build` runs first. Every gate chain and CI step that
+builds must create the directory.
+
+Also: **`src/shared/` must exist on disk** — Rojo errors on a `$path` pointing at a missing
+directory, in both `sourcemap` and `build`. Fixed with a committed `src/shared/.gitkeep`.
 
 ---
 

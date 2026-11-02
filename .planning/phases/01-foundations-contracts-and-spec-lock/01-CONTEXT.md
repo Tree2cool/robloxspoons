@@ -109,7 +109,23 @@ gameplay UI (Phase 4+), the five shipped maps (Phase 7).
 
 ### Post-Research Decisions (added 2026-11-02 after 01-RESEARCH.md)
 
-- **D-16:** **Rokit is the toolchain install path, in CI and locally.** Research found
+- **D-16 — CORRECTED 2026-11-02 after execution. The original text below is WRONG.**
+  **What is actually true:** `api.github.com/repos/.../releases/tags/...` returns **403** in this
+  container. Rokit uses only that API, so `rokit install` **cannot work here** and the Rokit
+  installer dies at its first step. The toolchain was instead installed by downloading each
+  tool's GitHub **release archive directly** (those return 200), unzipping, and placing the
+  binaries in `$HOME/.rokit/bin`. `rokit` itself is not installed. All five tools verified by
+  execution at their pinned versions: rojo 7.7.1, stylua 2.6.0, selene 0.32.0, luau-lsp 1.70.1,
+  lune 0.11.1.
+  **Why the original was wrong:** the orchestrator tested `api.github.com/rate_limit` (200) rather
+  than the `/repos/...` endpoint Rokit actually calls (403), and on that basis wrongly declared
+  the research's 403 finding stale. The research was right. Direct download — which D-16 voided —
+  is the working path.
+  **For later phases:** do not assume `rokit install` works in this container. CI on GitHub
+  Actions is unaffected (`setup-rokit` runs on GitHub's own infrastructure where the API is
+  reachable), so the repo's `rokit.toml` remains the version source of truth.
+
+  *Superseded original text:* **Rokit is the toolchain install path, in CI and locally.** Research found
   `api.github.com` returning 403 in this container, which would have broken `rokit install`;
   the owner opened the domain and it now returns 200. **No bespoke direct-download bootstrap
   script is needed** — that research recommendation is superseded. If a future environment
@@ -140,6 +156,19 @@ gameplay UI (Phase 4+), the five shipped maps (Phase 7).
   Note the mild overload: "round" also informally means the whole hide+play+podium cycle, so
   code and docs should say `RoundPhase.Round` when they mean this specific state. The planner
   originally proposed `Scramble`; the owner chose `Round`.
+
+- **D-21:** **`roblox.yml` must be generated outside this container and committed.**
+  `selene generate-roblox-std` fetches the Roblox API dump over TLS using a bundled rustls with
+  compiled-in roots; it ignores `SSL_CERT_FILE` and the system trust store, so it cannot verify
+  the egress proxy's CA and fails with `invalid peer certificate: UnknownIssuer`. `curl` fetches
+  the same URL fine (200, 7.6 MB), so this is selene's TLS stack, not a network policy block, and
+  no documented proxy fix applies. Building selene from source is also unavailable
+  (`static.crates.io` returns 403 — a policy denial, not routed around). `selene.toml` already
+  sets `roblox-std-source = "pinned"`, so selene reads `roblox.yml` from disk once it exists.
+  **The file must be generated with selene 0.32.0 on a machine with direct network access and
+  committed.** Switching the main lint to `std = "luau"` was explicitly rejected: the Roblox std
+  is what catches undefined Roblox globals in gameplay code, so that would be weakening a gate
+  to get green.
 
 ### Defaults Taken Without Asking (post-research)
 
