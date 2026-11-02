@@ -94,6 +94,16 @@ return function(t: Test.Runner)
 			expected = "Real",
 		},
 		{
+			-- An unpublished Studio place reports game.GameId == 0, and the un-filled production id is
+			-- also 0. Without the zero guard 0 == 0 would Refuse every local boot before the owner gate.
+			name = "unpublished place (GameId 0) with placeholder 0 is not refused",
+			state = "Access",
+			isStudio = true,
+			gameId = 0,
+			productionUniverseId = 0,
+			expected = "Real",
+		},
+		{
 			name = "unknown state string selects Mock, never Real",
 			state = "SomethingNew",
 			isStudio = false,
