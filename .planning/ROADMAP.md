@@ -50,7 +50,20 @@ P1 (sequential)
   3. The build fails when a `Scoring`, `CardTable` or `SpoonPlacement` module gains an import path to any cosmetics or shop module, and fails when a file under `server/engine/` references a Roblox API (each demonstrated by a deliberately failing fixture)
   4. A client message with a malformed, NaN, wrong-phase or over-rate payload is rejected by the single typed gateway, and a Studio session cannot write to production player data
   5. A gray-box reference map loads through the shared map contract with no per-map code branch, the server refuses an 11th player and refuses to start under 3, and an injected-clock test shows round end firing exactly once even when a stale callback from an earlier round fires at the boundary
-**Plans**: TBD
+**Plans**: 12 plans in 7 waves
+Plans:
+- [ ] 01-01-PLAN.md — Toolchain, pinned configs, vendored types, Rojo project, first green run (wave 1)
+- [ ] 01-02-PLAN.md — Headless test harness, fuzz helper, Rng, require spike, project-shape spec (wave 2)
+- [ ] 01-03-PLAN.md — check-guards: strict headers, FOUND-05 import closure, Net hygiene, secret names (wave 3)
+- [ ] 01-04-PLAN.md — Engine-purity allow-list fixtures and the three exit-code trap proofs (wave 3)
+- [ ] 01-05-PLAN.md — Validation vocabulary, intent manifest, token bucket (wave 3)
+- [ ] 01-06-PLAN.md — Round lifecycle exactly-once, RoundDriver, spec-lock todos (wave 3)
+- [ ] 01-07-PLAN.md — Map contract, structural validator, gray-box generator, MapLoader (wave 3)
+- [ ] 01-08-PLAN.md — Admission 10/3, PlayerGate, persistence isolation seam (wave 3)
+- [ ] 01-09-PLAN.md — Typed gateway, NetServer and ClientNet (wave 4)
+- [ ] 01-10-PLAN.md — Boot wiring and built-place require re-resolution (wave 5)
+- [ ] 01-11-PLAN.md — CI workflow, pre-commit hook, verify script, MANUAL-CHECKS (wave 6)
+- [ ] 01-12-PLAN.md — Owner gate: test universe, place settings, servePlaceIds (wave 7, not autonomous)
 **Research**: Verification pass only. Re-check Verification Debt rows V-1 to V-6, V-8 to V-10, V-14, V-30, V-31. Run the Lune/Roblox `require` spike (V-4).
 **Spec lock (resolved defaults, each written as a test)**: Open Question 1, deal-time four-of-a-kind (re-shuffle so no seat starts complete, including wild-completable hands; this is CARD-09). Open Question 2, which four cards leave on a joker completion (spend naturals first; this is CARD-10). Open Question 17, player cap of 10 stated explicitly (FOUND-08).
 
