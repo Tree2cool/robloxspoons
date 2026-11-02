@@ -1,2 +1,5 @@
 build/
 sourcemap.json
+
+# Claude Code agent worktrees (ephemeral, created per parallel executor)
+.claude/worktrees/
