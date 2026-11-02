@@ -211,13 +211,114 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (pending roadmap creation) | — | Pending |
+| FOUND-01 | Phase 1 | Pending |
+| FOUND-02 | Phase 1 | Pending |
+| FOUND-03 | Phase 1 | Pending |
+| FOUND-04 | Phase 1 | Pending |
+| FOUND-05 | Phase 1 | Pending |
+| FOUND-06 | Phase 1 | Pending |
+| FOUND-07 | Phase 1 | Pending |
+| FOUND-08 | Phase 1 | Pending |
+| CARD-01 | Phase 2 | Pending |
+| CARD-02 | Phase 4 | Pending |
+| CARD-03 | Phase 2 | Pending |
+| CARD-04 | Phase 2 | Pending |
+| CARD-05 | Phase 2 | Pending |
+| CARD-06 | Phase 2 | Pending |
+| CARD-07 | Phase 2 | Pending |
+| CARD-08 | Phase 2 | Pending |
+| CARD-09 | Phase 2 | Pending |
+| CARD-10 | Phase 2 | Pending |
+| CARD-11 | Phase 2 | Pending |
+| CARD-12 | Phase 2 | Pending |
+| CARD-13 | Phase 4 | Pending |
+| CARD-14 | Phase 4 | Pending |
+| CARD-15 | Phase 4 | Pending |
+| CARD-16 | Phase 4 | Pending |
+| CARD-17 | Phase 4 | Pending |
+| CARD-18 | Phase 7 | Pending |
+| CARD-19 | Phase 4 | Pending |
+| HIDE-01 | Phase 6 | Pending |
+| HIDE-02 | Phase 6 | Pending |
+| HIDE-03 | Phase 6 | Pending |
+| HIDE-04 | Phase 6 | Pending |
+| HIDE-05 | Phase 6 | Pending |
+| HIDE-06 | Phase 3 | Pending |
+| HIDE-07 | Phase 3 | Pending |
+| HIDE-08 | Phase 6 | Pending |
+| HIDE-09 | Phase 6 | Pending |
+| HIDE-10 | Phase 6 | Pending |
+| HUNT-01 | Phase 5 | Pending |
+| HUNT-02 | Phase 5 | Pending |
+| HUNT-03 | Phase 5 | Pending |
+| HUNT-04 | Phase 5 | Pending |
+| HUNT-05 | Phase 5 | Pending |
+| HUNT-06 | Phase 5 | Pending |
+| HUNT-07 | Phase 5 | Pending |
+| HUNT-08 | Phase 5 | Pending |
+| SCORE-01 | Phase 5 | Pending |
+| SCORE-02 | Phase 5 | Pending |
+| SCORE-03 | Phase 5 | Pending |
+| SCORE-04 | Phase 5 | Pending |
+| SCORE-05 | Phase 5 | Pending |
+| SCORE-06 | Phase 1 | Pending |
+| SCORE-07 | Phase 6 | Pending |
+| SCORE-08 | Phase 6 | Pending |
+| SCORE-09 | Phase 7 | Pending |
+| SCORE-10 | Phase 6 | Pending |
+| MATCH-01 | Phase 6 | Pending |
+| MATCH-02 | Phase 6 | Pending |
+| MATCH-03 | Phase 6 | Pending |
+| MATCH-04 | Phase 7 | Pending |
+| MATCH-05 | Phase 7 | Pending |
+| MATCH-06 | Phase 6 | Pending |
+| MATCH-07 | Phase 6 | Pending |
+| MATCH-08 | Phase 6 | Pending |
+| MATCH-09 | Phase 6 | Pending |
+| MATCH-10 | Phase 6 | Pending |
+| MATCH-11 | Phase 6 | Pending |
+| MATCH-12 | Phase 6 | Pending |
+| MAP-01 | Phase 1 | Pending |
+| MAP-02 | Phase 3 | Pending |
+| MAP-03 | Phase 3 | Pending |
+| MAP-04 | Phase 6 | Pending |
+| MAP-05 | Phase 7 | Pending |
+| MAP-06 | Phase 7 | Pending |
+| MAP-07 | Phase 7 | Pending |
+| MAP-08 | Phase 7 | Pending |
+| MAP-09 | Phase 7 | Pending |
+| SHOP-01 | Phase 7 | Pending |
+| SHOP-02 | Phase 7 | Pending |
+| SHOP-03 | Phase 7 | Pending |
+| SHOP-04 | Phase 7 | Pending |
+| SHOP-05 | Phase 7 | Pending |
+| SHOP-06 | Phase 7 | Pending |
+| SHOP-07 | Phase 7 | Pending |
+| SHOP-08 | Phase 7 | Pending |
+| SHOP-09 | Phase 7 | Pending |
+| SHOP-10 | Phase 7 | Pending |
+| SHOP-11 | Phase 7 | Pending |
+| SHOP-12 | Phase 7 | Pending |
+| SHOP-13 | Phase 7 | Pending |
+| SHOP-14 | Phase 7 | Pending |
+| SHOP-15 | Phase 7 | Pending |
+| SHOP-16 | Phase 7 | Pending |
+| UX-01 | Phase 4 | Pending |
+| UX-02 | Phase 4 | Pending |
+| UX-03 | Phase 4 | Pending |
+| UX-04 | Phase 4 | Pending |
+| UX-05 | Phase 8 | Pending |
+| UX-06 | Phase 8 | Pending |
+| UX-07 | Phase 8 | Pending |
+| SOC-01 | Phase 6 | Pending |
+| SOC-02 | Phase 6 | Pending |
+| SOC-03 | Phase 8 | Pending |
 
 **Coverage:**
 - v1 requirements: 102 total
-- Mapped to phases: 0 ⚠️
-- Unmapped: 102 ⚠️
+- Mapped to phases: 102 ✓
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-11-02*
-*Last updated: 2026-11-02 after initial definition*
+*Last updated: 2026-11-02 after roadmap creation (traceability mapped)*
