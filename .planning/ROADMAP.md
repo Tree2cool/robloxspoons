@@ -58,10 +58,10 @@ Plans:
 - [ ] 01-04-PLAN.md — Engine-purity allow-list fixtures and the three exit-code trap proofs (wave 3)
 - [ ] 01-05-PLAN.md — Validation vocabulary, intent manifest, token bucket (wave 3)
 - [ ] 01-06-PLAN.md — Round lifecycle exactly-once, RoundDriver, spec-lock todos (wave 3)
-- [ ] 01-07-PLAN.md — Map contract, structural validator, gray-box generator, MapLoader (wave 3)
+- [ ] 01-07-PLAN.md — Map contract, structural validator, gray-box generator, validate-map CLI (wave 3)
 - [ ] 01-08-PLAN.md — Admission 10/3, PlayerGate, persistence isolation seam (wave 3)
 - [ ] 01-09-PLAN.md — Typed gateway, NetServer and ClientNet (wave 4)
-- [ ] 01-10-PLAN.md — Boot wiring and built-place require re-resolution (wave 5)
+- [ ] 01-10-PLAN.md — MapLoader, boot wiring, built-place require re-resolution (wave 5)
 - [ ] 01-11-PLAN.md — CI workflow, pre-commit hook, verify script, MANUAL-CHECKS (wave 6)
 - [ ] 01-12-PLAN.md — Owner gate: test universe, place settings, servePlaceIds (wave 7, not autonomous)
 **Research**: Verification pass only. Re-check Verification Debt rows V-1 to V-6, V-8 to V-10, V-14, V-30, V-31. Run the Lune/Roblox `require` spike (V-4).
