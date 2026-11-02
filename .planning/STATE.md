@@ -4,7 +4,7 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: Phase 1 context gathered
-last_updated: "2026-11-02T21:30:00.115Z"
+last_updated: "2026-11-02T22:12:49.089Z"
 last_activity: 2026-11-02 -- Phase 1 execution started
 progress:
   total_phases: 8
@@ -81,6 +81,7 @@ None yet.
 - Owner decisions still open: match tiebreak (OQ 5, default: higher best-round then earlier four-of-a-kind placement), avatar normalisation scope (OQ 12, Phase 3), VIP route (OQ 14, Phase 7b), Game Pass versus Developer Product switch point (OQ 15, Phase 7b), rejoin policy confirmation (OQ 18, derived default in MATCH-08), cold-start and bot-fill decision (OQ 13, Phase 8 on telemetry).
 - Cold start below the 3-player minimum is an existential risk that code alone cannot fix; bot-fill decision is deferred to Phase 8 on telemetry.
 - First true 9 to 10 player human playtest needs a published place (human gate); Studio multi-client is capped.
+- 01-01: roblox.yml cannot be generated here - selene generate-roblox-std fails (rustls webpki roots reject egress-proxy CA, ignores SSL_CERT_FILE); static.crates.io 403 so no source build. 'selene src' (pinned std) cannot run. Needs roblox.yml generated on a machine with direct network, then committed.
 
 ## Deferred Items
 
