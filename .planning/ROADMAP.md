@@ -53,7 +53,7 @@ P1 (sequential)
 **Plans**: 12 plans in 7 waves
 Plans:
 - [x] 01-01-PLAN.md — Toolchain, pinned configs, vendored types, Rojo project, first green run (wave 1)
-- [ ] 01-02-PLAN.md — Headless test harness, fuzz helper, Rng, require spike, project-shape spec (wave 2)
+- [x] 01-02-PLAN.md — Headless test harness, fuzz helper, Rng, require spike, project-shape spec (wave 2)
 - [ ] 01-03-PLAN.md — check-guards: strict headers, FOUND-05 import closure, Net hygiene, secret names (wave 3)
 - [ ] 01-04-PLAN.md — Engine-purity allow-list fixtures and the three exit-code trap proofs (wave 3)
 - [ ] 01-05-PLAN.md — Validation vocabulary, intent manifest, token bucket (wave 3)

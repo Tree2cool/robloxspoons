@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-11-02T22:43:19.671Z"
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-11-02T22:50:12.093Z"
 last_activity: 2026-11-02
 progress:
   total_phases: 8
   completed_phases: 0
   total_plans: 12
-  completed_plans: 1
-  percent: 8
+  completed_plans: 2
+  percent: 17
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-11-02)
 ## Current Position
 
 Phase: 1 (Foundations, Contracts and Spec Lock) — EXECUTING
-Plan: 2 of 12
+Plan: 3 of 12
 Status: Ready to execute
 Last activity: 2026-11-02
 
-Progress: [█░░░░░░░░░] 8%
+Progress: [██░░░░░░░░] 17%
 
 ## Performance Metrics
 
@@ -53,6 +53,7 @@ Progress: [█░░░░░░░░░] 8%
 
 *Updated after each plan completion*
 | Phase 01 P01 | multi-session | 3 tasks | 16 files |
+| Phase 01 P02 | 1 session | 3 tasks | 15 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,8 @@ Recent decisions affecting current work:
 - [Phase 1 01-01]: D-16 corrected - tools installed by direct release-archive download (api.github.com 403); rokit.toml remains version source of truth for CI
 - [Phase 1 01-01]: D-21 - roblox.yml must be generated outside the container (selene rustls cannot trust egress proxy CA); owner-generated, committed 4f011f1
 - [Phase 1 01-01]: Fourth exit-code trap - luau-lsp exits 0 when sourcemap fails to load; sourcemap load must be asserted in every gate chain (01-10, 01-11)
+- [Phase 1 01-02]: Test.luau owns FuzzOpts/FuzzDriver and requires nothing; fuzz driver injected, absence fails loudly
+- [Phase 1 01-02]: Lune 0.11.1 passes '--' through to scripts and rejects .luau in require strings; runner handles both; failure-expecting meta cases must assert the reason
 
 ### Pending Todos
 
@@ -96,8 +99,8 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-11-02T22:43:19.655Z
-Stopped at: Completed 01-01-PLAN.md
+Last session: 2026-11-02T22:50:12.072Z
+Stopped at: Completed 01-02-PLAN.md
 Resume file: None
 
 **Planned Phase:** 1 (Foundations, Contracts and Spec Lock) — 12 plans — 2026-11-02T21:28:46.598Z
