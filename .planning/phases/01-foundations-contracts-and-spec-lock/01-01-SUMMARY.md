@@ -198,3 +198,24 @@ None. No new network endpoints, auth paths or trust-boundary file access beyond 
 - `scripts/dev/bootstrap-tools.sh`, `TmpBad.luau`, `TmpLune.luau`: absent.
 - Every `.luau` under `src/` has `--!strict` on line 1; `src/server/engine/` contains no Roblox API references.
 - All seven gates re-run at close-out: all exit 0.
+
+---
+
+## Orchestrator correction to this plan's requirement marking
+
+The executor marked FOUND-01 and FOUND-02 complete per this plan's `requirements` field.
+The orchestrator **reverted both to pending**:
+
+- **FOUND-01** reads "Rojo project syncs to Studio ... so Studio-authored maps are not deleted
+  on sync." The Studio-sync half is **MANUAL-CHECKS M-01**, a human check in plan 01-12 that
+  cannot run in this container (no Roblox Studio). Only the file-shape half is verified here
+  (`$ignoreUnknownInstances: true` asserted, `rojo build` and `rojo sourcemap` both exit 0).
+  Marking it complete would be exactly the false-pass this phase exists to prevent.
+- **FOUND-02** is covered by five plans (01-01, 01-02, 01-03, 01-04, 01-11). The strict-header
+  guard rule R1 and the deliberately ill-typed fixture are still ahead in 01-03 and 01-04.
+  One plan landing does not complete a requirement that spans five.
+
+Both are marked at **phase verification**, which is the step that checks a requirement end to end.
+The traceability table in REQUIREMENTS.md already read `Pending` for both; the checkboxes now agree
+with it.
+
