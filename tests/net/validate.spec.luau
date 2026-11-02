@@ -240,7 +240,7 @@ return function(t: Test.Runner)
 		expectReject(Validate.exactKeys({}), flat(64), "TooLarge", "64 entries, empty schema")
 		expectReject(Validate.exactKeys(schemaOfKeys(33)), flat(33), "TooLarge", "33 entries")
 		expectAccept(Validate.exactKeys(schemaOfKeys(32)), flat(32), "exactly 32")
-		-- 3 + 3 + 3 = 9 total entries: over a limit of 8 only if the count spans the nesting.
+		-- 3 top-level + 9 nested = 12 total entries; each table alone is <= 3, so this trips a limit of 8 only if the count spans the nesting.
 		local spread: { [string]: any } = { x = flat(3), y = flat(3), z = flat(3) }
 		expectReject(Validate.exactKeys({}, { maxEntries = 8 }), spread, "TooLarge", "entries counted across nesting")
 	end)
