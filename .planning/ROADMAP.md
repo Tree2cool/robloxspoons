@@ -186,7 +186,7 @@ Phases execute in numeric order, with parallel pairs: 2 and 3, then 4 and 5, wit
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundations, Contracts and Spec Lock | 1/12 | In progress | - |
+| 1. Foundations, Contracts and Spec Lock | 2/12 | In progress | - |
 | 2. Card Engine and Pacing Simulator | 0/TBD | Not started | - |
 | 3. Placement Rules, Map Pipeline and Validator | 0/TBD | Not started | - |
 | 4. Live Card Table | 0/TBD | Not started | - |
