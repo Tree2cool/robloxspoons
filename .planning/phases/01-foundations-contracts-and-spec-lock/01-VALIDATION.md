@@ -91,9 +91,21 @@ D-01 makes every check hard-fail. Research found three ways that promise breaks 
    `[ERROR] Failed to load sourcemap.json for workspace 'CLI'` and still **exited 0**. A missing
    or stale sourcemap therefore silently degrades the entire type check while reporting green.
    **The sourcemap step must be a hard prerequisite in every gate chain** — assert the file
-   exists and is newer than the sources, or grep the analyze output for `Failed to load
-   sourcemap` and fail on it. This is the most dangerous of the four traps because it degrades
-   a check that still appears to run.
+   exists and is newer than the sources, AND grep the analyze output. This is the most dangerous
+   of the four traps because it degrades a check that still appears to run.
+
+   **REFINED by plan 01-04, which tested a MALFORMED sourcemap as well as a missing one:**
+   there are **two distinct failure strings**, and the obvious detector catches only one.
+
+   | Case | Exit | Output |
+   |------|------|--------|
+   | Sourcemap missing | **0** | `[ERROR] Failed to load sourcemap.json for workspace 'CLI'` |
+   | Sourcemap malformed | **0** | `Sourcemap parsing failed, sourcemap is not loaded: ...` — **no `[ERROR]` line at all** |
+
+   Counting `[ERROR]` lines — the technique waves 1 and 2 used — **misses the malformed case
+   entirely**. Plans 01-10 and 01-11 must fail on `Failed to load` **OR** `Sourcemap parsing
+   failed`, not only on `[ERROR]`. A detector that catches one of two silent-degradation paths
+   is itself a silent-degradation path.
 
 Also: **Selene 0.32.0's `luau` std lacks `math.isfinite` / `isnan` / `isinf`**, so FOUND-04's
 NaN check must be hand-written portably rather than relying on a stdlib helper.
