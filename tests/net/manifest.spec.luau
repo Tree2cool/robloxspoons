@@ -12,7 +12,9 @@ local INF: number = math.huge
 -- The subset rule, written once. Returns a description of every way `phases` is not acceptable, empty
 -- when it is acceptable. The negative cases below drive this same function with bad input, so the rule
 -- is proven to catch what it claims to catch rather than merely to pass the real manifest.
-local function phaseProblems(phases: { string }): { string }
+-- (`{ any }` because Luau arrays are invariant: a { RoundPhase } is not a { string }, and a bad name is
+-- exactly the input this must accept in order to reject it.)
+local function phaseProblems(phases: { any }): { string }
 	local problems: { string } = {}
 	if #phases == 0 then
 		table.insert(problems, "empty")
@@ -42,7 +44,7 @@ return function(t: Test.Runner)
 	t.test("PHASES is frozen so no module can append a competing name at runtime", function()
 		t.truthy(table.isfrozen(Manifest.PHASES), "PHASES must be frozen")
 		t.throws(function()
-			table.insert(Manifest.PHASES :: { string }, "Scramble")
+			table.insert(Manifest.PHASES :: any, "Scramble")
 		end)
 		t.equal(#Manifest.PHASES, 4, "an insert attempt must not have changed PHASES")
 	end)
