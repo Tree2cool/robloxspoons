@@ -107,6 +107,28 @@ directory, in both `sourcemap` and `build`. Fixed with a committed `src/shared/.
 
 ---
 
+## Rule for every failure-expecting test (added after wave 2)
+
+**Assert the REASON, not just the exit code.**
+
+Wave 2 found two meta-tests passing for the wrong reason: Lune 0.11.1 does not consume the `--`
+separator, so `lune run tests/run.luau -- --filter x` delivers a literal `--` to the script. Those
+cases expected exit 1 and got it — from an *unknown-argument* error, not the condition under test.
+They would have stayed green forever while testing nothing.
+
+So for every test that asserts a failure, in every remaining plan:
+
+- assert the exit code **and** a distinctive substring of the failure message
+- for guard fixtures (FOUND-05, FOUND-06), assert the specific rule id or message, not merely
+  non-zero exit
+- for the exit-code trap proofs, assert the diagnostic text, not merely the exit code
+
+A failure-expecting test that only checks the exit code cannot distinguish "failed for the right
+reason" from "failed for an unrelated reason", and the second is indistinguishable from a passing
+test that has quietly stopped testing anything.
+
+The runner now skips a literal `--`, so existing `-- --filter` invocations in the plans still work.
+
 ## Manual-Only Verifications
 
 Six checks need a human; this container has no Roblox Studio. These populate `MANUAL-CHECKS.md` (D-04).
