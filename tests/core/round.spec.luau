@@ -207,7 +207,7 @@ return function(t: Test.Runner)
 
 	t.test("onEnded receives the reason it was ended with, for each reason", function()
 		local reasons: { RoundLifecycle.Reason } = { "AllSpoonsClaimed", "Timeout", "Aborted" }
-		for _, reason in reasons do
+		for _, reason: RoundLifecycle.Reason in reasons do
 			local _, rl, ended = setup()
 			local r = rl:begin(300)
 			rl:endRound(r, reason)
