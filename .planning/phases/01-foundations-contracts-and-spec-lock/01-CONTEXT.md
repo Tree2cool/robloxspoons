@@ -132,6 +132,15 @@ gameplay UI (Phase 4+), the five shipped maps (Phase 7).
   this is too loose, the contract can move to a union of volumes then — it is a contract
   change, not a rewrite.
 
+- **D-20:** **Round phase vocabulary is `Lobby | Hide | Round | Podium`.** Named in Phase 1 so
+  Phases 4, 5 and 6 cannot invent competing names for the same states. `Round` is the single
+  phase in which the card scramble and the hunt happen **concurrently** — PROJECT.md puts one
+  5:00 cap on "the card/hunt phase", and D-15 has a finisher leaving the table mid-pass while
+  others are still passing, so they genuinely overlap rather than being sequential phases.
+  Note the mild overload: "round" also informally means the whole hide+play+podium cycle, so
+  code and docs should say `RoundPhase.Round` when they mean this specific state. The planner
+  originally proposed `Scramble`; the owner chose `Round`.
+
 ### Defaults Taken Without Asking (post-research)
 
 Research raised five owner questions; four are D-16..D-19 above. The rest are defaulted:
