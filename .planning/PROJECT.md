@@ -26,15 +26,23 @@ transition.
 
 - **Rounds per match = player count at match start** (minimum 3 players, so minimum
   3 rounds). This means every player on the starting roster hides exactly once.
-- **Highest total points wins.** Points are earned, not deducted.
+- **Highest total points wins.**  Points are earned, not deducted.
 - **Spoons per round = N − 2**, where N is the round's player count.
   - 10 players → 1 hider, 9 seekers, 8 spoons → exactly one seeker finds nothing.
   - 3 players → 1 hider, 2 seekers, 1 spoon.
-- **Mid-round joiners** play as seekers only. They never take a hider turn, and they
-  do not add a round to the match. They will finish with fewer points than the
-  starting roster by design.
-- **Round end:** the top 3 players get a ~10-second podium moment displaying their
-  equipped cosmetics.
+- **Mid-round joiners wait in the parkour room until the next round starts**, then
+  play fully. They still join mid-match, still earn fewer points than the starting
+  roster, and still add no round. Joining mid-round outright was rejected: spoons are
+  counted out as `N − 2` for the roster at round start, so a late arrival would make
+  two players finish empty-handed and silently change the stakes of a round already
+  underway.
+- **Joiners never take a hider turn** — the starting roster keeps the rotation.
+- **Round end fires the instant the final spoon is claimed.** The 5:00 clock is a cap,
+  not a duration. This matters: it is the difference between a typical ~20-30 minute
+  match and the ~67 minute pathological worst case.
+- **Round-end podium:** the top 3 **by that round's score** get a ~10-second podium
+  moment displaying their equipped cosmetics. Round score rather than match total, so
+  the podium stays live even in a match that is already decided.
 
 ### Round Flow
 
@@ -43,37 +51,55 @@ transition.
 - One hider is alone in the map and places all `N − 2` spoons.
 - **Free placement with validity rails** — the hider may place anywhere, but the game
   rejects spots that are not reachable or not visible from a standable position. No
-  unfindable spoons.
+  unfindable spoons. Rejections must be instant and show a reason.
 - Hider can **end the phase early** once all spoons are placed. **Hard cap: 90
   seconds.**
 - If the cap expires with spoons unplaced, the remainder **auto-fill from a pool of at
   least 16 authored default spots per map**, chosen at random.
+- **If the scheduled hider has left**, the round runs on auto-fill and no hider points
+  are awarded. The round is not skipped and nobody hides twice — this preserves
+  `rounds = starting player count`.
 - Meanwhile all seekers wait in a **closed-off waiting room with a parkour course**, so
-  the hide phase is not dead time.
+  the hide phase is not dead time. Mid-round joiners wait here too.
 
 **2. Card phase**
 
 - Seekers sit in a circle. Each holds **4 cards**.
 - **One seat — the dealer — holds the remaining deck as their left pile.** The dealer
-  is the player who found a spoon first in the previous round. Second finisher sits
-  second in the order, and so on. This is the carried-over reward for finishing well:
-  the dealer sees every fresh card first.
+  is the player who found a spoon first in the previous round.
+- **Seat order each round:** finishers in the order they found spoons (1st, 2nd, 3rd…),
+  then the empty-handed seeker, then everyone else (previous hider, returning joiners).
+  Finishing well buys table position as well as the deck.
+- **Dealer collision rule:** if the previous round's first finder is this round's hider,
+  the deck passes to the **highest-placed finisher who is actually seated**. Round 1 has
+  no prior order, so the dealer is random.
 - Passing is **real-time and simultaneous** — no turns:
   1. Tap/click your **left pile** (what the upstream player passed on) → a card enters
      your hand, giving you **5 cards**, and the left pile **locks**.
   2. All 5 cards are selectable. **Tap once to select**, **tap again to send it to your
      right pile** — which is the next player's left pile.
   3. Back to 4 cards, left pile unlocks.
+- "The pile locks at 5" is simply the rule **draw only when hand size is 4**.
 - **The chain wraps:** the last seat's right pile feeds back underneath the dealer's
   deck. Cards never leave play, so **the deck cannot run dry** and there is no
   deck-exhaustion edge case.
-- **Jokers** are mixed into the deck as wilds, creating swings and near-misses.
+- **Four of a kind is checked only on draw** — passing can only leave a subset of a
+  hand that already had none.
+- **Jokers are wilds, gated on simulation.** A joker counts as any rank. This ships
+  **only if a headless bot simulator proves the table stays solvable at every player
+  count from 3 to 10**; completing a set with a joker strands the real fourth card of
+  that rank and removes a wild from circulation, which can deadlock a shrinking circle.
+  **Pre-agreed fallback if the simulator fails: jokers become blockers** that can never
+  complete a set.
 
 **3. Hunt**
 
 - The instant a seeker completes **four of a kind**, they leave the card table and head
-  out to search. **Their 4 cards leave with them and the chain closes up** — neighbors
-  link directly, so the circle shrinks seat-by-seat and stays solvable.
+  out to search. **The chain closes up** — neighbors link directly, so the circle shrinks
+  seat-by-seat and stays solvable.
+- **A removed seat's cards go to the successor's inbox, never deleted.** The completed
+  four leave play; the fifth card and the seat's left pile pass on. Destroying them can
+  make the remaining ranks unsolvable and deadlock the round.
 - Hidden spoons **glint only at close range / in line of sight**. Finding one takes
   actually sweeping a space, not spotting a glow from across the map.
 - Round ends when **all spoons are found** or the **5:00 round timer** expires.
@@ -92,9 +118,23 @@ Two independent components per round, summed:
   160s × 10 = **1600 find points**. The last seeker finds nothing → **0**.
 - Worked example 2: the player who was 3rd to four-of-a-kind finds a spoon with 1:00
   left → 800 bonus + 600 find = **1400 total**.
-- **Hider scoring:** the hider earns based on **how long their spoons survive unfound** —
-  roughly the inverse of what the seekers earn. Hiding well is the hider's way to score,
-  so the hider turn is a real competitive round, not a bye.
+- **Seeker ceiling: 4000** (1000 bonus + 3000 find).
+- **Timing is measured from server arrival time only**, in integer deciseconds. Client
+  timestamps are never trusted — the scoring granularity is 100ms, so a trusted client
+  clock would be a direct scoring exploit.
+
+**Hider scoring:**
+
+- **Hider earns `4000 × (average fraction of the round that their spoons survived)`.**
+  All 8 spoons found instantly → near 0. None found → 4000.
+- Scaled to the seeker ceiling of 4000 deliberately, so the hider turn is **neutral in
+  expectation**. Everyone hides exactly once per match, so a hider turn that scored
+  systematically worse would be a guaranteed penalty round for every player.
+- A flat per-unfound-spoon bonus was rejected: it pays most for spots nobody can find,
+  doubling down on the hider's existing perverse incentive.
+- The **placement rails are the only counterweight** to the hider wanting unreachable
+  spots. Avatar scale must be normalized during placement validation, because body
+  scale changes reach and camera height.
 
 ## Monetization
 
@@ -103,20 +143,57 @@ All cosmetics are **equipped in the lobby**, never mid-round.
 | Item | Where it shows |
 |------|----------------|
 | **Spoon skins** | Dual visibility — the **hider's** skin is what every hidden spoon looks like on the ground; a **seeker's** own skin takes over once they pick one up and carry it. Default is a plain white spoon. |
-| **Special decks** | Set by the **dealer** (previous round's first finder), so the cards everyone plays with are the deck of whoever is performing best. |
+| **Deck skins** | Set by the **dealer**, so the cards everyone plays with belong to whoever is performing best. |
+| **Deal animations** | Purchasable shuffle-and-deal flourishes that play to the whole table at card-phase start. High visibility by construction. |
 | **Character cosmetics** | Hats, trails, emotes — visible in lobby, parkour room, hunt and podium. |
-| **Hider effects** | Cosmetic flourishes on the act of placing spoons — placement animations, glint colors. Visual only. |
+| **Hider effects** | Cosmetic flourishes on placing spoons — placement animations, effect styling. Visual only. |
 | **Podium cosmetics** | Poses and effects for the ~10-second top-3 podium at round end. |
 | **VIP lobbies** | Access only — a separate lobby, not a gameplay advantage. |
 
+### Cosmetic visibility
+
+Two slots had almost no audience as originally specced — hider effects are seen only by
+the hider (who is alone on the map) and deck skins only by players still seated. All
+three fixes are in scope:
+
+- **Podium spoon reveal** — at round end, any unfound spoons are revealed with the
+  hider's placement effect during the podium window. Shows the purchase to the whole
+  server and doubles as satisfying information about where spoons were.
+- **Dealer reveal flourish** — the card phase opens with a shuffle-and-deal animation
+  showing the dealer's deck skin to every seeker before passing unlocks. The animation
+  variants are themselves a purchasable line.
+- **Lobby showcase** — the lobby displays each player's full equipped loadout on a
+  plinth, so purchases are visible between rounds and while waiting for the 3-player
+  minimum.
+
+### Monetization integrity
+
 **Hard rule: nothing purchasable may affect score, findability, or competitive
 outcome.** Score multipliers and point boosts were considered and explicitly rejected —
-in a points-scored game they sell leaderboard position outright. Hider effects must stay
-purely visual; anything that changes how easy a spoon is to find crosses the line.
+in a points-scored game they sell leaderboard position outright.
+
+Research surfaced that this rule can be broken **without any score multiplier**, so
+these are binding constraints, not guidelines:
+
+- **Spoon skins need an enforced template**: fixed bounding box, fixed scale, fixed
+  pickup hitbox, and a luminance/contrast floor. Otherwise a dark or dull skin is
+  literally purchasable camouflage — and the hider is scored on spoon survival time.
+- **The glint is a fixed, non-purchasable world effect.** Glint colour and range are
+  the findability mechanism and can never be a cosmetic.
+- **Deck skins must not harm legibility** — an ornate deck disadvantages everyone
+  except the dealer, who already knows it.
+- **Character cosmetics must not change collision or occlusion** — no oversized or
+  collidable accessories that alter what players can see or reach.
+- **Structural enforcement:** the `Scoring`, `CardTable` and `SpoonPlacement` modules
+  must have **no import path to the cosmetics or shop modules**. This makes
+  no-pay-to-win a property of the dependency graph rather than a promise someone has
+  to remember. A lint rule should enforce it.
+- The cosmetic catalog schema contains **only visual fields**.
+- **No soft currency, no random/loot crates.** Direct-purchase cosmetics only.
 
 The design deliberately ties the most visible cosmetic slots to **performing well**
-(dealer sets the deck, top 3 get the podium) rather than to paying, so purchases are
-shown off as a reward for skill.
+(dealer sets the deck and triggers the deal animation, top 3 get the podium) rather
+than to paying, so purchases are shown off as a reward for skill.
 
 ## Requirements
 
@@ -130,47 +207,70 @@ shown off as a reward for skill.
 
 <!-- Current scope. Building toward these. Hypotheses until shipped. -->
 
-- [ ] Real-time simultaneous card passing: 4-card hand, draw-to-5 from locking left
-      pile, tap-to-select / tap-to-pass to right pile
-- [ ] Dealer seat holds the deck; seat order carried over from previous round's find
-      order; chain wraps so the deck never empties
-- [ ] Jokers as wilds in the deck
-- [ ] Four-of-a-kind detection removes the player from the table and closes the chain
-- [ ] Hider hide phase: free placement with reachability/visibility validation, early
-      end, 90s cap, random auto-fill from ≥16 default spots per map
-- [ ] Seeker waiting room with parkour during hide phase
-- [ ] Close-range-only spoon glint and spoon pickup
-- [ ] Round timer (5:00) and round-end conditions (all spoons found / timeout)
-- [ ] Scoring: four-of-a-kind order bonus + find-time points; hider scored on spoon
-      survival time
+- [ ] Pure, headless, synchronous card-ring engine with property/fuzz tests
+- [ ] Headless bot pacing simulator; gates the joker-as-wild decision at N=3→10
+- [ ] Real-time simultaneous passing: 4-card hand, draw-to-5, tap-select / tap-pass
+- [ ] Dealer seat, seat order from previous round's find order, dealer collision rule
+- [ ] Wrapping chain so the deck never empties
+- [ ] Four-of-a-kind detection on draw; seat removal with cards to successor's inbox
+- [ ] Validated remote gateway: server-resolved targets, stable card IDs, rate limiting
+- [ ] Hider free placement with reachability + line-of-sight validation and instant
+      rejection feedback
+- [ ] 90s hide cap with random auto-fill from ≥16 validated default spots per map
+- [ ] Departed-hider handling (auto-fill, no hider points, round still runs)
+- [ ] Seeker parkour waiting room
+- [ ] Server-authoritative spoon visibility — positions never replicated as Instances;
+      per-client reveal on range + line of sight (anti-ESP)
+- [ ] Spoon claiming without double-claim races
+- [ ] Round timer with absolute deadlines, round-ID tokens and idempotent round end
+- [ ] Scoring: four-of-a-kind bonus + find points from server arrival time
+- [ ] Hider scoring at 4000 × average spoon survival fraction
 - [ ] Match structure: rounds = starting player count, min 3, full hider rotation
-- [ ] Mid-round join as seeker-only with no added round
-- [ ] Match scoreboard and winner determination (highest total)
-- [ ] Top-3 podium moment (~10s) at round end showing equipped cosmetics
+- [ ] Joiners queue to next round start; no added round; no hider turn
+- [ ] AFK auto-pass at the card table (an idle player stalls the whole circle)
+- [ ] Leaver handling and match abort below 3 players
+- [ ] Spectator mode
+- [ ] Match scoreboard showing bonus and find components separately
+- [ ] Top-3-by-round-score podium with unfound-spoon reveal
+- [ ] Map contract + automated validator that runs every default spot through the real
+      placement rules
 - [ ] Five maps: hotel (single floor), restaurant, mansion, maze with scattered decoy
       items, office
-- [ ] Lobby with cosmetic equipping
-- [ ] Cosmetic systems: spoon skins (ground + held), special decks, character
+- [ ] Lobby with 3-player gate, intermission, loadout showcase plinths
+- [ ] Cosmetic systems: spoon skins (templated), deck skins, deal animations, character
       cosmetics, hider effects, podium cosmetics
-- [ ] Robux purchase flow and ownership persistence
+- [ ] Shop with preview-before-buy behind an Owns/Prompt interface
+- [ ] Purchase + ownership persistence (Game Pass preferred over Developer Product)
 - [ ] VIP lobby access
 - [ ] Full PC and mobile parity for card UI, hunt controls and all menus
+- [ ] Lint rule enforcing no gameplay→cosmetics dependency
 
 ### Out of Scope
 
 - **Score multipliers / point boosts for Robux** — sells leaderboard position directly
   in a points-scored game; rejected explicitly during design
 - **Purchasable items affecting findability or hiding power** — same pay-to-win problem
-  applied to the hunt
-- **Elimination-ladder match format** — considered and rejected in favor of points
-  across a fixed round count, so nobody sits out waiting
+  applied to the hunt; includes purchasable glint colour and untemplated spoon skins
+- **Soft currency / spendable in-game coins** — the game has no waits to sell skips for,
+  so a currency layer adds economy surface with nothing to spend it on
+- **Random/loot crates** — Roblox's Paid Random Items policy requires odds disclosure,
+  and the catalog is small enough that direct purchase is better anyway
+- **Trading** — large exploit and scam surface for a cosmetics-only catalog
+- **Elimination-ladder match format** — rejected in favor of points across a fixed round
+  count, so nobody sits out waiting
 - **Turn-based card passing** — loses the frantic simultaneous feel that is the point
-  of Spoons
 - **Trash/discard pile at the end of the chain** — the wrapping chain removes the
   deck-exhaustion case entirely
-- **Predefined-only hiding spots** — free placement with rails was chosen for
-  expressiveness; the default-spot pool exists only as the 90s-cap fallback
+- **Predefined-only hiding spots** — free placement with rails was chosen; the
+  default-spot pool exists only as the 90s-cap fallback
 - **Mid-round cosmetic swapping** — everything is equipped in the lobby
+- **Joining mid-round into an active hunt** — breaks the `N − 2` spoon math
+- **Per-round map or hider votes** — inflates round length in an already-long match
+- **Player-initiated skip / vote-kick** — griefing surface
+- **Custom chat** — use Roblox's native `TextChatService`
+- **Hider chat to active seekers during a round** — collusion
+- **Custom party queue** — use Roblox's native friend-join
+- **Mandatory long tutorial** — party games are learned by playing
 
 ## Context
 
@@ -179,30 +279,55 @@ shown off as a reward for skill.
   targets a good experience on both.
 - **Genre anchors:** players will arrive with expectations set by Hide & Seek,
   Murder Mystery 2 and other Roblox party games, plus the physical card game Spoons.
-- **The hard part is the card engine.** Real-time simultaneous passing across up to 9
-  clients with a shrinking circle, authoritative hand state and anti-cheat is
-  substantially harder than the map content. The five maps are more total work but far
-  lower risk.
+- **The hard part is the card engine.** Research converged unanimously: build it as a
+  pure, headless, synchronous module with fuzz tests and a bot pacing simulator
+  *before* any UI or networking. It is simultaneously the highest-risk and most
+  testable component.
+- **The card ring has a clean data structure.** Seats are a circular doubly-linked
+  list; each seat has a `hand` and an `inbox` (its left pile, a FIFO deque). Passing
+  appends to `seat.next.inbox`; drawing pops your own inbox front. The wrap needs no
+  special case because the dealer's inbox *is* the deck. Races are safe by
+  construction: every command touches exactly one hand and one inbox, the engine is
+  pure and synchronous, and non-yielding Luau handlers are atomic.
+- **Card-engine risk is correctness, not load.** Nine clients at human tap speed
+  produce only tens of remotes per second — far under Roblox's limits. The real dangers
+  are stale hand indices, yields inside state mutations, and client-resolved pass
+  targets.
 - **Starting state:** empty repository. No existing code, no Rojo project, no place
   file.
+- **Cold start is an existential risk.** A new game with a 3-player minimum will often
+  sit in empty servers. The parkour room doubles as the lobby activity. Bot fill is a
+  deferred high-cost decision.
+- **Verification debt from research:** the container's network policy blocked
+  `create.roblox.com`, `devforum.roblox.com`, `robloxapi.github.io`,
+  `madstudioroblox.github.io` and `jsdotlua.github.io`. API-shape details for
+  ProfileStore, `ProcessReceipt`, DataStore limits and remote-ordering guarantees are
+  training-knowledge-only and flagged for re-verification. These hosts should be added
+  to the environment's allowed domains.
 - **Design is unusually well specified for a greenfield project** — scoring formulas,
-  round flow and monetization were worked out in detail before any code. Downstream
-  phases should treat the numbers in this document as decided, not as suggestions.
+  round flow and monetization were worked out in detail, and the post-research gaps
+  were closed before any code. Downstream phases should treat the numbers in this
+  document as decided, not as suggestions.
 
 ## Constraints
 
 - **Tech stack**: Roblox / Luau — the platform is the entire premise of the project
 - **Platform parity**: PC and mobile must both be first-class — the tap-select-tap-pass
-  card mechanic has to work with thumbs on a small screen *and* with a mouse
+  card mechanic has to work with thumbs on a small screen *and* with a mouse. Mobile
+  layout is genuinely tight: five cards plus two piles must share limited landscape
+  space with the default movement controls, so movement controls are disabled during
+  the card phase, touch targets are ≥48px, and `ScreenInsets` is set explicitly
 - **Monetization integrity**: no purchase may affect score, findability or competitive
-  outcome — protects the game from pay-to-win and from Roblox policy risk
-- **Round length**: 5:00 card/hunt phase plus ≤90s hide phase — a 10-player match is
-  10 rounds, so round pacing directly determines whether a full match is sittable
-- **Minimum viable lobby**: 3 players — the spoons = N−2 formula must hold at the
+  outcome — enforced structurally via the dependency graph, not by convention
+- **Server authority**: card state, four-of-a-kind detection, spoon placement validity,
+  spoon visibility and scoring are all server-authoritative. Hidden spoon positions
+  never exist as replicated Instances
+- **Round length**: 5:00 cap on the card/hunt phase plus ≤90s hide phase, with round
+  end firing immediately on the last claim. A 10-player match is 10 rounds, so round
+  pacing determines whether a full match is sittable
+- **Minimum viable lobby**: 3 players — the `spoons = N − 2` formula must hold at the
   bottom end, not just at 10
-- **Authoritative server**: card state, four-of-a-kind detection, spoon placement
-  validity and scoring must all be server-authoritative — a client-trusted card game
-  is trivially exploitable
+- **No soft currency**: cosmetics and access only, direct purchase
 
 ## Key Decisions
 
@@ -211,17 +336,33 @@ shown off as a reward for skill.
 | Real-time simultaneous passing, not turn-based | The chaos *is* the game; turn-based Spoons isn't Spoons | — Pending |
 | Tap-pile → 5 cards → tap-select → tap-pass interaction | Works identically with touch and mouse, satisfying full parity | — Pending |
 | Chain wraps back under the dealer's deck | Cards never leave play, so deck exhaustion is designed out rather than handled | — Pending |
-| Chain closes up when a player leaves for the hunt | Keeps player count and rank count aligned as the circle shrinks, so it stays solvable | — Pending |
+| Chain closes up when a player leaves for the hunt | Keeps player count and rank count aligned as the circle shrinks | — Pending |
+| Removed seat's cards go to the successor, never deleted | Deleting them can make remaining ranks unsolvable and deadlock the round | — Pending |
+| Four-of-a-kind checked only on draw | Passing can only leave a subset of a hand that already had none | — Pending |
 | Dealer seat awarded by previous round's find order | Gives finishing well a concrete mechanical reward in a simultaneous game | — Pending |
+| Dealer falls to next seated finisher when first finder is hider | Keeps the reward with whoever earned it most among players present | — Pending |
+| Seat order: finishers, then non-finder, then the rest | Finishing well buys table position too; consistent and easy to explain | — Pending |
 | Points across rounds, not elimination | Nobody sits out waiting; supports drop-in play | — Pending |
 | Rounds = starting player count | Makes the hider rotation exactly fair — everyone hides once | — Pending |
 | Separate four-of-a-kind bonus and find-time points | Rewards card skill and hunt skill independently | — Pending |
-| Hider scored on spoon survival time | Turns the hider turn into a real competitive round instead of a bye | — Pending |
+| Hider scores 4000 × average spoon survival fraction | Matches the seeker ceiling so the hider turn is neutral in expectation | — Pending |
+| Jokers as wilds, gated on a solvability simulator | Keeps the swings he wanted, with a pre-agreed blocker fallback if unsafe | — Pending |
+| Keep the 5:00 cap; end the round on the last claim | 5:00 is a cap, not a duration; avoids redesigning scoring around a rare tail | — Pending |
+| Joiners queue to the next round | Preserves the `N − 2` spoon math exactly instead of changing a round mid-flight | — Pending |
+| Departed hider → auto-fill, no hider points, round runs | Preserves rounds = starting count; nobody hides twice | — Pending |
 | Free hide placement with reachability/visibility rails | Expressive hiding without unfindable spoons stalling rounds | — Pending |
-| ≥16 default spots per map as 90s-cap fallback | Guarantees a complete round even if the hider stalls or disconnects | — Pending |
+| ≥16 validated default spots per map as 90s-cap fallback | Guarantees a complete round even if the hider stalls or disconnects | — Pending |
+| Podium ranks by round score, not match total | Keeps the podium live even in a match that's already decided | — Pending |
 | Spoon skins show on ground (hider's) and in hand (seeker's) | Buyers get visibility every round, not only on their one hider turn | — Pending |
 | Deck skin set by the dealer | Ties the most visible cosmetic slot to playing well, not to paying | — Pending |
-| No score-affecting purchases | Avoids pay-to-win in a scored game and Roblox policy risk | — Pending |
+| Purchasable deal animations revealed at card-phase start | High-visibility by construction, unlike the two slots it replaces | — Pending |
+| Podium spoon reveal carries the hider's effect | Gives an otherwise invisible purchase a server-wide audience | — Pending |
+| Enforced spoon-skin template + fixed non-purchasable glint | Without it, a dull skin is purchasable camouflage in a scored game | — Pending |
+| Gameplay modules cannot import cosmetics/shop modules | Makes no-pay-to-win a dependency-graph property, not a convention | — Pending |
+| Spoons are server-side data, never replicated Instances | A cheat client can read any Instance position; anti-ESP is load-bearing | — Pending |
+| Game Passes preferred over Developer Products | Roblox holds ownership, removing receipt idempotency and persistence risk | — Pending |
+| Pure RemoteEvents behind one typed `Net` module | 10 players at tap speed is far under remote limits; codegen libs add risk | — Pending |
+| No soft currency, no loot crates | Nothing to spend currency on; crates trigger odds-disclosure policy | — Pending |
 | 5 maps in v1 | Variety is what keeps a hunt game alive past the first session | — Pending |
 | Full PC/mobile parity | Splitting the Roblox audience is not worth the saved UI work | — Pending |
 
@@ -243,4 +384,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-01 after initialization*
+*Last updated: 2026-11-02 after initialization and post-research design resolution*
