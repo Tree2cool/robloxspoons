@@ -158,6 +158,23 @@ return function(t: Test.Runner)
 		t.equal(granted(store, 1, "Ping", SPEC, 10), 1, "refill is measured from the original last, so exactly 1 token")
 	end)
 
+	t.test("a backwards clock is refused even when tokens ARE available", function()
+		-- The drained-bucket case above cannot tell "refused because the clock went backwards" from
+		-- "refused because the bucket was empty". Here two tokens remain, so only the clock rule can
+		-- be what rejects the take.
+		local clock = FakeClock.new()
+		clock.advance(5)
+		local store = Bucket.new({ clock = clock })
+		t.equal(store:take(1, "Ping", SPEC), true, "t=5, 2 tokens remain")
+
+		clock.advance(-0.5) -- t = 4.5
+		t.equal(store:take(1, "Ping", SPEC), false, "must be refused despite 2 tokens being available")
+		t.equal(store:rejections(), 1, "and tallied as a rejection")
+
+		clock.advance(0.5) -- back to t = 5: the same two tokens are still there, none were burned
+		t.equal(granted(store, 1, "Ping", SPEC, 10), 2, "the refused take cost nothing")
+	end)
+
 	t.test(
 		"last is tracked per pair: a new pair read at an earlier instant than another pair's last still works",
 		function()
