@@ -161,7 +161,8 @@ return function(t: Test.Runner)
 							gameId = gameId,
 							productionUniverseId = prodId,
 						})
-						local label = string.format("state=%s studio=%s game=%d prod=%d", state, tostring(studio), gameId, prodId)
+						local label =
+							string.format("state=%s studio=%s game=%d prod=%d", state, tostring(studio), gameId, prodId)
 						t.equal(actual, expected, label)
 						count += 1
 					end
