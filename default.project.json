@@ -1,0 +1,32 @@
+{
+  "name": "Spoons",
+  "globIgnorePaths": ["**/*.spec.luau", "**/*.spec.lua"],
+  "tree": {
+    "$className": "DataModel",
+    "ServerScriptService": {
+      "$className": "ServerScriptService",
+      "Server": { "$path": "src/server" }
+    },
+    "ReplicatedStorage": {
+      "$className": "ReplicatedStorage",
+      "Shared": { "$path": "src/shared" }
+    },
+    "StarterPlayer": {
+      "$className": "StarterPlayer",
+      "StarterPlayerScripts": {
+        "$className": "StarterPlayerScripts",
+        "Client": { "$path": "src/client" }
+      }
+    },
+    "ServerStorage": {
+      "$className": "ServerStorage",
+      "Maps": {
+        "$className": "Folder"
+      }
+    },
+    "Workspace": {
+      "$className": "Workspace",
+      "$ignoreUnknownInstances": true
+    }
+  }
+}

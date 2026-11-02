@@ -1,0 +1,6 @@
+std = "luau"
+exclude = []
+
+[lints]
+undefined_variable = "deny"
+global_usage = "deny"

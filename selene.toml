@@ -1,0 +1,11 @@
+std = "roblox"
+roblox-std-source = "pinned"
+exclude = [
+	"tests/guards/fixtures/**",
+	"tests/purity/fixtures/**",
+	"tests/traps/fixtures/**",
+	"tests/meta/fixtures/**",
+	"build/**",
+	"tools/**",
+	"vendor/**",
+]
