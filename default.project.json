@@ -21,7 +21,8 @@
     "ServerStorage": {
       "$className": "ServerStorage",
       "Maps": {
-        "$className": "Folder"
+        "$className": "Folder",
+        "GrayBox": { "$path": "maps/gray-box.rbxm" }
       }
     },
     "Workspace": {

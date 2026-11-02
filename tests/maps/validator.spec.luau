@@ -145,7 +145,13 @@ local cases: { Case } = {
 		code = "MAP_META_INVALID",
 		pathContains = "ContractVersion",
 		mutate = function(r)
-			r.attributes.ContractVersion = nil
+			local kept: { [string]: string | number | boolean } = {}
+			for key, value in r.attributes do
+				if key ~= "ContractVersion" then
+					kept[key] = value
+				end
+			end
+			r.attributes = kept
 		end,
 	},
 	{
@@ -428,7 +434,7 @@ return function(t: Test.Runner)
 		seats.children = reversed
 		local issues, spec = MapValidator.validate(root)
 		t.deepEqual(issues, {})
-		assert(spec ~= nil)
+		assert(spec ~= nil, "expected a MapSpec")
 		t.deepEqual(spec.cardTable.seats[1].position, { x = -8, y = 3, z = -40 })
 		t.deepEqual(spec.cardTable.seats[9].position, { x = 8, y = 3, z = -40 })
 	end)
@@ -444,7 +450,7 @@ return function(t: Test.Runner)
 		find(root, "Data/DecoyAnchors").children = {}
 		local issues, spec = MapValidator.validate(root)
 		t.deepEqual(issues, {})
-		assert(spec ~= nil)
+		assert(spec ~= nil, "expected a MapSpec")
 		t.equal(#spec.decoyAnchors, 0)
 	end)
 
