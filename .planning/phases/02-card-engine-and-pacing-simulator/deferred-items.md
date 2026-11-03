@@ -51,3 +51,29 @@ plans are the natural home, because they are the first code whose *results* depe
 
 **Interim guidance for consumers:** do not hand `Rng.new` a small sequential counter. Hash the seed
 at the call site, or draw and discard once before the first meaningful draw.
+
+---
+
+## D-02-02 — `--filter` cannot isolate your own spec during a parallel wave
+
+**Found by:** plans 02-04, 02-05 and 02-13 independently, wave 3, 2026-11-03
+**File:** `tests/run.luau` (nobody's plan file)
+**Severity:** process friction, not a product defect — but it wastes time and invites wrong conclusions
+
+`tests/run.luau` **loads every discovered spec before applying `--filter`**. So while a parallel wave
+is in flight, a sibling's RED spec — a test written before its module exists, which is exactly what
+TDD produces — fails the run regardless of the filter. Three executors hit this independently:
+`--filter engine/hand` reported failures that were entirely 02-04's and 02-06's half-written files.
+
+The exit code of a filtered run is therefore untrustworthy precisely when you most want to isolate
+your own work. It also produces alarming-looking artifacts: one whole-suite snapshot read
+`420 passed, 9 failed` and the next `429 passed, 0 failed` with no commit in between — sibling
+agents mid-write, not flakiness. Anyone chasing that as a real failure loses an hour.
+
+**Workaround used (correct, costs nothing):** a throwaway `tests/_wave_isolated_NN/` directory
+re-exporting your own spec, run with `--root`, deleted before the first commit.
+
+**A fix would be:** apply `--filter` at discovery time rather than after load, so an unrelated spec
+that cannot even be required is never loaded. Not done here because `tests/run.luau` is shared by
+every plan in the wave and this is harness ergonomics, not correctness. Worth doing before the next
+phase that runs a wide parallel wave.
