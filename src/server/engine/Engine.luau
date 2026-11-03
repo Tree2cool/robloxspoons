@@ -286,6 +286,24 @@ local function apply(state: Types.State, intent: Types.Intent): Types.ApplyResul
 		-- ONE intent with a cause, not three operations (CLAUDE.md rule 8). Phase 4's AFK bench and
 		-- a disconnect both route through here, and so does nothing else: `removeSeat` is the single
 		-- generic operation and the cause only decides whether this counts as churn.
+		if intent.cause == "Completed" then
+			-- A CALLER-BUG ERROR, NOT AN EIGHTH REJECT CODE (the house rule from `Ring`: `error`
+			-- only where the alternative is silent corruption, and never where a reject code
+			-- exists). `Completed` is the engine's OWN cause: it is net zero on circulation only
+			-- because the completion path above retires four cards BEFORE removing the seat, and
+			-- `removeSeat` deliberately leaves `churnRemovals` alone for it. An externally supplied
+			-- `Remove{cause = "Completed"}` skips the retirement, so its four hand cards route into
+			-- the successor's inbox with nothing taken out of play: circulation gains 4 while
+			-- `expectedCirculation` does not, and `Invariants.check` reports `circulation`. One
+			-- forged intent would desynchronise card accounting for the rest of the round (threat
+			-- T-2-35), which is exactly the class of damage a reject code must not be used to
+			-- describe -- a reject is a legal answer to an illegal request, and this is a wiring
+			-- bug in the caller. Phase 4's adapter must bind the cause from the lifecycle event
+			-- (disconnect or AFK strike-out) and can never obtain this one.
+			error(
+				`Engine.apply: a Remove intent may not carry the "Completed" cause; it belongs to the completion path, which retires the four cards first (seat {intent.seat})`
+			)
+		end
 		local routedTo, cards = Ring.removeSeat(state, intent.seat, intent.cause)
 		table.insert(events, {
 			kind = "SeatRemoved",
