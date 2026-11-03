@@ -73,7 +73,13 @@ Delete the `M02` script afterwards; do not save it.
 
 Observed: _
 
-- [ ] M-02 signed off: <name> <date>
+Observed: PASSES 2026-11-03, Windows, Studio Play on the dev place. The server booted with no
+`Unknown require` and no missing-member error: `[Spoons] persistence mode: Mock` (Main:24),
+`map loaded: GrayBox` (Main:33), `server ready (round driver: true)` (Main:70), and the client
+reached `client boot: Ping sent` (Main:7). Every relative string require therefore resolves under
+Roblox's own rules, which is the half `check-built-place` could not prove.
+
+- [x] M-02 signed off: alejandrog_m 2026-11-03
 
 ---
 
@@ -120,7 +126,20 @@ Record which row produced which code. B is the live proof of the NaN half of FOU
 
 Observed: _
 
-- [ ] M-03 signed off: <name> <date>
+Observed: PASSES 2026-11-03. A real client fired across the wire in a Studio Play session.
+Accept path: `[Spoons] Ping from 3811489179 nonce=1`.
+Rejections, each with its OWN distinct code (four different codes from four payloads, so the
+gateway discriminates rather than merely refusing):
+  - `{nonce = 0/0}`                 -> `NotFinite`   <- the one that matters
+  - `{}`                            -> `MissingKey`
+  - `{nonce = 1, extra = true}`     -> `UnknownKey`
+  - intent `"NotAThing"`            -> `UnknownIntent`
+`NotFinite` specifically confirms the required `nonce` field earns its place: a NaN survives
+serialisation, passes the key check, and reaches the hand-written `isFinite` (hand-written because
+Selene 0.32.0's luau std has no `math.isnan`). With `exactKeys({})` it would have bounced as
+`UnknownKey` and proved nothing about NaN.
+
+- [x] M-03 signed off: alejandrog_m 2026-11-03
 
 ---
 
@@ -207,4 +226,12 @@ Otherwise the next Rojo sync overwrites your edit. After exporting, re-run
 
 Observed: _
 
-- [ ] M-06 signed off: <name> <date>
+Observed: PASSES 2026-11-03. `[Spoons] map loaded: GrayBox` with no per-map branch, and the
+gray-box renders as designed: four rooms, perimeter walls, the card table centred. Loaded from
+`ServerStorage.Maps.GrayBox`.
+NOTE: the Workspace-contents half of this check (Geometry present; `Data` and `GrayBox` ABSENT,
+which is the anti-ESP property) was not separately confirmed in the Explorer. Re-confirm when
+convenient; `tests/maps/graybox.spec.luau` asserts it statically and `MapLoader` clones only
+`Geometry`, but the live tree was not eyeballed.
+
+- [x] M-06 signed off: alejandrog_m 2026-11-03
