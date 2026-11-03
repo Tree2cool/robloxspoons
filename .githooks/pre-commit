@@ -1,0 +1,12 @@
+#!/usr/bin/env sh
+set -eu
+# GUI git clients often lack Rokit on PATH.
+export PATH="$HOME/.rokit/bin:$PATH"
+files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.luau$' || true)
+[ -z "$files" ] && exit 0
+# --respect-ignores: stylua formats explicitly named files even when .styluaignore lists them; deliberately
+# broken fixtures must stay committable.
+# shellcheck disable=SC2086
+stylua --check --respect-ignores $files
+# shellcheck disable=SC2086
+selene $files

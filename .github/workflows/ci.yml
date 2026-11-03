@@ -1,0 +1,50 @@
+name: ci
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: CompeyDev/setup-rokit@1d9390883f7ebce19d48f5b8d006e11d387c92ab  # v0.2.1
+        with:
+          version: v1.2.0
+      - name: Tool versions
+        run: rojo --version && stylua --version && selene --version && luau-lsp --version && lune --version
+      - name: Lune typedefs
+        run: lune setup
+      - name: Format
+        run: stylua --check src scripts tests
+      - name: Lint (shipped code, Roblox std)
+        run: selene src scripts tests
+      - name: Pure zone list
+        id: zones
+        run: |
+          zones="$(lune run scripts/ci/check-guards.luau --print-zones)" || exit 1
+          test -n "$zones" || { echo "FATAL: empty pure-zone list - the FOUND-06 gate would be vacuous"; exit 1; }
+          echo "pure zones: $zones"
+          echo "list=$zones" >> "$GITHUB_OUTPUT"
+      - name: Lint (pure zones, FOUND-06 allow-list)
+        run: selene --config selene.pure.toml ${{ steps.zones.outputs.list }}
+      - name: Sourcemap
+        run: rojo sourcemap default.project.json --include-non-scripts -o sourcemap.json
+      - name: Typecheck (roblox platform)
+        run: lune run scripts/ci/analyze.luau --platform roblox --sourcemap sourcemap.json --definitions=tools/types/globalTypes.None.d.luau --base-luaurc .luaurc --ignore "**/fixtures/**" src
+      - name: Typecheck (standard platform, pure zones + tooling)
+        run: lune run scripts/ci/analyze.luau --platform standard --base-luaurc .luaurc --ignore "**/fixtures/**" ${{ steps.zones.outputs.list }} scripts tests
+      - name: Structural guards (FOUND-02 / FOUND-05 / FOUND-06 / R4 / R5)
+        run: lune run scripts/ci/check-guards.luau
+      - name: Map contract (MAP-01)
+        run: lune run scripts/maps/validate-map.luau maps/gray-box.rbxm
+      - name: Tests (unit, fuzz, guard fixtures, traps, map validator)
+        run: lune run tests/run.luau
+      - name: Build
+        run: mkdir -p build && rojo build default.project.json -o build/spoons.rbxl
+      - name: Built-place require check (FOUND-03)
+        run: lune run scripts/ci/check-built-place.luau build/spoons.rbxl
