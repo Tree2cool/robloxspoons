@@ -30,6 +30,41 @@ local function playerIdsFor(seatCount: number): { Types.PlayerId }
 	return ids
 end
 
+-- The round every rejection case starts from: 3 seats, ranks = 4, no jokers, circulation = 4.
+-- Seat 1 holds {1,2,3,4} with the deck {13,14,15,16} in its inbox, seat 2 holds {5,6,7,8} and seat
+-- 3 holds {9,10,11,12}, both with empty inboxes. The seed is hardcoded so that seat 1's FIRST draw
+-- does not complete -- the positive draw case below asserts exactly one event, which is what pins
+-- it, so a seed change cannot silently turn these cases into completion cases.
+local REJECT_SEED = 11
+
+local function rejectRound(): Types.State
+	return Engine.newRound(configFor(3, 1, 0, "Wild"), playerIdsFor(3), Rng.new(REJECT_SEED))
+end
+
+-- Narrowing accessors. `Types.Event` is a tagged union, so `.cardId` is not a field of every
+-- variant; these keep the narrowing local instead of sprinkling asserts through the cases.
+local function kindsOf(events: { Types.Event }): { string }
+	local out: { string } = {}
+	for _, event in events do
+		table.insert(out, event.kind)
+	end
+	return out
+end
+
+local function drewCard(event: Types.Event): Types.CardId?
+	if event.kind == "Drew" then
+		return event.cardId
+	end
+	return nil
+end
+
+local function passedBy(event: Types.Event): (Types.SeatId?, Types.CardId?)
+	if event.kind == "Passed" then
+		return event.to, event.cardId
+	end
+	return nil, nil
+end
+
 -- Everything on `State` except `valve.rng`, which is a table of CLOSURES: two independently
 -- constructed generators are never equal by value, so a whole-state deepEqual would fail for a
 -- reason that has nothing to do with reproducibility.
@@ -109,5 +144,144 @@ return function(t: Test.Runner)
 		local a = Engine.newRound(configFor(6, 2, 1, "Blocker"), playerIdsFor(6), Rng.new(99))
 		local b = Engine.newRound(configFor(6, 2, 1, "Blocker"), playerIdsFor(6), Rng.new(99))
 		t.deepEqual(snapshot(a), snapshot(b), "the same config, seat list and seed deal the same round")
+	end)
+
+	-- THE SEVEN REJECT CODES -----------------------------------------------------------------------
+	-- Research 11.3 says "each of the six Reject codes". It UNDERCOUNTS: section 9 lists seven and
+	-- all seven are reachable, each with its own row below. Recorded here because plan 02-08's fuzz
+	-- suite must assert coverage of SEVEN codes at a minimum observation count each, not six -- a
+	-- code nobody can reach would otherwise ship as an untested branch.
+	--
+	-- Every row asserts all four of: ok == false, the exact code, an EMPTY event list, and an
+	-- unchanged canonical state hash. A rejection that mutates state is worse than one that errors,
+	-- and the hash is what makes "unchanged" checkable rather than assumed.
+	--
+	-- It also asserts the valve did not move. That is NOT covered by the hash: `Invariants.hash`
+	-- deliberately excludes `valve` (it must, or no state could ever repeat and the valve could
+	-- never fire), so a valve entry point called on a rejection would leave the hash identical and
+	-- slip through. The locked valve call rule is "neither on a rejection", and this is the only
+	-- place it can be checked on all seven codes.
+	local function rejects(name: string, setup: (Types.State) -> Types.Intent, expected: Types.Reject)
+		t.test(name, function()
+			local state = rejectRound()
+			local intent = setup(state)
+			local before = Invariants.hash(state)
+			local observations = state.valve.observations
+			local lap = state.valve.actionsSinceProgress
+			local result = Engine.apply(state, intent)
+			t.equal(result.ok, false, `{name}: the intent must be refused`)
+			t.equal(result.reject, expected, `{name}: the reject code`)
+			t.equal(typeof(result.events), "table", `{name}: events is an empty table, never nil`)
+			t.equal(#result.events, 0, `{name}: a rejection returns no events`)
+			t.equal(Invariants.hash(state), before, `{name}: a rejection must leave the state byte-identical`)
+			t.equal(state.valve.observations, observations, `{name}: no valve entry point runs on a rejection`)
+			t.equal(state.valve.actionsSinceProgress, lap, `{name}: a rejection is not an action`)
+		end)
+	end
+
+	-- 6 ------------------------------------------------------------------------------------------
+	rejects("Draw naming seat 0 is UnknownSeat", function()
+		return { kind = "Draw", seat = 0 }
+	end, "UnknownSeat")
+
+	-- 7 ------------------------------------------------------------------------------------------
+	rejects("Pass naming seatCount + 1 is UnknownSeat", function(state)
+		return { kind = "Pass", seat = state.seatCount + 1, cardId = 1 }
+	end, "UnknownSeat")
+
+	-- 8 ------------------------------------------------------------------------------------------
+	rejects("Draw at a seat removed a moment ago is SeatNotLive", function(state)
+		local gone = Engine.apply(state, { kind = "Remove", seat = 2, cause = "Benched" })
+		t.truthy(gone.ok, "the setup removal must succeed")
+		return { kind = "Draw", seat = 2 }
+	end, "SeatNotLive")
+
+	-- 9 ------------------------------------------------------------------------------------------
+	rejects("Pass of card id 0 is UnknownCard", function()
+		return { kind = "Pass", seat = 1, cardId = 0 }
+	end, "UnknownCard")
+
+	-- 10 -----------------------------------------------------------------------------------------
+	rejects("Pass of card id totalCards + 1 is UnknownCard", function(state)
+		return { kind = "Pass", seat = 1, cardId = state.totalCards + 1 }
+	end, "UnknownCard")
+
+	-- 11 -----------------------------------------------------------------------------------------
+	rejects("Pass at a hand of 4 is HandNotFive", function()
+		return { kind = "Pass", seat = 1, cardId = 1 }
+	end, "HandNotFive")
+
+	-- 12 -----------------------------------------------------------------------------------------
+	rejects("Pass of a card held by another seat is NotYourCard", function(state)
+		local drew = Engine.apply(state, { kind = "Draw", seat = 1 })
+		t.truthy(drew.ok, "the setup draw must succeed")
+		return { kind = "Pass", seat = 1, cardId = 5 }
+	end, "NotYourCard")
+
+	-- 13 -----------------------------------------------------------------------------------------
+	rejects("Draw at a hand of 5 is HandNotFour", function(state)
+		local drew = Engine.apply(state, { kind = "Draw", seat = 1 })
+		t.truthy(drew.ok, "the setup draw must succeed")
+		return { kind = "Draw", seat = 1 }
+	end, "HandNotFour")
+
+	-- 14 -----------------------------------------------------------------------------------------
+	rejects("Draw at a hand of 4 with an empty inbox is InboxEmpty", function()
+		return { kind = "Draw", seat = 2 }
+	end, "InboxEmpty")
+
+	-- 15 -----------------------------------------------------------------------------------------
+	rejects("NotYourCard also covers a card sitting in the actor's OWN inbox", function(state)
+		-- Research 7.6: in the live round this is the card that was auto-passed a moment before the
+		-- intent arrived. A predicate that only checked "not in SOME hand" by scanning hands would
+		-- answer UnknownCard or crash here; a predicate that scanned every container would accept it.
+		local drew = Engine.apply(state, { kind = "Draw", seat = 1 })
+		t.truthy(drew.ok, "the setup draw must succeed")
+		t.equal(state.seats[1].inbox[1], 14, "the setup must leave a card in the actor's own inbox")
+		return { kind = "Pass", seat = 1, cardId = 14 }
+	end, "NotYourCard")
+
+	-- 16 -----------------------------------------------------------------------------------------
+	rejects("UnknownCard is checked BEFORE HandNotFive", function(state)
+		-- Illegal on both counts: seat 1 holds 4 cards AND card id 99 names no card. The locked
+		-- precedence says UnknownCard. Without this row two correct-looking implementations would
+		-- disagree and no test would say which one is right.
+		t.equal(#state.seats[1].hand, Types.HAND_SIZE, "the seat must be at a resting hand")
+		return { kind = "Pass", seat = 1, cardId = 99 }
+	end, "UnknownCard")
+
+	-- 17 -----------------------------------------------------------------------------------------
+	t.test("a legal draw at exactly 4 is accepted and the hand becomes 5", function()
+		local state = rejectRound()
+		local front = state.seats[1].inbox[1]
+		t.equal(front, 13, "the dealer's inbox front is the lowest deck id")
+		local result = Engine.apply(state, { kind = "Draw", seat = 1 })
+		t.truthy(result.ok, "a draw at a resting hand with a stocked inbox is legal (CARD-01)")
+		t.equal(result.reject, nil, "an accepted intent carries no reject code")
+		t.deepEqual(kindsOf(result.events), { "Drew" }, "a non-completing draw emits exactly one event")
+		t.equal(drewCard(result.events[1]), front, "the drawn card is the PRE-draw inbox front (FIFO)")
+		t.equal(#state.seats[1].hand, Types.MAX_HAND, "the hand is now 5: the pile has locked")
+		t.deepEqual(state.seats[1].inbox, { 14, 15, 16 }, "the front was popped, the rest kept their order")
+		local ok, why = Invariants.check(state)
+		t.truthy(ok, `the state after a legal draw reported {tostring(why)}`)
+	end)
+
+	-- 18 -----------------------------------------------------------------------------------------
+	t.test("a legal pass at exactly 5 lands at the tail of the resolved successor's inbox", function()
+		local state = rejectRound()
+		local drew = Engine.apply(state, { kind = "Draw", seat = 1 })
+		local card = drewCard(drew.events[1])
+		t.equal(card, 13, "the setup draw must take the deck front")
+		local result = Engine.apply(state, { kind = "Pass", seat = 1, cardId = 13 })
+		t.truthy(result.ok, "a pass at a locked hand is legal (CARD-03)")
+		t.deepEqual(kindsOf(result.events), { "Passed" }, "a pass emits exactly one event")
+		local to, passed = passedBy(result.events[1])
+		t.equal(to, 2, "the target is the resolved live successor, never a client-supplied seat")
+		t.equal(passed, 13, "the event names the card the intent named")
+		local inbox = state.seats[2].inbox
+		t.equal(inbox[#inbox], 13, "the card is the LAST element of the successor's inbox (FIFO tail)")
+		t.equal(#state.seats[1].hand, Types.HAND_SIZE, "the passer is back to a resting hand")
+		local ok, why = Invariants.check(state)
+		t.truthy(ok, `the state after a legal pass reported {tostring(why)}`)
 	end)
 end
