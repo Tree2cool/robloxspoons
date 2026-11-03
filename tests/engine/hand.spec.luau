@@ -258,6 +258,28 @@ return function(t: Test.Runner)
 		end, "hand must hold 5")
 	end)
 
+	t.test("the retired set does not depend on the hand's array order", function()
+		-- A real hand is an array in DRAW order, never sorted, so the ascending-ID selection inside
+		-- each group is what makes the retired set a function of the hand's contents alone. Without
+		-- this case both `table.sort` calls in Hand could be deleted and every other row would still
+		-- pass, because `handOf` hands back an already-ascending array: the determinism claim would
+		-- be true only of the fixture.
+		local rankOf = handOf({ 0, 3, 3, 3, 0 })
+		local orders: { { Types.CardId } } = { { 1, 2, 3, 4, 5 }, { 4, 1, 5, 3, 2 }, { 5, 4, 3, 2, 1 } }
+		for _, hand in orders do
+			local got = Hand.detectCompletion(rankOf, hand, "Wild")
+			t.truthy(got, `hand order {table.concat(hand, ",")}: expected a completion`)
+			local c = got :: Hand.Completion
+			local label = `hand order {table.concat(hand, ",")}`
+			t.deepEqual(
+				c.retired,
+				{ 2, 3, 4, 1 },
+				`{label}: retired must be the naturals ascending then the lowest joker`
+			)
+			t.equal(c.fifth, 5, `{label}: the higher joker stays as the fifth`)
+		end
+	end)
+
 	t.test("retirement is deterministic across repeated calls", function()
 		-- CONTEXT requires a failing simulator trial to paste straight into a unit test, which is
 		-- only true if the same inputs always retire the same four cards in the same order.
