@@ -230,8 +230,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CARD-02 | Phase 4 | Pending |
 | CARD-03 | Phase 2 | Pending |
 | CARD-04 | Phase 2 | Pending |
-| CARD-05 | Phase 2 | Pending |
-| CARD-06 | Phase 2 | Pending |
+| CARD-05 | Phase 2 | **Partial** (one ranking in `SeatOrder`, locked by corpus; unwired until Phase 6) |
+| CARD-06 | Phase 2 | **Partial** (same ranking as CARD-05, bucket 2 is a list; unwired until Phase 6) |
 | CARD-07 | Phase 2 | Pending |
 | CARD-08 | Phase 2 | Pending |
 | CARD-09 | Phase 2 | Pending |
