@@ -319,9 +319,7 @@ return function(t: Test.Runner)
 			`ring milestones    dealer removed {milestones.dealerRemoved}   ring to 2 {milestones.ringToTwo}   ring to 1 {milestones.ringToOne}   ring emptied {milestones.ringEmptied}`,
 			`reject codes       UnknownSeat {rejectCounts.UnknownSeat}   SeatNotLive {rejectCounts.SeatNotLive}   UnknownCard {rejectCounts.UnknownCard}   NotYourCard {rejectCounts.NotYourCard}   HandNotFour {rejectCounts.HandNotFour}   HandNotFive {rejectCounts.HandNotFive}   InboxEmpty {rejectCounts.InboxEmpty}`,
 			`valve              observations {valveObservations}   firings {valveFirings}   armed rounds {armedRounds}   seen resets {valveSeenResets}`,
-			`valve defences     depth mismatches {valveDepthMismatches} ({tostring(valveDepthRepro)})   observations on a rejection {valveObservationsOnRejection} ({tostring(
-				valveLeakRepro
-			)})`,
+			`valve defences     depth mismatches {valveDepthMismatches}   observations on a rejection {valveObservationsOnRejection}`,
 		}
 		local seats: { string } = {}
 		for count = 2, 9 do
@@ -532,6 +530,13 @@ return function(t: Test.Runner)
 			end
 		end
 
+		-- Two reusable buffers for the legal-action enumeration, hoisted out of the loop: a fresh
+		-- pair per action allocated twice per action over 170,000 accepted actions and showed up as
+		-- GC time in the case's wall-time measurement. Both are fully rewritten every action and the
+		-- live prefix is `options` long, so nothing carries over.
+		local optionSeat: { number } = {}
+		local optionDraw: { boolean } = {}
+
 		-- THE ROUND. It ends when the ring empties, or when every seat that can still win has won
 		-- (seatCount - 1 completions: there are always two fewer spoons than players), or at the
 		-- action cap, which errors.
@@ -558,8 +563,6 @@ return function(t: Test.Runner)
 				-- A uniformly chosen legal action among every live seat that has one. Draw at
 				-- exactly four with something to draw; pass a uniformly chosen held card at five.
 				local options = 0
-				local optionSeat: { number } = {}
-				local optionDraw: { boolean } = {}
 				for id = 1, #state.seats do
 					local seat = state.seats[id]
 					if not seat.live then
@@ -637,7 +640,154 @@ return function(t: Test.Runner)
 			return
 		end
 
-		print(`  fuzz coverage (plan 02-08):\n  {coverageReport()}`)
+		local failures: { string } = {}
+		local function needs(ok: boolean, detail: string)
+			if not ok then
+				table.insert(failures, detail)
+			end
+		end
+
+		-- 1. THE ACTION COUNT. This single assertion closes the carried Phase 1 todo -- "the fuzz
+		-- harness has only ever run toy properties at 200 iterations, never the 100k-action scale
+		-- Phase 2 needs" -- and it is the one research 11.3 names first: a generator bug that
+		-- shortens rounds leaves the suite green while running 2,000 actions instead of 100,000.
+		-- The observed total is in the message so a near miss is visible rather than mysterious.
+		needs(
+			totalActions >= 100_000,
+			`action count: {totalActions} actions over {roundsPlayed} rounds, need at least 100,000. A generator bug that shortens rounds is research 11.3's first way for a fuzz suite to be theatre`
+		)
+
+		-- 2. PER-KIND EVENT COUNTS. A floor of one would pass on a driver that played two rounds, so
+		-- the bulk kinds carry real floors.
+		needs(
+			eventCounts.Drew >= 20_000,
+			`Drew events: {eventCounts.Drew}, need at least 20,000 (the bulk of play; a floor of 1 would pass on a broken driver)`
+		)
+		needs(
+			eventCounts.Passed >= 20_000,
+			`Passed events: {eventCounts.Passed}, need at least 20,000 (the bulk of play; a floor of 1 would pass on a broken driver)`
+		)
+		needs(
+			eventCounts.Completed >= 200,
+			`Completed events: {eventCounts.Completed}, need at least 200 -- without completions the four-of-a-kind path, the retirement and the completion chain are all untested`
+		)
+		needs(
+			completionShapes[4] >= 100,
+			`natural completions (naturalsUsed == 4): {completionShapes[4]}, need at least 100 -- the ordinary completion shape`
+		)
+		needs(
+			completionShapes[3] >= 10,
+			`3+1 joker completions (naturalsUsed == 3): {completionShapes[3]}, need at least 10 -- the Wild-mode joker path is otherwise untested`
+		)
+		-- The rarest shape, and a FAILURE rather than a lowered floor if it is absent. Research 3.3:
+		-- 2+2 is strictly worse on both axes, so naturals-first never CHOOSES it; it arises only
+		-- when a hand holds exactly two naturals of the qualifying rank plus BOTH jokers.
+		needs(
+			completionShapes[2] >= 1,
+			`2+2 joker completions (naturalsUsed == 2): {completionShapes[2]}, need at least 1 -- the rarest completion shape (research 3.3). If this cannot occur at j <= 2 under this generator that is a real result and belongs in the SUMMARY, not in a lowered floor`
+		)
+		needs(
+			causeCounts.Completed >= 200,
+			`SeatRemoved with cause "Completed": {causeCounts.Completed}, need at least 200 -- the removal that happens inside the completing apply`
+		)
+		needs(
+			causeCounts.Disconnected >= 50,
+			`SeatRemoved with cause "Disconnected": {causeCounts.Disconnected}, need at least 50 -- without it mid-pass departures are untested (research 7.6)`
+		)
+		needs(
+			causeCounts.Benched >= 50,
+			`SeatRemoved with cause "Benched": {causeCounts.Benched}, need at least 50 -- the AFK path through the one generic removal (CLAUDE.md rule 8)`
+		)
+
+		-- 3. RING-SHRINK MILESTONES. Research 7: these are the states a naive ring breaks on, and an
+		-- unobserved milestone means the generator never reached the dangerous one.
+		needs(
+			milestones.dealerRemoved >= 1,
+			`the dealer (seat 1) was removed {milestones.dealerRemoved} times, need at least 1 -- the dealer's inbox IS the deck, so its removal is the dangerous one`
+		)
+		needs(
+			milestones.ringToTwo >= 1,
+			`a removal reduced the ring to 2 seats {milestones.ringToTwo} times, need at least 1 -- the 2-ring is where next == prev and a naive unlink breaks`
+		)
+		needs(
+			milestones.ringToOne >= 1,
+			`a removal reduced the ring to 1 seat {milestones.ringToOne} times, need at least 1 -- a sole seat passes to itself`
+		)
+		needs(
+			milestones.ringEmptied >= 1,
+			`the ring emptied {milestones.ringEmptied} times, need at least 1 -- otherwise state.terminal and the no-successor branch (research 7.3) are never exercised`
+		)
+
+		-- 4. ALL SEVEN REJECT CODES. Research 11.3 says six and undercounts; Types.Reject lists
+		-- seven and plan 02-07 proved all seven reachable. A code with zero observations is an
+		-- untested branch, and the whole table is printed below so the missing one is obvious.
+		needs(
+			rejectCounts.UnknownSeat >= 10,
+			`reject UnknownSeat: {rejectCounts.UnknownSeat} observations, need at least 10`
+		)
+		needs(
+			rejectCounts.SeatNotLive >= 10,
+			`reject SeatNotLive: {rejectCounts.SeatNotLive} observations, need at least 10 (threat T-2-39: an intent for a removed seat)`
+		)
+		needs(
+			rejectCounts.UnknownCard >= 10,
+			`reject UnknownCard: {rejectCounts.UnknownCard} observations, need at least 10`
+		)
+		needs(
+			rejectCounts.NotYourCard >= 10,
+			`reject NotYourCard: {rejectCounts.NotYourCard} observations, need at least 10`
+		)
+		needs(
+			rejectCounts.HandNotFour >= 10,
+			`reject HandNotFour: {rejectCounts.HandNotFour} observations, need at least 10 (CARD-01, the draw-at-five refusal)`
+		)
+		needs(
+			rejectCounts.HandNotFive >= 10,
+			`reject HandNotFive: {rejectCounts.HandNotFive} observations, need at least 10`
+		)
+		needs(
+			rejectCounts.InboxEmpty >= 10,
+			`reject InboxEmpty: {rejectCounts.InboxEmpty} observations, need at least 10`
+		)
+
+		-- 5. VALVE OBSERVATION DEPTH. Exactly one entry point per accepted apply and none on a
+		-- rejection. No floor is placed on the firing count: see header note 7 for why a number this
+		-- suite cannot honestly meet is recorded instead of floored.
+		needs(
+			valveDepthMismatches == 0,
+			`the valve was observed the wrong number of times on {valveDepthMismatches} accepted actions -- a wiring bug that skipped it inside a conditional would otherwise leave this suite green while Gate G1's mechanism never ran. First: {tostring(
+				valveDepthRepro
+			)}`
+		)
+		needs(
+			valveObservationsOnRejection == 0,
+			`the valve was observed on {valveObservationsOnRejection} REJECTED actions, need 0 -- a rejection must leave the state unchanged and the valve's counters are part of the state. Invariants.hash cannot catch this: it excludes valve by design. First: {tostring(
+				valveLeakRepro
+			)}`
+		)
+		needs(
+			valveObservations == acceptedActions,
+			`valve observations {valveObservations} against {acceptedActions} accepted actions; they must be equal exactly (plan 02-07 asserted it at 114 == 114 with a rejection injected)`
+		)
+
+		-- 6. PARTITION-IDENTITY DEPTH. If `Invariants.check` were accidentally moved inside a
+		-- conditional this is what catches it; without it the suite could run 125k actions and check
+		-- 400 states.
+		needs(
+			checksRun >= totalActions,
+			`Invariants.check ran {checksRun} times over {totalActions} actions; it must run at least once per action, or the conservation claim covers only the states that happened to be checked`
+		)
+
+		local report = coverageReport()
+		if #failures > 0 then
+			error(
+				`fuzz coverage FAILED after {roundsPlayed} rounds -- the suite ran but did not exercise everything it claims:\n  * {table.concat(
+					failures,
+					"\n  * "
+				)}\n\n  {report}`
+			)
+		end
+		print(`  fuzz coverage (plan 02-08):\n  {report}`)
 	end
 
 	local fuzzOpts: Test.FuzzOpts = {
