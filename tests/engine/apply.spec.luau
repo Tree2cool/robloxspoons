@@ -159,7 +159,7 @@ local function snapshot(state: Types.State)
 end
 
 return function(t: Test.Runner)
-	-- 1 ------------------------------------------------------------------------------------------
+	-- 1 ---------------------------------------------------------------------------------------------
 	t.test("newRound deals 9 seats of 4 with the whole circulating supply in the dealer's inbox", function()
 		local state = Engine.newRound(configFor(9, 2, 1, "Wild"), playerIdsFor(9), Rng.new(7))
 		t.equal(state.liveCount, 9, "every dealt seat is live")
@@ -177,7 +177,7 @@ return function(t: Test.Runner)
 		t.equal(Invariants.circulation(state), 9, "circulation is 4k + j at the deal")
 	end)
 
-	-- 2 ------------------------------------------------------------------------------------------
+	-- 2 ---------------------------------------------------------------------------------------------
 	t.test("newRound lays the cards out per the LOCKED deal layout", function()
 		local state = Engine.newRound(configFor(3, 1, 0, "Wild"), playerIdsFor(3), Rng.new(11))
 		t.deepEqual(state.seats[1].hand, { 1, 2, 3, 4 }, "seat 1 holds ids 1..4")
@@ -186,7 +186,7 @@ return function(t: Test.Runner)
 		t.deepEqual(state.seats[1].inbox, { 13, 14, 15, 16 }, "the rest sit in the dealer's inbox ASCENDING")
 	end)
 
-	-- 3 ------------------------------------------------------------------------------------------
+	-- 3 ---------------------------------------------------------------------------------------------
 	t.test("newRound initialises the valve cold and the counters by scanning", function()
 		local state = Engine.newRound(configFor(4, 1, 2, "Wild"), playerIdsFor(4), Rng.new(3))
 		t.equal(state.valve.actionsSinceProgress, 0, "actionsSinceProgress starts at 0")
@@ -202,9 +202,24 @@ return function(t: Test.Runner)
 		for rank = 1, 5 do
 			t.equal(state.counters.rankInPlay[rank], 4, `rank {rank} has all four copies in play`)
 		end
+
+		-- The valve's generator is DERIVED from the round's own, as a draw off it. Nothing else in
+		-- this file would notice a constant seed: `snapshot` cannot compare `valve.rng` (it is a
+		-- table of closures) and the end-to-end valve cases seed the fixture directly. So the
+		-- derivation is asserted from both sides -- the same round seed replays the same valve
+		-- draws, a different round seed does not -- which is what makes a failing simulator trial
+		-- reproducible from its seed alone.
+		local same = Engine.newRound(configFor(4, 1, 2, "Wild"), playerIdsFor(4), Rng.new(3))
+		local other = Engine.newRound(configFor(4, 1, 2, "Wild"), playerIdsFor(4), Rng.new(4))
+		local firstDraw = state.valve.rng:nextInt(1, 1000000)
+		t.equal(same.valve.rng:nextInt(1, 1000000), firstDraw, "the same round seed must replay the same valve draws")
+		t.truthy(
+			other.valve.rng:nextInt(1, 1000000) ~= firstDraw,
+			"a different round seed must give a different valve, or the seed is a constant"
+		)
 	end)
 
-	-- 4 ------------------------------------------------------------------------------------------
+	-- 4 ---------------------------------------------------------------------------------------------
 	t.test("newRound refuses a dead pool and an empty seat list", function()
 		t.throws(function()
 			Engine.newRound(configFor(5, 0, 0, "Wild"), playerIdsFor(5), Rng.new(1))
@@ -214,7 +229,7 @@ return function(t: Test.Runner)
 		end, "at least one seated seeker")
 	end)
 
-	-- 5 ------------------------------------------------------------------------------------------
+	-- 5 ---------------------------------------------------------------------------------------------
 	t.test("newRound is reproducible from its seed alone", function()
 		local a = Engine.newRound(configFor(6, 2, 1, "Blocker"), playerIdsFor(6), Rng.new(99))
 		local b = Engine.newRound(configFor(6, 2, 1, "Blocker"), playerIdsFor(6), Rng.new(99))
@@ -254,58 +269,58 @@ return function(t: Test.Runner)
 		end)
 	end
 
-	-- 6 ------------------------------------------------------------------------------------------
+	-- 6 ---------------------------------------------------------------------------------------------
 	rejects("Draw naming seat 0 is UnknownSeat", function()
 		return { kind = "Draw", seat = 0 }
 	end, "UnknownSeat")
 
-	-- 7 ------------------------------------------------------------------------------------------
+	-- 7 ---------------------------------------------------------------------------------------------
 	rejects("Pass naming seatCount + 1 is UnknownSeat", function(state)
 		return { kind = "Pass", seat = state.seatCount + 1, cardId = 1 }
 	end, "UnknownSeat")
 
-	-- 8 ------------------------------------------------------------------------------------------
+	-- 8 ---------------------------------------------------------------------------------------------
 	rejects("Draw at a seat removed a moment ago is SeatNotLive", function(state)
 		local gone = Engine.apply(state, { kind = "Remove", seat = 2, cause = "Benched" })
 		t.truthy(gone.ok, "the setup removal must succeed")
 		return { kind = "Draw", seat = 2 }
 	end, "SeatNotLive")
 
-	-- 9 ------------------------------------------------------------------------------------------
+	-- 9 ---------------------------------------------------------------------------------------------
 	rejects("Pass of card id 0 is UnknownCard", function()
 		return { kind = "Pass", seat = 1, cardId = 0 }
 	end, "UnknownCard")
 
-	-- 10 -----------------------------------------------------------------------------------------
+	-- 10 --------------------------------------------------------------------------------------------
 	rejects("Pass of card id totalCards + 1 is UnknownCard", function(state)
 		return { kind = "Pass", seat = 1, cardId = state.totalCards + 1 }
 	end, "UnknownCard")
 
-	-- 11 -----------------------------------------------------------------------------------------
+	-- 11 --------------------------------------------------------------------------------------------
 	rejects("Pass at a hand of 4 is HandNotFive", function()
 		return { kind = "Pass", seat = 1, cardId = 1 }
 	end, "HandNotFive")
 
-	-- 12 -----------------------------------------------------------------------------------------
+	-- 12 --------------------------------------------------------------------------------------------
 	rejects("Pass of a card held by another seat is NotYourCard", function(state)
 		local drew = Engine.apply(state, { kind = "Draw", seat = 1 })
 		t.truthy(drew.ok, "the setup draw must succeed")
 		return { kind = "Pass", seat = 1, cardId = 5 }
 	end, "NotYourCard")
 
-	-- 13 -----------------------------------------------------------------------------------------
+	-- 13 --------------------------------------------------------------------------------------------
 	rejects("Draw at a hand of 5 is HandNotFour", function(state)
 		local drew = Engine.apply(state, { kind = "Draw", seat = 1 })
 		t.truthy(drew.ok, "the setup draw must succeed")
 		return { kind = "Draw", seat = 1 }
 	end, "HandNotFour")
 
-	-- 14 -----------------------------------------------------------------------------------------
+	-- 14 --------------------------------------------------------------------------------------------
 	rejects("Draw at a hand of 4 with an empty inbox is InboxEmpty", function()
 		return { kind = "Draw", seat = 2 }
 	end, "InboxEmpty")
 
-	-- 15 -----------------------------------------------------------------------------------------
+	-- 15 --------------------------------------------------------------------------------------------
 	rejects("NotYourCard also covers a card sitting in the actor's OWN inbox", function(state)
 		-- Research 7.6: in the live round this is the card that was auto-passed a moment before the
 		-- intent arrived. A predicate that only checked "not in SOME hand" by scanning hands would
@@ -316,7 +331,7 @@ return function(t: Test.Runner)
 		return { kind = "Pass", seat = 1, cardId = 14 }
 	end, "NotYourCard")
 
-	-- 16 -----------------------------------------------------------------------------------------
+	-- 16 --------------------------------------------------------------------------------------------
 	rejects("UnknownCard is checked BEFORE HandNotFive", function(state)
 		-- Illegal on both counts: seat 1 holds 4 cards AND card id 99 names no card. The locked
 		-- precedence says UnknownCard. Without this row two correct-looking implementations would
@@ -325,7 +340,33 @@ return function(t: Test.Runner)
 		return { kind = "Pass", seat = 1, cardId = 99 }
 	end, "UnknownCard")
 
-	-- 17 -----------------------------------------------------------------------------------------
+	-- 17 --------------------------------------------------------------------------------------------
+	rejects("HandNotFour is checked BEFORE InboxEmpty", function(state)
+		-- The other half of the precedence lock, and the one a mutation found missing: an intent
+		-- illegal on BOTH counts must answer HandNotFour. Seat 2 reaches a hand of five with an
+		-- empty inbox the only way it can -- seat 1 draws, passes to it, and seat 2 draws that one
+		-- card -- so this is a situation the live round produces constantly, in particular all
+		-- through the start-up ramp of research 3.8. Without this row an implementation that checks
+		-- the inbox first reads green on every other case in the file; a mutation found it missing.
+		local drew = Engine.apply(state, { kind = "Draw", seat = 1 })
+		t.truthy(drew.ok, "the setup draw must succeed")
+		local card = drewCard(drew.events[1])
+		assert(card ~= nil, "narrowing")
+		local passed = Engine.apply(state, { kind = "Pass", seat = 1, cardId = card })
+		t.truthy(passed.ok, "the setup pass must succeed")
+		local onward = Engine.apply(state, { kind = "Draw", seat = 2 })
+		t.truthy(onward.ok, "seat 2 must be able to draw the one card it was passed")
+		t.deepEqual(
+			kindsOf(onward.events),
+			{ "Drew" },
+			"and that draw must not complete, or the setup is a different case"
+		)
+		t.equal(#state.seats[2].hand, Types.MAX_HAND, "seat 2 now holds five")
+		t.equal(#state.seats[2].inbox, 0, "with nothing behind it to draw")
+		return { kind = "Draw", seat = 2 }
+	end, "HandNotFour")
+
+	-- 18 --------------------------------------------------------------------------------------------
 	t.test("a legal draw at exactly 4 is accepted and the hand becomes 5", function()
 		local state = rejectRound()
 		local front = state.seats[1].inbox[1]
@@ -341,7 +382,7 @@ return function(t: Test.Runner)
 		t.truthy(ok, `the state after a legal draw reported {tostring(why)}`)
 	end)
 
-	-- 18 -----------------------------------------------------------------------------------------
+	-- 19 --------------------------------------------------------------------------------------------
 	t.test("a legal pass at exactly 5 lands at the tail of the resolved successor's inbox", function()
 		local state = rejectRound()
 		local drew = Engine.apply(state, { kind = "Draw", seat = 1 })
@@ -360,7 +401,7 @@ return function(t: Test.Runner)
 		t.truthy(ok, `the state after a legal pass reported {tostring(why)}`)
 	end)
 
-	-- 19 -----------------------------------------------------------------------------------------
+	-- 20 --------------------------------------------------------------------------------------------
 	t.test("a completing draw emits Drew, Completed, SeatRemoved in that order, from ONE apply", function()
 		-- CARD-07. SEED 1 IS HARDCODED: the greedy sequence above reaches a completion on action 17
 		-- of a 3-seat, ranks = 4, jokerless round, and hardcoding it makes the case deterministic
@@ -398,7 +439,7 @@ return function(t: Test.Runner)
 		t.truthy(ok, `the state after the completion chain reported {tostring(why)}`)
 	end)
 
-	-- 20 -----------------------------------------------------------------------------------------
+	-- 21 --------------------------------------------------------------------------------------------
 	t.test("the IDENTICAL scripted sequence completes in Wild and does not in Blocker", function()
 		-- CARD-12 at the apply level: both variants available behind an `EngineConfig` VALUE from
 		-- the start, selected in the same process. SEED 5 IS HARDCODED. Both modes deal the same
@@ -452,7 +493,7 @@ return function(t: Test.Runner)
 		t.truthy(ok, `the Blocker twin reported {tostring(why)}`)
 	end)
 
-	-- 21 -----------------------------------------------------------------------------------------
+	-- 22 --------------------------------------------------------------------------------------------
 	t.test("a Remove intent routes identically for every cause an intent may carry", function()
 		-- CARD-08 and CLAUDE.md rule 8: ONE generic operation. The two causes below are the two an
 		-- intent may carry; `Completed` is covered by the next case, because it is the ENGINE's own
@@ -483,7 +524,7 @@ return function(t: Test.Runner)
 		t.equal(benchedChurn, 1, "so is an AFK bench")
 	end)
 
-	-- 22 -----------------------------------------------------------------------------------------
+	-- 23 --------------------------------------------------------------------------------------------
 	t.test("a Remove intent may not carry the engine's own Completed cause", function()
 		-- See the note in Engine.luau. `Completed` is net zero on circulation ONLY because the
 		-- completion path retires four cards before removing the seat; an intent carrying it would
@@ -501,7 +542,7 @@ return function(t: Test.Runner)
 		t.equal(state.valve.observations, 0, "and no valve entry point ran")
 	end)
 
-	-- 23 -----------------------------------------------------------------------------------------
+	-- 24 --------------------------------------------------------------------------------------------
 	t.test("a departed seat rejects its own intents while a pass TARGETING it lands downstream", function()
 		-- Research 7.6, both ends in one case. The actor end is rejected; the target end is not a
 		-- rejection at all, because `Ring.pass` resolves the successor at EXECUTION time.
@@ -529,7 +570,7 @@ return function(t: Test.Runner)
 		t.truthy(ok, `the state after a downstream pass reported {tostring(why)}`)
 	end)
 
-	-- 24 -----------------------------------------------------------------------------------------
+	-- 25 --------------------------------------------------------------------------------------------
 	t.test("newRound is clean, correct and reproducible across the whole pool grid", function()
 		local function gridFor(mode: Types.JokerMode)
 			for seatCount = 2, 9 do
@@ -568,7 +609,7 @@ return function(t: Test.Runner)
 		gridFor("Blocker")
 	end)
 
-	-- 25 -----------------------------------------------------------------------------------------
+	-- 26 --------------------------------------------------------------------------------------------
 	t.test("a forced pass from the valve is a normal pass plus a marker, end to end", function()
 		-- CARD-11 wired. This drives `tests/harness/Livelock`'s hand-verified cycle through the REAL
 		-- `Engine.apply`, never through the fixture's own `Livelock` mutator, because a fixture only
@@ -674,7 +715,7 @@ return function(t: Test.Runner)
 		t.equal(accepted, 114, "114 accepted applies; the injected rejection is not one of them")
 	end)
 
-	-- 26 -----------------------------------------------------------------------------------------
+	-- 27 --------------------------------------------------------------------------------------------
 	t.test("MUTATION: with antiLivelockValve = false the identical fixture never escapes", function()
 		-- One half of case 25 fails if the valve is not wired; THIS half fails if the fixture is not
 		-- really a cycle. Without it, "the valve rescued the round" is unfalsifiable: a round that
@@ -731,7 +772,7 @@ return function(t: Test.Runner)
 		t.equal(state.valve.observations, LIMIT, "every action was observed")
 	end)
 
-	-- 27 -----------------------------------------------------------------------------------------
+	-- 28 --------------------------------------------------------------------------------------------
 	t.test("apply never yields and hands control to nobody", function()
 		-- Plan 02-03's R3 guard already fails the whole gate chain on any of these inside a pure
 		-- zone. This case exists so a developer running only `--filter engine` still sees it, and so
