@@ -16,7 +16,7 @@
 --   1. finishers                        -- position in previousFindOrder
 --   2. non-finishers seated last round  -- their index in previousSeatOrder, ascending
 --   3. the previous hider               -- single entry
---   4. joiners (in no previous list)    -- index in roster, i.e. join order
+--   4. joiners (in no previous list)    -- index in the filtered roster, i.e. join order
 --
 -- Zero finishers is NOT a special case: bucket 1 is simply empty and the head falls through to
 -- bucket 2, which is reachable in every round that ends at the cap -- exactly the rounds the pacing
