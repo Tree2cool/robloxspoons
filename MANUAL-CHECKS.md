@@ -44,9 +44,12 @@ mkdir -p build && rojo build default.project.json -o build/spoons.rbxl
 `$ignoreUnknownInstances: true` on `Workspace` and gives it no `$path`. Code appears under `ServerScriptService.Server`,
 `ReplicatedStorage.Shared` and `StarterPlayer.StarterPlayerScripts.Client`.
 
-Observed: _
+Observed: Passed on Windows 2026-11-03. Baseplate + rojo serve 7.7.1 (CLI and plugin matched;
+the plugin's "a newer compatible version" notice was informational). A Part named `SurvivalTest`
+added by hand in Workspace survived an edit-sync of `src/shared/Config/Round.luau` AND a full
+Disconnect/Connect re-sync. Code appeared under the three mounts as expected.
 
-- [ ] M-01 signed off: <name> <date>
+- [x] M-01 signed off: alejandrog_m 2026-11-03
 
 ---
 
@@ -150,9 +153,18 @@ experience is NOT isolation.
 - With `PRODUCTION_UNIVERSE_ID` filled in, press Play from the production place: the server must refuse to boot with
   `Refusing real persistence: this is a Studio session and game.GameId matches the production universe id ...`.
 
-Observed (ids stay out of this file if you prefer; record them in `Environments.luau`): _
+Observed: Partially complete 2026-11-03. Dev experience created on the Creator Hub; the place was
+uploaded with **Save to Roblox As** after Studio's **Publish As** failed repeatedly with a bare
+"Save failed" (web creation worked, so it was Studio-side, not an account restriction).
+"Enable Studio Access to API Services" is ON for the dev experience. Ids recorded in
+`Environments.luau`: DEV_UNIVERSE_ID 10774453248, DEV_PLACE_ID 123236339661606.
 
-- [ ] M-04 signed off: <name> <date>
+STILL OPEN for M-04: (a) no production experience exists yet, so `PRODUCTION_UNIVERSE_ID` is 0 and
+the Studio tripwire protects nothing until it is set; (b) the two DataStore verification commands
+(dev must succeed, production must fail with `StudioAccessToApisNotAllowed`) are unrun — the second
+needs a production place; (c) `servePlaceIds` is deliberately not yet in `default.project.json`.
+
+- [ ] M-04 signed off: <name> <date>   (blocked on a production experience existing)
 
 ---
 
