@@ -67,7 +67,7 @@ good pool; a 0.025% residual at k=2,j=2).**
 - **Files created:** 3; **modified:** 0 (no shared planning file was touched — the orchestrator owns `STATE.md`, `ROADMAP.md` and `REQUIREMENTS.md` this wave)
 - **`--filter engine/valve`:** `11 passed, 0 failed, 0 todo in 0.30s` (0.337s wall, `time` real; repeat runs 0.30–0.44s — well under the 1.0s bar)
 - **`--filter engine`:** `107 passed, 0 failed, 3 todo in 0.52s`; `--filter engine/`: `103 passed, 0 failed, 3 todo in 0.35s`
-- **Full suite (run at the end of the wave, after the siblings landed):** `429 passed, 0 failed, 3 todo in 15.58s` — baseline at `0e3bbba` was 380; +11 from this plan, the rest from wave-3 siblings 02-04, 02-05 and 02-06
+- **Full suite (run at the end of the wave, after the siblings landed):** `429 passed, 0 failed, 3 todo in 15.58s`, and `431 passed, 0 failed, 3 todo in 14.55s` on a final re-run two sibling commits later — baseline at `0e3bbba` was 380; +11 from this plan, the rest from wave-3 siblings 02-04, 02-05 and 02-06
 - **`scripts/verify.luau`:** `verify: all 14 automated steps passed in 16.9s`
 - **`check-guards`:** `ok (74 files, 163 requires, 19 guarded roots)`
 - **Both purity layers:** `selene --config selene.pure.toml src/server/engine` → `0 errors`; `luau-lsp --platform standard` → `analyze: ok`
