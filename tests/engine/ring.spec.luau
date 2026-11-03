@@ -205,6 +205,26 @@ return function(t: Test.Runner)
 		expectClean(state, "m=1 after a pass")
 	end)
 
+	-- 7 ----------------------------------------------------------------------------------------
+	t.test("the target is resolved at execution time", function()
+		-- CARD-03's actual wording is "the server resolving which seat that is at execution time",
+		-- and this is the case that distinguishes it from a cached target: seat 5's neighbour left
+		-- between the intent and the execution, so the card lands in the DEPARTED seat's successor,
+		-- with no rejection and no special handling (research 6, 7.6). The client never names the
+		-- target (CLAUDE.md rule 7) and `pass` has no target parameter to name it with.
+		local state = makeRing(9, 11, 1, "Wild")
+		t.equal(state.seats[5].next, 6, "seat 5's neighbour at the deal")
+		Ring.removeSeat(state, 6, "Disconnected")
+		t.equal(Ring.successorOf(state, 5), 7, "seat 5's successor after the departure")
+		t.equal(Ring.successorOf(state, 6), nil, "a removed seat has no successor to steer toward")
+		local card = state.seats[5].hand[1]
+		local target = Ring.pass(state, 5, card)
+		t.equal(target, 7, "the pass landed in the departed seat's successor")
+		local inbox = state.seats[7].inbox
+		t.equal(inbox[#inbox], card, "at the tail, behind the cards seat 6 routed there")
+		t.equal(#inbox, 5, "seat 6's four routed cards are still ahead of it")
+	end)
+
 	-- 8 ----------------------------------------------------------------------------------------
 	t.test("circulation is unchanged by every pass and every draw", function()
 		-- Research 4.1 and CARD-04's "the deck never runs dry": `Invariants.check` must be clean and

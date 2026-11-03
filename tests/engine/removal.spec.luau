@@ -131,6 +131,38 @@ local function completionReady(): Types.State
 	return state
 end
 
+-- The deterministic Rule 8 fixture research 3.4 recommends: a conservation-clean state in which
+-- EXACTLY ONE rank is still fully intact and all four of its copies sit in seat 1's hand and inbox.
+-- Every other rank has been partly retired, so no other rank can ever be completed, and seat 2's
+-- own cards cannot rescue the round. Jokers are absent, so `satisfiable` in Wild mode is exactly
+-- "some rank still has all four copies in play".
+--   ranks 1..6, no jokers, T = 24. seatCount 4, liveCount 2, churnRemovals 0, so plan 02-01's
+--   identity #retired + #terminal == 4 * (seatCount - liveCount - churnRemovals) gives 8 retired,
+--   which is why the STARTING state is conservation-clean and the mutation below is the only change.
+local function makeOneIntactRank(): Types.State
+	local state = makeRing(4, 6, 0, "Wild")
+	for _, seatId in { 3, 4 } do
+		local dead = state.seats[seatId]
+		dead.hand = {}
+		dead.inbox = {}
+		dead.live = false
+		dead.next = seatId
+		dead.prev = seatId
+	end
+	state.liveCount = 2
+	state.head = 1
+	state.seats[1].next, state.seats[1].prev = 2, 2
+	state.seats[2].next, state.seats[2].prev = 1, 1
+	state.counters.completions = 2
+	state.retired = { 5, 6, 9, 10, 13, 14, 17, 21 }
+	state.seats[1].hand = { 1, 2, 7, 8 } -- rank 1 x2, rank 2 x2
+	state.seats[1].inbox = { 3, 4, 11, 12 } -- rank 1 x2, rank 3 x2
+	state.seats[2].hand = { 15, 16, 18, 19 } -- rank 4 x2, rank 5 x2
+	state.seats[2].inbox = { 20, 22, 23, 24 } -- rank 5 x1, rank 6 x3
+	recount(state)
+	return state
+end
+
 return function(t: Test.Runner)
 	local function expectClean(state: Types.State, label: string)
 		local ok, why = Invariants.check(state)
@@ -341,6 +373,68 @@ return function(t: Test.Runner)
 		t.equal(Invariants.expectedCirculation(state), expectedBefore, "churn did not move")
 		t.equal(state.counters.churnRemovals, 0, "a completion is not churn")
 		expectClean(state, "after a completion removal")
+	end)
+
+	-- 17 ---------------------------------------------------------------------------------------
+	t.test("MUTATION: destroying a removed seat's cards breaks conservation and kills the multiset", function()
+		-- The Rule 8 tripwire proof, built the deterministic way research 3.4 recommends rather than
+		-- statistically. Measured there: across 12,800 rounds the destroy variant fired the
+		-- satisfiability tripwire in 2.9-5.7% of rounds while the honest variant fired it in 0.0%.
+		-- That is why a crafted fixture is paired with the statistical version in plan 02-09's
+		-- simulator: 3-6% is too rare to be a reliable unit test, and 0% is indistinguishable from a
+		-- predicate that cannot fire at all.
+		local routed: { Types.CardId } = { 1, 2, 7, 8, 3, 4, 11, 12 } -- hand ascending, then inbox FIFO
+
+		-- The honest path: Rule 8 is obeyed, so the round stays solvable.
+		local honest = makeOneIntactRank()
+		expectClean(honest, "the crafted fixture before the removal")
+		t.equal(Invariants.satisfiable(honest), true, "the fixture must start solvable")
+		t.equal(honest.counters.cnt[5], 1, "exactly one rank is still fully intact")
+		local routedTo, moved = Ring.removeSeat(honest, 1, "Disconnected")
+		t.equal(routedTo, 2, "the successor")
+		t.equal(moved, #routed, "every held card was routed")
+		t.deepEqual(honest.seats[2].inbox, { 20, 22, 23, 24, 1, 2, 7, 8, 3, 4, 11, 12 }, "routed to the tail")
+		t.equal(Invariants.satisfiable(honest), true, "routing the cards keeps the round solvable")
+		expectClean(honest, "after the honest removal")
+
+		-- The destruction Rule 8 forbids, performed from the TEST side: no shipped code path can do
+		-- this, which is the whole point of there being no `destroyCards` parameter on `removeSeat`.
+		local destroyed = makeOneIntactRank()
+		Ring.removeSeat(destroyed, 1, "Disconnected")
+		local inbox = destroyed.seats[2].inbox
+		local gone: { [Types.CardId]: true } = {}
+		for _, id in routed do
+			gone[id] = true
+		end
+		local kept: { Types.CardId } = {}
+		for _, id in inbox do
+			if not gone[id] then
+				table.insert(kept, id)
+			end
+		end
+		destroyed.seats[2].inbox = kept
+		recount(destroyed) -- the counters follow the cards into the void, so `satisfiable` can see it
+		t.deepEqual(destroyed.seats[2].inbox, { 20, 22, 23, 24 }, "the routed cards were destroyed")
+
+		-- The multiset died: no rank has four copies left in play and there is no joker to stand in,
+		-- so no seat can ever reach four of a kind. Asserted through the PREDICATE, directly.
+		t.equal(Invariants.satisfiable(destroyed), false, "destroying a removed seat's cards kills the multiset")
+		t.equal(destroyed.counters.cnt[5], 0, "no rank is fully intact any more")
+
+		-- ...and `check` reports `circulation`, NOT the satisfiability violation. `check` returns the
+		-- FIRST violation in a locked order: `circulation` is violation 4 and the satisfiability
+		-- tripwire is violation 9. Destroying cards drops `Invariants.circulation` while
+		-- `expectedCirculation` is unchanged, so the conservation break is reported and violation 9
+		-- is never reached. Both facts are worth asserting -- the cards vanished AND the multiset
+		-- died. Reordering the violation list so violation 9 comes out here is forbidden: it would
+		-- make every genuine conservation bug surface as a stall statistic in the simulator instead
+		-- of as an error, inverting the whole design of `Invariants.check`. Plan 02-09's simulator
+		-- classifies that stall category from `satisfiable()` for exactly the same reason.
+		local ok, why = Invariants.check(destroyed)
+		t.equal(why, "circulation", "a vanished card is a conservation bug and must be reported as one")
+		t.equal(ok, false, "check reported ok on a state with eight destroyed cards")
+		t.equal(Invariants.circulation(destroyed), 4, "circulation fell by the eight destroyed cards")
+		t.equal(Invariants.expectedCirculation(destroyed), 12, "...while the expected side did not move")
 	end)
 
 	-- 18 ---------------------------------------------------------------------------------------
