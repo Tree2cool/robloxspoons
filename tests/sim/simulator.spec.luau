@@ -49,6 +49,29 @@ local function opts(
 	}
 end
 
+-- Cases 3 and 4 both need the valve-OFF outcome of the same 80 seeds, and `tests/run.luau` runs
+-- cases in registration order -- so a case reading another case's local would depend on that order.
+-- One lazy shared scan makes the dependency explicit and halves the cost.
+local SOLVABILITY_SEEDS = 80
+local cachedValveOff: { [number]: string }? = nil
+
+local function valveOffOutcomes(): { [number]: string }
+	local cached = cachedValveOff
+	if cached ~= nil then
+		return cached
+	end
+	local out: { [number]: string } = {}
+	for seed = 1, SOLVABILITY_SEEDS do
+		out[seed] = Simulator.runRound(opts(10, 2, 2, "Wild", "Solvability", {
+			valve = false,
+			autoPassSeconds = math.huge,
+			seed = seed,
+		})).outcome
+	end
+	cachedValveOff = out
+	return out
+end
+
 return function(t: Test.Runner)
 	t.test("Pacing at the reference pool clears for the great majority of seeds, with a plausible TTFC", function()
 		local cleared, total = 0, 40
@@ -87,34 +110,24 @@ return function(t: Test.Runner)
 		-- 0.25%, so a case built on it would need ~2,000 seeds to see one Livelock and would be a
 		-- coin flip at 80.
 		local livelocked, cleared = 0, 0
-		for seed = 1, 80 do
-			local r = Simulator.runRound(opts(10, 2, 2, "Wild", "Solvability", {
-				valve = false,
-				autoPassSeconds = math.huge,
-				seed = seed,
-			}))
-			if r.outcome == "Livelock" then
+		for _, outcome in valveOffOutcomes() do
+			if outcome == "Livelock" then
 				livelocked += 1
-			elseif r.outcome == "Cleared" then
+			elseif outcome == "Cleared" then
 				cleared += 1
 			end
 		end
-		print(`    valve OFF, k=2 j=2, 80 seeds: {livelocked} Livelock, {cleared} Cleared`)
-		t.truthy(livelocked >= 1, "pure greed must livelock on at least one of 80 seeds at k=2, j=2")
-		t.truthy(cleared >= 1, "pure greed must also clear on at least one of 80 seeds")
-		t.equal(livelocked + cleared, 80, "every round must land in one of the two categories")
+		print(`    valve OFF, k=2 j=2, {SOLVABILITY_SEEDS} seeds: {livelocked} Livelock, {cleared} Cleared`)
+		t.truthy(livelocked >= 1, "pure greed must livelock on at least one seed at k=2, j=2")
+		t.truthy(cleared >= 1, "pure greed must also clear on at least one seed")
+		t.equal(livelocked + cleared, SOLVABILITY_SEEDS, "every round must land in one of the two categories")
 	end)
 
 	t.test("the valve rescues exactly the seeds that livelocked without it", function()
 		local rescued, firings = 0, 0
 		local checked = 0
-		for seed = 1, 80 do
-			local off = Simulator.runRound(opts(10, 2, 2, "Wild", "Solvability", {
-				valve = false,
-				autoPassSeconds = math.huge,
-				seed = seed,
-			}))
-			if off.outcome ~= "Livelock" then
+		for seed, offOutcome in valveOffOutcomes() do
+			if offOutcome ~= "Livelock" then
 				continue
 			end
 			checked += 1
@@ -133,8 +146,11 @@ return function(t: Test.Runner)
 	end)
 
 	t.test("a destroyed-card round is Unsatisfiable, classified from the PREDICATE", function()
+		-- 30 rounds, not 120: the measured Unsatisfiable rate is 77% of churned sabotage rounds
+		-- (subset.spec.luau carries the arithmetic), so the chance of seeing none in 30 is 0.23^30,
+		-- about 1e-19, and a destroyed-card round is the most expensive round this simulator runs.
 		local unsat, other = 0, {}
-		for seed = 1, 120 do
+		for seed = 1, 30 do
 			local r = Simulator.runRound(opts(10, REF_K, REF_J, "Wild", "Pacing", {
 				churn = true,
 				sabotage = "DestroyRemovedCards",
@@ -150,11 +166,11 @@ return function(t: Test.Runner)
 				other[r.outcome] = (other[r.outcome] or 0) + 1
 			end
 		end
-		print(`    sabotage over 120 rounds: {unsat} Unsatisfiable; other outcomes:`)
+		print(`    sabotage over 30 rounds: {unsat} Unsatisfiable; other outcomes:`)
 		for name, count in other do
 			print(`      {name} = {count}`)
 		end
-		t.truthy(unsat >= 1, "destroying routed cards must produce at least one Unsatisfiable round in 120")
+		t.truthy(unsat >= 1, "destroying routed cards must produce at least one Unsatisfiable round in 30")
 	end)
 
 	t.test("a roster shortfall is its own category, not CapReached", function()
