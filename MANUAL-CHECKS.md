@@ -194,7 +194,7 @@ ids with no zeros, `default.project.json` has `"servePlaceIds": [120922388251092
 that dev and production are different universes, and that `servePlaceIds` never names production.
 Each of those assertions was mutation-proven to fail when its subject is broken.
 
-M-04's three command-bar checks (all unblocked now that the production id is live) — **2 of 3 passed, 1 unrun**:
+M-04's three command-bar checks — **2 of 3 passed, the third deferred by owner decision**:
 
 1. ~~In **`Spoons Dev`** the DataStore write must succeed.~~ **PASSED 2026-11-03.** Observed:
    `GameId 10774461969 -> WROTE | nil`. The line printed `game.GameId` alongside the result, so the
@@ -217,12 +217,28 @@ M-04's three command-bar checks (all unblocked now that the production id is liv
    production `m04` data store. Nothing reads that store, so it is inert, but it is a live
    production write and should be treated as one.
 
-3. In **`SPOONS [BETA]`**, re-sync this build and press **Play**: the server must refuse to boot with
-   `Refusing real persistence: this is a Studio session and game.GameId matches the production
-   universe id 10774453248`. This is the in-code tripwire firing for real; it was inert while
-   `PRODUCTION_UNIVERSE_ID` was 0.
+3. **DEFERRED by owner decision 2026-11-03.** In `SPOONS [BETA]`, press Play and confirm the
+   server refuses to boot with `Refusing real persistence: ... matches the production universe id
+   10774453248`.
 
-- [ ] M-04 signed off: <name> <date>   (isolation verified both ways; check 3, the boot tripwire, is unrun)
+   Why deferred rather than run: seeing it fire needs the new `PRODUCTION_UNIVERSE_ID` inside the
+   production place, and `servePlaceIds` now makes `rojo serve` refuse production on purpose, so the
+   only route is publishing a build over the live production place. That is a disproportionate
+   action for a **secondary** control, given check 2 proved the primary one works and
+   `PersistenceMode.decide` is unit-tested directly in `tests/core/persistence.spec.luau`. It will
+   be exercised naturally at the first real deploy.
+
+   Carried in `NEEDS_HUMAN.md`. What is NOT claimed: the tripwire has never fired in a live Studio
+   session. Its logic is tested; its wiring to `game.GameId` in a real place is not.
+
+Dev access re-confirmed after the production toggle was flipped, to rule out having traded one
+problem for another: `GameId 10774461969 -> WROTE | nil`. The setting is per-experience, as expected.
+
+**Scope of this sign-off:** the separate dev universe exists, all ids are recorded and machine-checked,
+Studio writes succeed in dev and are refused in production with `StudioAccessToApisNotAllowed`. The
+boot tripwire (check 3) is deferred and is NOT covered by this tick.
+
+- [x] M-04 signed off: alejandrog_m 2026-11-03   (checks 1 and 2; check 3 deferred, see above)
 
 ---
 
@@ -240,9 +256,17 @@ multi-client limit means the 11th-join behaviour needs a published place. The co
 **Expected:** the 11th join is refused (by the platform at the cap, or kicked by `PlayerGate` with its full-server
 message if it slips through). The server stays at 10 and keeps running.
 
-Observed: _
+Observed: 2026-11-03. Step 1 done — **Maximum Players = 10 on both places**, dev and production.
 
-- [ ] M-05 signed off: <name> <date>
+Steps 2 and 3 are **unrun**: they need ten simultaneous real clients, which the owner does not have
+available. The code-side half of FOUND-08 is covered without them — `Admission` and `PlayerGate` are
+unit-tested over the full boundary table (3-player minimum, 10-player cap, each refusal asserting its
+own reason code), and the 11th-join refusal at the cap is platform behaviour, not our code.
+
+**Scope of this sign-off:** the place setting is confirmed. An observed 11th-join refusal is NOT
+claimed, and is carried in `NEEDS_HUMAN.md` for the first playtest that reaches ten players.
+
+- [x] M-05 signed off: alejandrog_m 2026-11-03   (cap set on both places; 11th-join unobserved, see above)
 
 ---
 

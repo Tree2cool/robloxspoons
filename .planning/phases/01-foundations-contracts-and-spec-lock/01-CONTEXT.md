@@ -184,6 +184,29 @@ gameplay UI (Phase 4+), the five shipped maps (Phase 7).
   Options then: charge a token on rejection too, or keep this order and add a cheap
   repeat-offender counter. Do not treat the current order as settled.
 
+- **D-23 (owner decision, 2026-11-03): M-04's boot tripwire check and M-05's 11th-join check are
+  deferred with their scope recorded, rather than being ticked as if verified.** Phase 1 closes on
+  the controls that were actually demonstrated.
+  **What M-04 did prove:** the dev universe exists, all three ids are recorded and machine-checked,
+  and Studio DataStore writes succeed in `Spoons Dev` (`GameId 10774461969 -> WROTE`) while being
+  refused in `SPOONS [BETA]` with `StudioAccessToApisNotAllowed`. This is FOUND-07's **primary**
+  control, and it was found switched OFF — the first production run returned `WROTE`, meaning
+  Studio could write live player data. The check paid for itself.
+  **What is deferred:** pressing Play in production to watch `PersistenceMode` refuse to boot. The
+  tripwire is a *secondary* control, its logic is unit-tested in `tests/core/persistence.spec.luau`,
+  and observing it live would require publishing a build over the live production place — because
+  `servePlaceIds` now deliberately stops `rojo serve` reaching production. Not worth a production
+  publish; it will be exercised at the first real deploy.
+  **Also deferred:** M-05's 11th-join refusal, which needs ten simultaneous real clients. The cap
+  itself is set to 10 on both places, and `Admission`/`PlayerGate` are unit-tested over the full
+  boundary table.
+  **Not claimed:** that the tripwire has ever fired in a real Studio session, or that an 11th join
+  has been observed being refused. Both are carried in `NEEDS_HUMAN.md` against the event that
+  makes them cheap.
+  **Note for later:** the tripwire would not have caught the real defect found here. It guards the
+  server boot path, not a hand-run command-bar write. If a future phase ever treats it as the thing
+  protecting production data, that is a mistake — the toggle is.
+
 ### Defaults Taken Without Asking (post-research)
 
 Research raised five owner questions; four are D-16..D-19 above. The rest are defaulted:
