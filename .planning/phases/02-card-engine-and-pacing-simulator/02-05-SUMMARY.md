@@ -57,7 +57,10 @@ completed: 2026-11-03
 - **Files created:** 2; **modified:** 0
 - **`hand.spec.luau` isolated:** `10 passed, 0 failed, 0 todo in 0.01s`
 - **`--filter engine`:** `87 passed, 0 failed, 3 todo in 0.38s`
-- **Full suite:** `409 passed, 0 failed, 3 todo in 14.95s` (verified baseline at `0e3bbba` was 380; +10 from this plan, the rest from wave-3 siblings 02-04/02-06/02-13)
+- **Full suite:** `429 passed, 0 failed, 3 todo in 15.28s` at the end of the wave (verified baseline at
+  `0e3bbba` was 380; +10 from this plan, the rest from wave-3 siblings 02-04/02-06/02-13). The first
+  post-plan run read `409 passed, 0 failed` before those siblings finished landing
+- **`scripts/verify.luau`:** `verify: all 14 automated steps passed in 17.1s`
 - **Purity layers:** `selene --config selene.pure.toml src/server/engine` → `0 errors`; `analyze --platform standard src/server/engine` → `ok`; `check-guards` → `ok (72 files, 153 requires, 19 guarded roots)`
 
 ## Task Commits
@@ -281,27 +284,29 @@ are verbatim.
 - **Files modified:** `tests/engine/hand.spec.luau`
 - **Commit:** `99b2278`
 
-### Not fixed (out of scope, not logged as a defect)
+### Transient, resolved by its owner (not logged as a defect)
 
-`scripts/verify.luau` currently stops at its `analyze` step with
+Mid-wave, `scripts/verify.luau` stopped at its `analyze` step with
 `tests/engine/pool.spec.luau(341,80): TypeError: Expected this to be '"Blocker" | "Wild"' but got
 'string | string'` — the same widening defect as deviation 3, in **wave-3 sibling plan 02-04's
-uncommitted working copy** (`git status` shows ` M tests/engine/pool.spec.luau`, +379 lines, at the
-time of writing). It is not in any commit and not this plan's file, so it was left untouched and was
-deliberately **not** written to the shared `deferred-items.md` (a concurrent sibling owns that file
-too). Evidence that nothing else is wrong:
+uncommitted working copy** (` M tests/engine/pool.spec.luau`, +379 lines, at the time). It was not in
+any commit and not this plan's file, so it was left untouched and deliberately **not** written to the
+shared `deferred-items.md`, which a concurrent sibling also owns. While it was outstanding, the rest
+of the tree was shown clean by running `analyze` with that one file excluded:
 
 ```
 analyze --platform standard --ignore "**/fixtures/**" --ignore "**/pool.spec.luau" \
-        src/server/engine scripts tests   →  analyze: ok
-stylua --check src scripts tests          →  (clean)
-selene src scripts tests                  →  0 errors, 0 warnings, 0 parse errors
-check-guards                              →  ok (72 files, 153 requires, 19 guarded roots)
-lune run tests/run.luau                   →  409 passed, 0 failed, 3 todo in 14.95s
+        src/server/engine scripts tests   ->  analyze: ok
 ```
 
-The fix is one line in 02-04's file (pass the mode literal, or index the table through a visitor) and
-belongs to whoever is holding it. `verify.luau` should be re-run by the wave gate once 02-04 commits.
+**02-04 has since committed its fix.** The final gate run from this working tree is
+`verify: all 14 automated steps passed in 17.1s`, so nothing is outstanding. Nothing was deferred by
+this plan.
+
+Note for the verifier: while siblings were mid-edit, a single full-suite run read
+`420 passed, 9 failed` and the next read `429 passed, 0 failed` with no commit in between — the
+failures were a snapshot of other agents' half-written files, not flakiness in the suite. This plan's
+10 rows were `ok` in every run.
 
 ## Wave-3 isolation note (method, for the verifier)
 
