@@ -47,6 +47,7 @@
 --    shipped hot path must not pay for a test-time assertion. `newRound` does call it once, because
 --    a round that starts corrupt must not be playable and the deal is the cheapest place to catch a
 --    layout mistake.
+local Hand = require("./Hand")
 local Invariants = require("./Invariants")
 local Pool = require("./Pool")
 local Ring = require("./Ring")
@@ -54,6 +55,7 @@ local Types = require("./Types")
 local Valve = require("./Valve")
 
 local HAND_SIZE = Types.HAND_SIZE
+local MAX_HAND = Types.MAX_HAND
 local JOKER_RANK = Types.JOKER_RANK
 local BUCKETS = 5 -- counters.cnt[a + 1] for a in 0..4
 
@@ -155,6 +157,211 @@ local function newRound(config: Types.EngineConfig, seatPlayerIds: { Types.Playe
 	return state
 end
 
+-- Every rejection returns through here, so there is exactly one shape for a refusal: a code, and an
+-- EMPTY event list rather than nil, because a consumer that has to distinguish nil from empty will
+-- eventually get it wrong. Nothing is mutated on this path -- no card moves, no counter moves and
+-- no valve entry point runs.
+local function rejected(code: Types.Reject): Types.ApplyResult
+	return { ok = false, events = {}, reject = code }
+end
+
+-- The ONLY mutation entry point. Synchronous, two parameters, no handler function, no clock. The
+-- events are RETURNED; the caller feeds them to its own stream after this function has returned.
+--
+-- VALIDATION RUNS IN THE LOCKED PRECEDENCE, first match wins, because the tests assert the exact
+-- code and a different order is a different contract:
+--   any     UnknownSeat  -> SeatNotLive
+--   Draw    ...          -> HandNotFour -> InboxEmpty
+--   Pass    ...          -> UnknownCard -> HandNotFive -> NotYourCard
+--   Remove  ...          (no further checks; the cause comes from outside)
+local function apply(state: Types.State, intent: Types.Intent): Types.ApplyResult
+	local seat = state.seats[intent.seat]
+	if seat == nil then
+		-- A seat index that names no seat. NOT an error: this module does not assume the shape
+		-- layer ran, and an out-of-range index is an illegal intent like any other.
+		return rejected("UnknownSeat")
+	end
+	if not seat.live then
+		-- Research 7.6, the actor end of a mid-pass departure: an intent whose actor left between
+		-- intent and execution must be refused, never applied to a dead seat. This is also the
+		-- engine's own answer to a replayed or forged intent for a removed seat.
+		return rejected("SeatNotLive")
+	end
+
+	local events: { Types.Event } = {}
+
+	if intent.kind == "Draw" then
+		if #seat.hand ~= HAND_SIZE then
+			-- CARD-01. "The pile locks at 5" is exactly this rule and nothing else; there is no
+			-- `locked` flag on a seat that could disagree with the hand it describes.
+			return rejected("HandNotFour")
+		end
+		if #seat.inbox == 0 then
+			return rejected("InboxEmpty")
+		end
+
+		local cardId = Ring.draw(state, intent.seat)
+		table.insert(events, { kind = "Drew", seat = intent.seat, cardId = cardId })
+
+		-- THE ONLY completion check in the engine (CLAUDE.md, research section 5).
+		local completion = Hand.detectCompletion(state.rankOf, seat.hand, state.config.jokerMode)
+		if completion ~= nil then
+			-- Retirement, which with `Ring.removeSeat`'s terminal branch is one of exactly two
+			-- places a card leaves play. `removeSeat` owns that branch and `churnRemovals`; this
+			-- block owns the retired four and `completions`, and neither touches the other's
+			-- counters (02-06-SUMMARY.md: do not double-count).
+			local counters = state.counters
+			local isRetired: { [Types.CardId]: true } = {}
+			for _, id in completion.retired do
+				isRetired[id] = true
+				table.insert(state.retired, id)
+				local rank = state.rankOf[id]
+				if rank == JOKER_RANK then
+					counters.jokersInPlay -= 1
+				else
+					local copies = counters.rankInPlay[rank]
+					counters.cnt[copies + 1] = (counters.cnt[copies + 1] or 0) - 1
+					counters.rankInPlay[rank] = copies - 1
+					counters.cnt[copies] = (counters.cnt[copies] or 0) + 1
+				end
+			end
+			local kept: { Types.CardId } = {}
+			for _, id in seat.hand do
+				if not isRetired[id] then
+					table.insert(kept, id)
+				end
+			end
+			seat.hand = kept
+			counters.completions += 1
+
+			table.insert(events, {
+				kind = "Completed",
+				seat = intent.seat,
+				rank = completion.rank,
+				retired = completion.retired,
+				fifth = completion.fifth,
+			})
+
+			-- THE REMOVAL HAPPENS INSIDE THE SAME APPLY AS THE DRAW. CARD-07's wording is "detected
+			-- on draw and immediately removes that player"; splitting it across two applies would
+			-- open a window in which a completed seat is still a legal pass target. The retirement
+			-- above runs FIRST, because `removeSeat` routes whatever is still in the hand.
+			local routedTo, cards = Ring.removeSeat(state, intent.seat, "Completed")
+			table.insert(events, {
+				kind = "SeatRemoved",
+				seat = intent.seat,
+				cause = "Completed",
+				routedTo = routedTo,
+				cards = cards,
+			})
+		end
+	elseif intent.kind == "Pass" then
+		if intent.cardId % 1 ~= 0 or intent.cardId < 1 or intent.cardId > state.totalCards then
+			-- A card id outside `1..totalCards` names no card in this round. A fractional or NaN id
+			-- names no card either, so the legality answer is the same one; the shape layer still
+			-- owns refusing it as a malformed payload (research Security Domain V5).
+			return rejected("UnknownCard")
+		end
+		if #seat.hand ~= MAX_HAND then
+			return rejected("HandNotFive")
+		end
+		if table.find(seat.hand, intent.cardId) == nil then
+			-- NotYourCard covers BOTH situations, and must: the card is held by a different seat,
+			-- and the card is in play but sitting in an inbox rather than in any hand. Research 7.6:
+			-- a card that was auto-passed a moment before the intent arrived is no longer in the
+			-- actor's hand, and that is a rejection rather than a crash. ASVS V4: a seat can only
+			-- ever act on cards it actually holds.
+			return rejected("NotYourCard")
+		end
+
+		-- `Ring.pass` takes NO target and resolves the successor at execution time, so the client
+		-- names a card and nothing else (CLAUDE.md rule 7).
+		local to = Ring.pass(state, intent.seat, intent.cardId)
+		table.insert(events, { kind = "Passed", seat = intent.seat, to = to, cardId = intent.cardId })
+
+		-- NO COMPLETION CHECK HERE, AND NONE MAY BE ADDED. Passing can only leave a SUBSET of a
+		-- hand that already had no set, so a pass can never create one. A "defensive" check here
+		-- would not be defensive: it would double-fire completions on the forced pass below.
+	else
+		-- ONE intent with a cause, not three operations (CLAUDE.md rule 8). Phase 4's AFK bench and
+		-- a disconnect both route through here, and so does nothing else: `removeSeat` is the single
+		-- generic operation and the cause only decides whether this counts as churn.
+		local routedTo, cards = Ring.removeSeat(state, intent.seat, intent.cause)
+		table.insert(events, {
+			kind = "SeatRemoved",
+			seat = intent.seat,
+			cause = intent.cause,
+			routedTo = routedTo,
+			cards = cards,
+		})
+	end
+
+	-- THE VALVE (plan 02-13, 02-CONTEXT.md amendment A7 and its correction). ONE block covering all
+	-- three intent kinds, and the last thing a successful apply does. Four reasons it is shaped
+	-- exactly like this:
+	--
+	-- * IT IS WIRED IN HERE RATHER THAN EXPOSED AS A TICK. If a caller had to run it, Phase 4 could
+	--   forget, and the measured zero-stall result would stop applying to the shipped product.
+	--   Breaking a livelock is a liveness property of the engine, like the hand-size rule -- not an
+	--   optional service a caller opts into.
+	-- * IT RUNS AFTER THE MUTATION AND INSIDE THE SAME SYNCHRONOUS APPLY. No yield point, no handler
+	--   function, nothing broadcast (CLAUDE.md rule 6). `apply` still takes exactly two parameters.
+	-- * A FORCED PASS IS A REAL PASS. `Ring.pass` resolves `next` at execution time, so the valve
+	--   names a card and never a target (CLAUDE.md rule 7), and the seat drops back to a resting
+	--   hand exactly as if the player had passed. `ValveForcedPass` comes BEFORE the `Passed` it
+	--   explains, and the `Passed` is emitted as well rather than folded into the marker, so that
+	--   EVERY card movement in the engine has exactly one `Drew` or `Passed` event -- a uniform rule
+	--   Phase 4's adapter and plan 02-08's fuzz suite can both rely on, instead of a consumer having
+	--   to know that one event kind is secretly also a pass. Phase 4 must read `ValveForcedPass` as
+	--   "that pass was not the player's choice", the same contract as an AFK auto-pass.
+	-- * A PASS CAN NEVER COMPLETE ANYONE, so the forced pass needs no completion check and cannot
+	--   cascade.
+	--
+	-- Exactly one entry point runs per SUCCESSFUL apply and NEITHER runs on a rejection: a rejection
+	-- must leave the state unchanged, and the valve's counters are part of the state. Plan 02-08
+	-- asserts `state.valve.observations == acceptedActions`, which is what catches the valve being
+	-- skipped inside a conditional and reading green.
+	--
+	-- What is claimed: the valve eliminated OBSERVED stalls for a good pool -- 0 of 4,000 rounds at
+	-- k=1,j=1 and at k=2,j=1 -- and reduced but did not eliminate them at k=2,j=2 (21.600% to
+	-- 0.025%). It is a demonstrated property of a selected configuration and never an unconditional
+	-- property of the engine.
+	local progressed = false
+	for _, event in events do
+		if event.kind == "Completed" or event.kind == "SeatRemoved" then
+			progressed = true
+			break
+		end
+	end
+	if progressed then
+		Valve.afterProgress(state)
+	else
+		-- `drewAtSeat` is the drawing seat on a non-completing draw and nil on a pass. Immediately
+		-- after a non-completing draw is the only instant at which a known seat holds MAX_HAND and
+		-- therefore provably has a legal pass, and it is about to pass anyway -- so the valve
+		-- changes WHICH card leaves, never whether a pass happens.
+		local drewAtSeat: Types.SeatId? = if intent.kind == "Draw" then intent.seat else nil
+		local forced = Valve.afterAction(state, drewAtSeat)
+		if forced ~= nil then
+			local to = Ring.pass(state, intent.seat, forced)
+			-- `lap` carries the firing's `actionsSinceProgress` so the metric is in the event stream
+			-- and not only in a counter. NO state hash goes in an event: the hash encodes every
+			-- hand and an event crosses the network boundary in Phase 4 (CLAUDE.md rule 3).
+			table.insert(events, {
+				kind = "ValveForcedPass",
+				seat = intent.seat,
+				cardId = forced,
+				to = to,
+				lap = state.valve.actionsSinceProgress,
+			})
+			table.insert(events, { kind = "Passed", seat = intent.seat, to = to, cardId = forced })
+		end
+	end
+
+	return { ok = true, events = events }
+end
+
 return {
 	newRound = newRound,
+	apply = apply,
 }
