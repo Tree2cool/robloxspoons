@@ -80,6 +80,24 @@ local CASES: { Case } = {
 		rules = { "R6" },
 		needles = { "cross-mount require", "resolves on disk but not in the DataModel", "src/server/engine/Bad.luau:2" },
 	},
+	-- These two roots live under tests/purity/fixtures/ rather than tests/guards/fixtures/ because
+	-- 02-VALIDATION.md's Wave 0 list names those paths, and because they document the *purity* claim
+	-- (CLAUDE.md rules 2, 5 and 6) even though the rule that enforces them is R3. Written as literal
+	-- paths, not via FIXTURES, which points at tests/guards/fixtures.
+	-- Rule 6: a pure-zone module must not yield in the middle of a state mutation.
+	{
+		root = "tests/purity/fixtures/engine-yield",
+		ok = false,
+		rules = { "R3" },
+		needles = { "banned construct: coroutine", "src/server/engine/Yielder.luau:" },
+	},
+	-- Rule 5: the server is the only clock, so a pure-zone module must not read a real one.
+	{
+		root = "tests/purity/fixtures/engine-clock",
+		ok = false,
+		rules = { "R3" },
+		needles = { "banned construct: os.", "src/server/engine/Clocked.luau:" },
+	},
 }
 
 local function guard(args: { string }): process.ExecResult
@@ -159,6 +177,18 @@ return function(t: Test.Runner)
 		t.equal(r.code, 0, output)
 		t.contains(output, "check-guards: ok")
 		t.deepEqual(ruleIds(output), {}, output)
+	end)
+
+	-- The coroutine/os. bans are deliberately NOT repo-wide: tests/run.luau legitimately calls os.clock()
+	-- for the suite timer. Without this case a future widening of R3's scope would fail the suite in a
+	-- confusing place (67 unrelated-looking reports) instead of here, by name.
+	t.test("R3's coroutine/os ban is scoped to pure zones, not repo-wide", function()
+		local r = guard({ "." })
+		local output = r.stdout .. r.stderr
+		t.equal(r.code, 0, output)
+		t.falsy(string.find(output, "tests/run.luau", 1, true), output)
+		t.falsy(string.find(output, "banned construct: os.", 1, true), output)
+		t.falsy(string.find(output, "banned construct: coroutine", 1, true), output)
 	end)
 
 	t.test("--print-zones prints the pure zones space-separated and exits 0", function()
