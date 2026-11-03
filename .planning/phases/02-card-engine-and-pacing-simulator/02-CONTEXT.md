@@ -65,6 +65,58 @@ applies — `server/engine/` is lint-enforced pure and runs headless in CI.
   sweep is a manual/nightly script whose output is committed as a report. Phase 1's CI is ~20s and
   that should stay true.
 
+### AMENDMENTS after research (2026-11-03) — these OVERRIDE the three areas above
+
+Phase research ran ~230,000 simulated rounds and found that two decisions accepted earlier today do
+not survive contact with the numbers. Both were re-decided by the owner. The superseded wording is
+kept above deliberately, so the record shows what changed and why.
+
+**A1. Gate G1 is gated on greedy bots PLUS the shipped AFK auto-pass mechanic (CARD-16), not on
+pure greedy.** The zero-stall bar is unachievable against a purely greedy population: every
+configuration livelocks at a non-zero rate, while a trace of deviation drives it to zero. Confirmed
+in two independent implementations (the researcher's Luau spike and a separate Python check, which
+agreed qualitatively while differing in magnitude):
+
+| k | j | circulation = 4k+j | pure greedy stall | +2% deviation |
+|---|---|--------------------|-------------------|---------------|
+| 0 | 0 | 0  | 100%  | 100% |
+| 0 | 1 | 1  | 1.0%  | 0.0% |
+| 1 | 1 | 5  | 0.3%  | 0.0% |
+| 2 | 1 | 9  | 0.3%  | 0.0% |
+| 2 | 2 | 10 | 20.7% | 0.0% |
+
+Auto-pass is chosen over a bare "assume humans deviate 2%" floor because it is a **real mechanic the
+game already ships**, so the gate measures the actual product rather than an unverifiable claim
+about human behaviour. The pure-greedy stall curve is still computed and reported as the known
+worst case. Rationale for caring at all: a gate that cannot pass does not stay a gate — it gets
+quietly relaxed by whoever is executing, and then nothing was gated.
+
+**A2. Pool selection gains a third bar: a circulation/occupancy floor (~60% of seats able to act).**
+The accepted rule — smallest pool that passes, fewest extra ranks then fewest jokers — selects
+**k=0, j=1**, which is **one single card circulating among nine seats**. It passes both the stall
+and the pacing bars while being barely a game. Time-to-first-completion provably cannot detect a
+dead table; occupancy can, costs one counter, and selects k=2.
+
+**A3. `seatCount` means SEATED SEEKERS, not match roster** (resolved from the design, not asked).
+The hider does not play cards, and CLAUDE.md fixes the card table at 9 seat anchors against a
+10-player cap. So `ranks = (players in round − 1) + k`. The research flagged this ambiguity as
+shifting the chosen configuration by a full notch, so it is stated explicitly rather than left to
+the executor.
+
+**A4. k >= 1 is mandatory** (derived, not asked). At k=0 the CARD-12 blocker variant stalls ~97% at
+N=10 while the wild variant is fine, so "both variants behind a flag from the start" would be false
+at k=0 — the flag would be a cliff, not a flag. Combined with A2 this means the search starts at
+k=1, and k=0 is retained only as a documented negative result.
+
+**A5. Circulation is `4k + j` exactly**, which makes CARD-04's "the deck never runs dry" simply
+`circulation >= 1`, and makes `k=0, j=0` a provable instant deadlock rather than an empirical one.
+
+**A6. Rules 5 and 6 are enforced by nothing today.** Research ran a pure-zone fixture using
+`coroutine.yield`, `coroutine.resume`, `os.clock` and `os.time` through `selene.pure.toml` and got
+**0 errors** — `std = "luau"` permits all of them. No pure zone uses any of them today, so banning
+them in `check-guards` R3 is zero-churn and makes Non-Negotiable Rules 5 and 6 actually enforced
+instead of merely stated. This phase should do it.
+
 ### Claude's Discretion
 
 - Engine module decomposition, type shapes, and the exact `apply`/event vocabulary, subject to
