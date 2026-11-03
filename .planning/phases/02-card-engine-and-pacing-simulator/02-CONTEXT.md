@@ -181,6 +181,63 @@ secondary mitigation, with its deadline free to take a realistic AFK value.
 choosing a card the player would NOT have chosen. If Phase 4 ships the obvious "pass your worst card",
 deviation is exactly zero and the simulator's result transfers nothing to the shipped game.
 
+**A8 (2026-11-03, measured + owner). The prototype figures in A7-CORRECTION do not reproduce against
+the real engine. G1's bars are re-derived from measurement.**
+
+Plan 02-09 measured the real simulator and I reproduced it independently on a different seed:
+
+| quantity, N=10, k=2 j=1, Pacing | prototype (A7-CORRECTION) | real engine |
+|---------------------------------|---------------------------|-------------|
+| stall rate, valve OFF           | 0.250%                    | **9.6 – 10.6%** |
+| stall rate, valve ON            | 0.000%                    | 0.00 – 0.10% |
+| rounds where the valve fired    | 0.25%                     | **9.6 – 15.8%** |
+
+**The valve itself is vindicated, not undermined:** `valveFiringRate(ON)` equals `stallRate(OFF)` to
+three decimals at every pool measured, so every firing is a real rescue. A valve-off stall is a
+1,300–1,900 action non-progressing tail against a healthy round's ~313 actions, and all 53 stalled
+seeds in a 500-round sample clear with the valve on.
+
+**Cause, traced rather than guessed:** amendment A3. The prototype seated 10 players; the real game
+seats 9 seekers because the hider does not play cards. One fewer rank means deeper endgames, and 33
+of 53 stalls occur at `liveCount == 2` — a two-seat greedy endgame, which is the `Livelock` fixture's
+own configuration. Research OQ-B predicted this off-by-one would "shift the configuration by a full
+notch"; measured, it is a factor of 40. It also places the result inside research §3.6's own 1–45%
+range, which the prototype's 0.250% never sat inside.
+
+**So the valve is far MORE load-bearing than A7 claimed** — it rescues roughly one round in ten at a
+full roster, not one in four hundred. Phase 4 must treat `ValveForcedPass` as a visible, ordinary
+event needing a real affordance, not a rare edge case.
+
+**Three resolutions:**
+
+1. **(owner) The valve firing-rate bar is re-derived from the measured curve**, not from the
+   prototype's 0.25%. No pool clears the proposed ~1% — the bar is set where the measured curve
+   actually separates good pools from bad, preserving the signal that exposed k=2 j=2 as a bad pool
+   when stall rate alone could not.
+2. **(owner) G1's zero-stall bar becomes an explicit residual ceiling**, around 0.5% — well above
+   the measured 0.05–0.10% valve-ON residual and far below the ~10% a valve regression produces —
+   with the actual measured residual printed in the G1 report rather than rounded away.
+3. **(derived from data, not asked) The search grid extends past k=2.** Measured at N=10, 400 rounds
+   per cell, j=1:
+
+   | k | circulation | stalls (valve off) | occupancy |
+   |---|-------------|--------------------|-----------|
+   | 1 | 5  | 27.75% | 0.634 |
+   | 2 | 9  | 12.25% | 0.790 |
+   | 3 | 13 | 5.00%  | 0.824 |
+   | 4 | 17 | 3.25%  | 0.838 |
+   | 6 | 25 | **1.00%** | 0.856 |
+   | 8 | 33 | 1.75%  | 0.870 |
+
+   The planned grid stopped at k=2, which carries 12% intrinsic stalls — it would never have looked
+   where the good pools are. `k` now searches at least {1,2,3,4,6}; A4's `k >= 1` floor still holds.
+   This is a search-range correction, not a design decision.
+
+**Not changed, and not to be changed to make a bar pass:** the 500-round statistical floor, any
+mutation case, `VALVE_ARM_ACTIONS_PER_SEAT` (raising it cannot help — every firing maps to a real
+stall, so a later arm point delays the rescue rather than avoiding it), or the pool moving to a
+green-but-unshippable k.
+
 ### Claude's Discretion
 
 - Engine module decomposition, type shapes, and the exact `apply`/event vocabulary, subject to
