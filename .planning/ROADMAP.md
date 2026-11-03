@@ -62,7 +62,7 @@ Plans:
 - [ ] 01-08-PLAN.md — Admission 10/3, PlayerGate, persistence isolation seam (wave 3)
 - [ ] 01-09-PLAN.md — Typed gateway, NetServer and ClientNet (wave 4)
 - [x] 01-10-PLAN.md — MapLoader, boot wiring, built-place require re-resolution (wave 5)
-- [ ] 01-11-PLAN.md — CI workflow, pre-commit hook, verify script, MANUAL-CHECKS (wave 6)
+- [x] 01-11-PLAN.md — CI workflow, pre-commit hook, verify script, MANUAL-CHECKS (wave 6)
 - [ ] 01-12-PLAN.md — Owner gate: test universe, place settings, servePlaceIds (wave 7, not autonomous)
 **Research**: Verification pass only. Re-check Verification Debt rows V-1 to V-6, V-8 to V-10, V-14, V-30, V-31. Run the Lune/Roblox `require` spike (V-4).
 **Spec lock (resolved defaults, each written as a test)**: Open Question 1, deal-time four-of-a-kind (re-shuffle so no seat starts complete, including wild-completable hands; this is CARD-09). Open Question 2, which four cards leave on a joker completion (spend naturals first; this is CARD-10). Open Question 17, player cap of 10 stated explicitly (FOUND-08).
