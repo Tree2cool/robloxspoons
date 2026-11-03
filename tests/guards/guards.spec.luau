@@ -5,6 +5,7 @@
 --   1. the exit code,
 --   2. the EXACT set of rule ids that fired (so a fixture cannot pass by tripping some other rule),
 --   3. distinguishing substrings of the diagnostic.
+local fs = require("@lune/fs")
 local process = require("@lune/process")
 
 local Test = require("../harness/Test")
@@ -104,7 +105,38 @@ local function ruleIds(output: string): { string }
 	return list
 end
 
+-- Sorted relative paths of .luau files under src/ whose contents contain `needle` (plain find, so a comment
+-- mentioning the identifier counts too: the owner file must be the only file that names it at all).
+local function filesUnderSrcContaining(needle: string): { string }
+	local found: { string } = {}
+	local function walk(dir: string)
+		for _, name in fs.readDir(dir) do
+			local path = `{dir}/{name}`
+			if fs.isDir(path) then
+				walk(path)
+			elseif string.sub(name, -5) == ".luau" and string.find(fs.readFile(path), needle, 1, true) ~= nil then
+				table.insert(found, path)
+			end
+		end
+	end
+	walk("src")
+	table.sort(found)
+	return found
+end
+
 return function(t: Test.Runner)
+	t.test("FOUND-04 exactly one file under src/ names OnServerEvent", function()
+		local owners = filesUnderSrcContaining("OnServerEvent")
+		t.equal(#owners, 1, table.concat(owners, ", "))
+		t.equal(owners[1], "src/server/services/NetServer.luau")
+	end)
+
+	t.test("FOUND-04 exactly one file under src/ names FireServer", function()
+		local owners = filesUnderSrcContaining("FireServer")
+		t.equal(#owners, 1, table.concat(owners, ", "))
+		t.equal(owners[1], "src/client/net/ClientNet.luau")
+	end)
+
 	for _, case in CASES do
 		t.test(`guard fixture {case.root}`, function()
 			local r = guard({ case.root })
