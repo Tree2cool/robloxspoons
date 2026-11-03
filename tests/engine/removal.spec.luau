@@ -145,26 +145,32 @@ return function(t: Test.Runner)
 		-- retirement, which is the caller's work in every cause -- so the only thing that can differ
 		-- afterwards is what `removeSeat` itself did. If a future edit forks the routing by cause,
 		-- this is the case that fails, and the disconnect path is the one nobody exercises by hand.
-		local causes: { Types.RemoveCause } = { "Completed", "Disconnected", "Benched" }
-		local inboxes: { { Types.CardId } } = {}
-		local hashes: { string } = {}
-		local churn: { number } = {}
-		for index, cause in causes do
+		-- The causes are passed as LITERALS at the call site rather than iterated out of a table:
+		-- Luau widens a singleton-string literal table to `{ string }`, and the widened element no
+		-- longer satisfies `RemoveCause` at the call site (the same real TypeError plan 02-01's
+		-- spec documents for `JokerMode`).
+		local function routeWith(cause: Types.RemoveCause): ({ Types.CardId }, string, number)
 			local state = completionReady()
 			retireFour(state, 3, { 9, 10, 11, 12 })
 			local routedTo, moved = Ring.removeSeat(state, 3, cause)
 			t.equal(routedTo, 4, `the successor of seat 3 ({cause})`)
 			t.equal(moved, 2, `cards routed ({cause})`)
-			inboxes[index] = table.clone(state.seats[4].inbox)
-			hashes[index] = Invariants.hash(state)
-			churn[index] = state.counters.churnRemovals
+			return table.clone(state.seats[4].inbox), Invariants.hash(state), state.counters.churnRemovals
 		end
-		t.deepEqual(inboxes[2], inboxes[1], "Disconnected routed differently from Completed")
-		t.deepEqual(inboxes[3], inboxes[1], "Benched routed differently from Completed")
-		t.equal(hashes[2], hashes[1], "Disconnected left a different table from Completed")
-		t.equal(hashes[3], hashes[1], "Benched left a different table from Completed")
+		local completedInbox, completedHash, completedChurn = routeWith("Completed")
+		local disconnectedInbox, disconnectedHash, disconnectedChurn = routeWith("Disconnected")
+		local benchedInbox, benchedHash, benchedChurn = routeWith("Benched")
+		t.deepEqual(completedInbox, { 21, 22 }, "the successor's inbox gained the fifth card and the left pile")
+		t.deepEqual(disconnectedInbox, completedInbox, "Disconnected routed differently from Completed")
+		t.deepEqual(benchedInbox, completedInbox, "Benched routed differently from Completed")
+		t.equal(disconnectedHash, completedHash, "Disconnected left a different table from Completed")
+		t.equal(benchedHash, completedHash, "Benched left a different table from Completed")
 		-- The ONE thing the cause is allowed to change.
-		t.deepEqual(churn, { 0, 1, 1 }, "only churnRemovals may differ by cause")
+		t.deepEqual(
+			{ completedChurn, disconnectedChurn, benchedChurn },
+			{ 0, 1, 1 },
+			"only churnRemovals may differ by cause"
+		)
 	end)
 
 	-- 10 ---------------------------------------------------------------------------------------
