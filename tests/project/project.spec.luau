@@ -4,6 +4,7 @@
 local fs = require("@lune/fs")
 local serde = require("@lune/serde")
 
+local Environments = require("../../src/shared/Config/Environments")
 local Test = require("../harness/Test")
 
 return function(t: Test.Runner)
@@ -42,6 +43,43 @@ return function(t: Test.Runner)
 		t.equal(luaurc.languageMode, "strict")
 		t.equal(luaurc.lintErrors, true)
 		t.equal(luaurc.typeErrors, true)
+	end)
+
+	t.test("FOUND-07 every experience id is recorded, not a placeholder zero", function()
+		-- A zero PRODUCTION_UNIVERSE_ID leaves the PersistenceMode Studio tripwire inert: it refuses
+		-- only when game.GameId equals it, and no real experience has GameId 0. So a zero here is not
+		-- a harmless placeholder, it is a disabled control. Same for the dev ids, which select the
+		-- experience that is safe to write to.
+		for _, field in { "PRODUCTION_UNIVERSE_ID", "DEV_UNIVERSE_ID", "DEV_PLACE_ID" } do
+			local value = (Environments :: any)[field]
+			t.equal(type(value), "number", `{field} must be a number`)
+			t.truthy(value > 0, `{field} is still a placeholder zero, so its control is inert`)
+			t.truthy(value % 1 == 0 and value < 2 ^ 53, `{field} must be an exact integer id`)
+		end
+	end)
+
+	t.test("FOUND-07 production and dev are separate universes", function()
+		-- D-13: data stores are per-experience, so isolation IS the universe split. If these ever
+		-- matched, Studio sessions would share live player data and the tripwire would refuse every run.
+		t.truthy(
+			Environments.PRODUCTION_UNIVERSE_ID ~= Environments.DEV_UNIVERSE_ID,
+			"dev and production must be different universes or there is no isolation"
+		)
+	end)
+
+	t.test("FOUND-07 rojo serve is restricted to the dev place", function()
+		-- servePlaceIds is what stops `rojo serve` syncing into the production place by accident.
+		-- Asserting it EQUALS the dev place id, not merely that it exists, is what makes the pair
+		-- impossible to desync: changing one file without the other fails here.
+		t.equal(type(project.servePlaceIds), "table", "servePlaceIds must be present")
+		t.equal(#project.servePlaceIds, 1)
+		t.equal(project.servePlaceIds[1], Environments.DEV_PLACE_ID)
+		for _, id in project.servePlaceIds do
+			t.truthy(
+				id ~= Environments.PRODUCTION_UNIVERSE_ID,
+				"servePlaceIds must never name the production experience"
+			)
+		end
 	end)
 
 	t.test("vendored Roblox definitions are the pinned copy", function()

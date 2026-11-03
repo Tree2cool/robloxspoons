@@ -1,6 +1,7 @@
 {
   "name": "Spoons",
   "globIgnorePaths": ["**/*.spec.luau", "**/*.spec.lua"],
+  "servePlaceIds": [120922388251092],
   "tree": {
     "$className": "DataModel",
     "ServerScriptService": {

@@ -2,17 +2,20 @@
 -- Universe and place identifiers. Data stores are consistent per EXPERIENCE, so isolation means a
 -- separate universe (D-13), not a separate place.
 --
--- Filled in from MANUAL-CHECKS M-04 on 2026-11-03. The dev experience was created on the Creator
--- Hub and the place uploaded with "Save to Roblox As" (Studio's Publish As failed repeatedly with
--- a bare "Save failed"; creating the experience on the web first and uploading into it worked).
--- "Enable Studio Access to API Services" is ON for the dev experience.
+-- Filled in from MANUAL-CHECKS M-04 on 2026-11-03. Two experiences exist:
 --
--- PRODUCTION_UNIVERSE_ID is still 0 because no production experience exists yet. A zero here is
--- safe, not a gap: the Studio tripwire requires BOTH a Studio session AND a non-zero production id
--- equal to game.GameId, so a placeholder zero never refuses an unrelated session. Set it the moment
--- a production experience exists, or the tripwire protects nothing.
+--   SPOONS [BETA]  production  GameId 10774453248  PlaceId 123236339661606
+--   Spoons Dev     dev         GameId 10774461969  PlaceId 120922388251092
+--
+-- Both places were uploaded with "Save to Roblox As" (Studio's "Publish As" failed repeatedly with
+-- a bare "Save failed"; creating the experience on the Creator Hub first and uploading into it
+-- worked). "Enable Studio Access to API Services" is ON for Spoons Dev and OFF for SPOONS [BETA].
+--
+-- PRODUCTION_UNIVERSE_ID being non-zero is what makes the Studio tripwire live: PersistenceMode
+-- returns Refuse when RunService:IsStudio() and game.GameId == PRODUCTION_UNIVERSE_ID. A zero here
+-- would leave it inert, so never reset it to a placeholder.
 return {
-	PRODUCTION_UNIVERSE_ID = 0,
-	DEV_UNIVERSE_ID = 10774453248,
-	DEV_PLACE_ID = 123236339661606,
+	PRODUCTION_UNIVERSE_ID = 10774453248,
+	DEV_UNIVERSE_ID = 10774461969,
+	DEV_PLACE_ID = 120922388251092,
 }

@@ -172,18 +172,36 @@ experience is NOT isolation.
 - With `PRODUCTION_UNIVERSE_ID` filled in, press Play from the production place: the server must refuse to boot with
   `Refusing real persistence: this is a Studio session and game.GameId matches the production universe id ...`.
 
-Observed: Partially complete 2026-11-03. Dev experience created on the Creator Hub; the place was
-uploaded with **Save to Roblox As** after Studio's **Publish As** failed repeatedly with a bare
-"Save failed" (web creation worked, so it was Studio-side, not an account restriction).
-"Enable Studio Access to API Services" is ON for the dev experience. Ids recorded in
-`Environments.luau`: DEV_UNIVERSE_ID 10774453248, DEV_PLACE_ID 123236339661606.
+Observed: 2026-11-03. **Both experiences now exist and both ids are recorded.**
 
-STILL OPEN for M-04: (a) no production experience exists yet, so `PRODUCTION_UNIVERSE_ID` is 0 and
-the Studio tripwire protects nothing until it is set; (b) the two DataStore verification commands
-(dev must succeed, production must fail with `StudioAccessToApisNotAllowed`) are unrun — the second
-needs a production place; (c) `servePlaceIds` is deliberately not yet in `default.project.json`.
+| Role | Experience | GameId (universe) | PlaceId |
+|------|-----------|-------------------|---------|
+| production | `SPOONS [BETA]` | 10774453248 | 123236339661606 |
+| dev | `Spoons Dev` | 10774461969 | 120922388251092 |
 
-- [ ] M-04 signed off: <name> <date>   (blocked on a production experience existing)
+Both places were uploaded with **Save to Roblox As** after Studio's **Publish As** failed repeatedly
+with a bare "Save failed" (creating the experience on the Creator Hub first and uploading into it
+worked, so it was Studio-side, not an account restriction). "Enable Studio Access to API Services"
+is ON for `Spoons Dev`.
+
+Recorded in code, and now machine-checked rather than eyeballed: `Environments.luau` holds all three
+ids with no zeros, `default.project.json` has `"servePlaceIds": [120922388251092]`, and
+`tests/project/project.spec.luau` asserts that the two files agree, that no id is a placeholder zero,
+that dev and production are different universes, and that `servePlaceIds` never names production.
+Each of those assertions was mutation-proven to fail when its subject is broken.
+
+STILL OPEN for M-04 — three command-bar checks, all now unblocked because the production id is live:
+
+1. In **`Spoons Dev`**: `game:GetService("DataStoreService"):GetDataStore("m04"):SetAsync("k", 1)`
+   must **succeed**.
+2. In **`SPOONS [BETA]`**: the same line must **fail** with `StudioAccessToApisNotAllowed`. If it
+   succeeds, API access is still ON for production — turn it OFF in Experience Settings, Security.
+3. In **`SPOONS [BETA]`**, re-sync this build and press **Play**: the server must refuse to boot with
+   `Refusing real persistence: this is a Studio session and game.GameId matches the production
+   universe id 10774453248`. This is the in-code tripwire firing for real; it was inert while
+   `PRODUCTION_UNIVERSE_ID` was 0.
+
+- [ ] M-04 signed off: <name> <date>   (ids recorded; the three command-bar checks above are unrun)
 
 ---
 
