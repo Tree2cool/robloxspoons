@@ -80,7 +80,8 @@ return function(t: Test.Runner)
 		-- The lint is still REPORTED, so the exit code differs only because of lintErrors, not because the lint is off.
 		t.contains(out(r), "LocalUnused")
 		-- And the nested config really was the one consulted.
-		t.contains(out(r), "lint-only-disabled/.luaurc")
+		-- Normalise separators: Windows luau-lsp prints "lint-only-disabled\\.luaurc".
+		t.contains((out(r):gsub("\\", "/")), "lint-only-disabled/.luaurc")
 		t.equal(
 			fs.readFile("tests/traps/fixtures/lint-only/Lint.luau"),
 			fs.readFile("tests/traps/fixtures/lint-only-disabled/Lint.luau"),
@@ -236,29 +237,50 @@ return function(t: Test.Runner)
 	end)
 
 	t.test("CI gate: stylua --check rejects badly formatted Luau", function()
-		-- stdin, so no .styluaignore entry can make this pass for the wrong reason.
-		local r = process.exec("stylua", { "--check", "-" }, { stdio = { stdin = "local x    =1\n" } })
-		t.falsy(r.ok, "stylua --check must reject this: " .. out(r))
-		t.equal(r.code, 1)
-		t.contains(out(r), "Diff in stdin")
-		-- Control: the same tool, same mode, accepts well-formatted input, so the rejection above is about formatting.
-		local good = process.exec("stylua", { "--check", "-" }, { stdio = { stdin = "local x = 1\n" } })
-		t.truthy(good.ok, out(good))
+		-- A real file at a path NEITHER .styluaignore NOR selene's exclude covers, so a pass here
+		-- cannot be an ignore rule rather than a clean file. stdin was tried first (01-04) but does
+		-- not deliver under Lune on Windows: the tool receives nothing and exits 0, which reads as
+		-- a passing gate. Found by the 01-11 fresh-clone rehearsal on a real Windows machine.
+		local dir = "tests/traps/cigate"
+		local path = dir .. "/Bad.luau"
+		fs.writeDir(dir)
+		local ran, err = pcall(function()
+			fs.writeFile(path, "local x    =1\nreturn x\n")
+			local r = process.exec("stylua", { "--check", path })
+			t.falsy(r.ok, "stylua --check must reject this: " .. out(r))
+			t.equal(r.code, 1)
+			-- Control: same tool, same mode, well-formatted input passes, so the rejection is about formatting.
+			fs.writeFile(path, "local x = 1\nreturn x\n")
+			local good = process.exec("stylua", { "--check", path })
+			t.truthy(good.ok, out(good))
+		end)
+		fs.removeDir(dir)
+		if not ran then
+			error(err, 0)
+		end
 	end)
 
 	t.test("CI gate: selene with the Roblox std rejects an undefined global", function()
-		local bad = "--!strict\nlocal y = someGlobalThatDoesNotExist\nreturn y\n"
-		local r = process.exec("selene", { "-" }, { stdio = { stdin = bad } })
-		t.falsy(r.ok, "selene must reject this: " .. out(r))
-		t.equal(r.code, 1)
-		t.contains(out(r), "undefined_variable")
-		t.contains(out(r), "someGlobalThatDoesNotExist")
-		-- Control: a clean input passes, and the Roblox std is genuinely active (`game` is known, unlike in a pure zone).
-		local good = process.exec(
-			"selene",
-			{ "-" },
-			{ stdio = { stdin = '--!strict\nlocal p = game:GetService("Players")\nreturn p\n' } }
-		)
-		t.truthy(good.ok, "the roblox std must accept `game`: " .. out(good))
+		-- Same reasoning as the stylua case: a real file outside every exclude, not stdin.
+		local dir = "tests/traps/cigate"
+		local path = dir .. "/Bad.luau"
+		fs.writeDir(dir)
+		local ran, err = pcall(function()
+			fs.writeFile(path, "--!strict\nlocal y = someGlobalThatDoesNotExist\nreturn y\n")
+			local r = process.exec("selene", { path })
+			t.falsy(r.ok, "selene must reject this: " .. out(r))
+			t.equal(r.code, 1)
+			t.contains(out(r), "undefined_variable")
+			t.contains(out(r), "someGlobalThatDoesNotExist")
+			-- Control: clean input passes AND the Roblox std is genuinely active (`game` is known here,
+			-- unlike in a pure zone under selene.pure.toml).
+			fs.writeFile(path, '--!strict\nlocal p = game:GetService("Players")\nreturn p\n')
+			local good = process.exec("selene", { path })
+			t.truthy(good.ok, "the roblox std must accept `game`: " .. out(good))
+		end)
+		fs.removeDir(dir)
+		if not ran then
+			error(err, 0)
+		end
 	end)
 end
