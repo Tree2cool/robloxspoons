@@ -170,6 +170,20 @@ gameplay UI (Phase 4+), the five shipped maps (Phase 7).
   is what catches undefined Roblox globals in gameplay code, so that would be weakening a gate
   to get green.
 
+- **D-22 (FLAGGED FOR PHASE 4/8, not settled): the gateway checks phase BEFORE the rate-limit
+  bucket.** Order is `isKnown` -> phase gate -> `Bucket:take` -> `validate` -> dispatch. This came
+  from 01-05's handoff and was passed through by the orchestrator; the 01-09 plan body had the
+  bucket first, so this is a deliberate but **unexamined** choice, not a researched one.
+  **What it buys:** a legitimate player whose intent arrives microseconds after a phase boundary
+  is not charged a token for a race they did not cause.
+  **What it costs:** a wrong-phase message is never throttled by the gateway, so a cheater can
+  hammer invalid-phase intents at zero token cost. Exposure is bounded — the per-message work is
+  an intent lookup plus a string compare, and Roblox's own per-client remote cap still applies —
+  but `onReject` telemetry would flood and no backpressure engages.
+  **Revisit in Phase 4** (when real card traffic exists) **or Phase 8** (anti-exploit tuning).
+  Options then: charge a token on rejection too, or keep this order and add a cheap
+  repeat-offender counter. Do not treat the current order as settled.
+
 ### Defaults Taken Without Asking (post-research)
 
 Research raised five owner questions; four are D-16..D-19 above. The rest are defaulted:
