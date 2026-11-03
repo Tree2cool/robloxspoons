@@ -77,7 +77,20 @@ Plans:
   3. A four-of-a-kind on draw removes that seat immediately, the ring closes up, and the removed seat's remaining cards reach the successor's left pile and are never destroyed
   4. The dealer and seat order for the next round are computed correctly from the previous find order, including the case where the first finder is the hider (deck goes to the highest-placed finisher actually seated) and the random round-1 dealer
   5. **Gate G1:** the bot pacing simulator reports zero stalls at every player count from 3 to 10 and acceptable time-to-first-completion, selecting the card pool and joker count; jokers ship as wilds (CARD-10) only if it passes, otherwise they ship as blockers (CARD-12), with both variants available behind a flag from the start
-**Plans**: TBD
+**Plans**: 12 plans in 7 waves
+Plans:
+- [ ] 02-01-PLAN.md — shared type vocabulary plus the circulation, partition-identity and satisfiability invariants, each mutation-proven
+- [ ] 02-02-PLAN.md — SeatOrder: one total order for dealer and seat order, with a corpus covering the five unspecified cases
+- [ ] 02-03-PLAN.md — pure-zone R3 guard extension banning `coroutine` and `os.`, with two mutation fixtures (CLAUDE.md rules 5 and 6)
+- [ ] 02-04-PLAN.md — Pool: build, shuffle, and the CARD-09 deal with a rejection-fired assertion
+- [ ] 02-05-PLAN.md — Hand: completion detection, naturals-first retirement, and the Wild/Blocker divergence
+- [ ] 02-06-PLAN.md — Ring: pass/draw/wrap and the one generic seat removal with its terminal bucket
+- [ ] 02-07-PLAN.md — Engine.apply: validation, all seven reject codes, the locked event order, and newRound
+- [ ] 02-08-PLAN.md — the 100k-action fuzz suite with action-count and per-kind coverage assertions
+- [ ] 02-09-PLAN.md — the bot simulator, the six-outcome taxonomy, the three G1 bars, and the CI regression subset
+- [ ] 02-10-PLAN.md — the two-stage full sweep and the committed G1 report
+- [ ] 02-11-PLAN.md — the G1 decision in `Config/CardPool`, and the three spec-lock todos become real tests (todo count 0)
+- [ ] 02-12-PLAN.md — record the verdict in the planning documents, hand Phase 4 the auto-pass constraint, owner sign-off
 **Research**: YES. Simulator design (stall definition, pacing targets, bot reaction-time model, snowball and start-up latency measurement). Domain design, not API research. Open Questions 3 and 6 are resolved here. Re-check V-15 and V-35.
 **Note on CARD-10 and CARD-12**: both are mapped here and both are built, but exactly one is active in the shipped game, selected by Gate G1.
 
