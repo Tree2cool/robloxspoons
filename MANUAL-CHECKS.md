@@ -194,10 +194,11 @@ ids with no zeros, `default.project.json` has `"servePlaceIds": [120922388251092
 that dev and production are different universes, and that `servePlaceIds` never names production.
 Each of those assertions was mutation-proven to fail when its subject is broken.
 
-STILL OPEN for M-04 — three command-bar checks, all now unblocked because the production id is live:
+M-04's three command-bar checks (all unblocked now that the production id is live) — 1 of 3 passed:
 
-1. In **`Spoons Dev`**: `game:GetService("DataStoreService"):GetDataStore("m04"):SetAsync("k", 1)`
-   must **succeed**.
+1. ~~In **`Spoons Dev`** the DataStore write must succeed.~~ **PASSED 2026-11-03.** Observed:
+   `GameId 10774461969 -> WROTE | nil`. The line printed `game.GameId` alongside the result, so the
+   pass is tied to the dev experience and cannot have come from the wrong place open in Studio.
 2. In **`SPOONS [BETA]`**: the same line must **fail** with `StudioAccessToApisNotAllowed`. If it
    succeeds, API access is still ON for production — turn it OFF in Experience Settings, Security.
 3. In **`SPOONS [BETA]`**, re-sync this build and press **Play**: the server must refuse to boot with
@@ -205,7 +206,7 @@ STILL OPEN for M-04 — three command-bar checks, all now unblocked because the 
    universe id 10774453248`. This is the in-code tripwire firing for real; it was inert while
    `PRODUCTION_UNIVERSE_ID` was 0.
 
-- [ ] M-04 signed off: <name> <date>   (ids recorded; the three command-bar checks above are unrun)
+- [ ] M-04 signed off: <name> <date>   (ids recorded; dev write passed; checks 2 and 3 unrun)
 
 ---
 
