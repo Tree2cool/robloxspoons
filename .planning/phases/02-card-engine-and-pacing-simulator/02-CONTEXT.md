@@ -146,8 +146,30 @@ about players. It fires in roughly 0.25% of rounds and is invisible otherwise. T
 exists in the plans — `Invariants.hash` and the simulator's cycle detection — so this largely moves
 it from `scripts/sim/` into `src/server/engine/`.
 
-**What this does to the gate.** G1's zero-stall bar is now met by construction, so the simulator's job
-changes: it must prove the valve FIRES when needed and that stalls are zero *with it enabled*, and it
+**A7-CORRECTION (measured, same day).** A7 above claims zero-stall "becomes a theorem about the
+engine". My own prototype of the valve falsifies that as an unconditional claim, so the weaker and
+true version governs. Measured at N=10, 4,000 rounds per cell:
+
+| pool | stall valve OFF | stall valve ON | rounds where valve fired | mean fires/round |
+|------|-----------------|----------------|--------------------------|------------------|
+| k=1, j=1 | 0.275% | **0.000%** | 0.28% | 0.004 |
+| k=2, j=1 | 0.250% | **0.000%** | 0.25% | 0.005 |
+| k=2, j=2 | 21.600% | 0.025% | **21.60%** | 0.415 |
+
+1. **The valve works for good pools.** Both `j=1` configurations go to exactly 0 stalls in 4,000
+   rounds while firing in only ~0.25% of them, so it is invisible in normal play.
+2. **It is NOT an unconditional guarantee.** `k=2, j=2` with the valve ON still stalls 0.025%. That
+   may be the prototype's 20,000-action cap binding rather than a true livelock, but the honest claim
+   is "the valve eliminates observed stalls **for the selected pool**, demonstrated rather than
+   assumed" — not "by construction, for every pool". The plans must not repeat the stronger claim.
+3. **Valve firing rate is a much better pool discriminator than stall rate**, which is the real
+   argument for making it a selection input. `k=2, j=2` is a bad pool that needs rescuing in 21.6% of
+   rounds, yet its *stall* rate with the valve on (0.025%) would sail past a naive zero-stall bar.
+   The firing rate screams. A hard bar of ~1% is proposed. Note also that `j=2` is dramatically worse
+   than `j=1` at the same `k` — independent evidence for the "jokers present but few" reading.
+
+**What this does to the gate.** G1's zero-stall bar is now carried by the valve rather than by player
+behaviour, so the simulator's job changes: it must prove the valve FIRES when needed and that stalls are zero *with it enabled*, and it
 must still report the pure-greedy and auto-pass curves as evidence about the margin. The valve's
 firing rate becomes a first-class metric; a pool whose valve fires often is a bad pool even at zero
 stalls.
