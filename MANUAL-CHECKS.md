@@ -11,9 +11,13 @@ How to use this file:
   (`- [ ] M-0x signed off: <name> <date>`); `scripts/verify.luau` parses it.
 - Record anything surprising under the check ("Observed"), even when it passes.
 
-Also an owner action: **the first green GitHub Actions run.** The build environment cannot push, so
-`.github/workflows/ci.yml` has never run on the remote. After pushing a branch, confirm the `ci` workflow goes green
-and record the run URL in `NEEDS_HUMAN.md`.
+~~Also an owner action: the first green GitHub Actions run.~~ **Closed 2026-11-03.** `ci.yml` has now
+run on the remote and is green: six runs on `claude/happy-cerf-ughp67`, the latest being
+[run 6](https://github.com/Tree2cool/robloxspoons/actions/runs/41582812758) on commit `3ea2af0`.
+All fourteen verify steps appear as separate green steps in the job, so the workflow genuinely runs
+the gates rather than merely exiting 0. This also settles the two things the build container could
+not check: `actions/checkout@v7` resolves, and the SHA-pinned `CompeyDev/setup-rokit` installs the
+pinned toolchain on a clean `ubuntu-latest` runner.
 
 Prerequisites for everything below: Roblox Studio, Rokit (`https://github.com/rojo-rbx/rokit`), and a fresh clone:
 
