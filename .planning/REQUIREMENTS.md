@@ -11,16 +11,21 @@ Requirements for initial release. Each maps to exactly one roadmap phase.
 
 ### Foundations
 
-- [ ] **FOUND-01
+- [x] **FOUND-01
 **: Rojo project syncs to Studio with git as source of truth, with `$ignoreUnknownInstances` on Workspace so Studio-authored maps are not deleted on sync
-- [ ] **FOUND-02
+- [x] **FOUND-02
 **: Toolchain is pinned via Rokit (StyLua, Selene, luau-lsp) and every Luau file is `--!strict`
-- [ ] **FOUND-03**: Engine tests and the fuzz suite run headless outside Studio in CI
-- [ ] **FOUND-04**: Every client-to-server message passes a single typed gateway that validates arguments (including NaN) and rate-limits per player
-- [ ] **FOUND-05**: The build fails if `Scoring`, `CardTable` or `SpoonPlacement` gain an import path to any cosmetics or shop module
-- [ ] **FOUND-06**: The build fails if the card engine references any Roblox API
-- [ ] **FOUND-07**: A Studio session cannot write to production player data
+- [x] **FOUND-03**: Engine tests and the fuzz suite run headless outside Studio in CI
+- [x] **FOUND-04**: Every client-to-server message passes a single typed gateway that validates arguments (including NaN) and rate-limits per player
+- [x] **FOUND-05**: The build fails if `Scoring`, `CardTable` or `SpoonPlacement` gain an import path to any cosmetics or shop module
+- [x] **FOUND-06**: The build fails if the card engine references any Roblox API
+- [x] **FOUND-07**: A Studio session cannot write to production player data
 - [ ] **FOUND-08**: Server enforces a 10-player cap and a 3-player minimum to start
+  - **PARTIAL after Phase 1.** The 10-cap is complete and wired. The 3-minimum is a tested
+    predicate with **zero callers** (`PlayerGate.canStart` is defined, never called) because no
+    match-start path exists until Phase 6, so the server does not yet *enforce* it. Kept open
+    deliberately: it is the only thing that will catch Phase 6 inventing its own start predicate,
+    which `Admission.luau` explicitly forbids.
 
 ### Card Engine
 
@@ -75,7 +80,7 @@ Requirements for initial release. Each maps to exactly one roadmap phase.
 - [ ] **SCORE-03**: A seeker who finds no spoon earns 0 find points but keeps their four-of-a-kind bonus
 - [ ] **SCORE-04**: The hider earns 4000 × the average fraction of a fixed 300 seconds that their spoons survived, with unfound spoons counting as the full 300
 - [ ] **SCORE-05**: The round ends the instant the final spoon is claimed, or at the 5:00 cap
-- [ ] **SCORE-06**: Round end happens exactly once, and a scheduled callback from an earlier round can never affect a later one
+- [x] **SCORE-06**: Round end happens exactly once, and a scheduled callback from an earlier round can never affect a later one
 - [ ] **SCORE-07**: The scoreboard shows four-of-a-kind bonus and find points as separate figures
 - [ ] **SCORE-08**: The top 3 by that round's score get a ~10-second podium displaying their equipped cosmetics
 - [ ] **SCORE-09**: The podium reveals any unfound spoons using the hider's placement effect
@@ -98,7 +103,7 @@ Requirements for initial release. Each maps to exactly one roadmap phase.
 
 ### Maps
 
-- [ ] **MAP-01**: Maps are data behind one shared contract, with no per-map code branches
+- [x] **MAP-01**: Maps are data behind one shared contract, with no per-map code branches
 - [ ] **MAP-02**: An automated validator runs every authored default spot through the real placement rules and fails the build on any that would be unfindable
 - [ ] **MAP-03**: Every map provides at least 16 validated default hiding spots
 - [ ] **MAP-04**: Maps are selected at random without repeating the previous map
@@ -213,14 +218,14 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| FOUND-01 | Phase 1 | Pending |
-| FOUND-02 | Phase 1 | Pending |
-| FOUND-03 | Phase 1 | Pending |
-| FOUND-04 | Phase 1 | Pending |
-| FOUND-05 | Phase 1 | Pending |
-| FOUND-06 | Phase 1 | Pending |
-| FOUND-07 | Phase 1 | Pending |
-| FOUND-08 | Phase 1 | Pending |
+| FOUND-01 | Phase 1 | Complete |
+| FOUND-02 | Phase 1 | Complete |
+| FOUND-03 | Phase 1 | Complete |
+| FOUND-04 | Phase 1 | Complete |
+| FOUND-05 | Phase 1 | Complete |
+| FOUND-06 | Phase 1 | Complete |
+| FOUND-07 | Phase 1 | Complete |
+| FOUND-08 | Phase 1 | **Partial** (cap done; 3-minimum unwired until Phase 6) |
 | CARD-01 | Phase 2 | Pending |
 | CARD-02 | Phase 4 | Pending |
 | CARD-03 | Phase 2 | Pending |
@@ -263,7 +268,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SCORE-03 | Phase 5 | Pending |
 | SCORE-04 | Phase 5 | Pending |
 | SCORE-05 | Phase 5 | Pending |
-| SCORE-06 | Phase 1 | Pending |
+| SCORE-06 | Phase 1 | Complete |
 | SCORE-07 | Phase 6 | Pending |
 | SCORE-08 | Phase 6 | Pending |
 | SCORE-09 | Phase 7 | Pending |
@@ -280,7 +285,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | MATCH-10 | Phase 6 | Pending |
 | MATCH-11 | Phase 6 | Pending |
 | MATCH-12 | Phase 6 | Pending |
-| MAP-01 | Phase 1 | Pending |
+| MAP-01 | Phase 1 | Complete |
 | MAP-02 | Phase 3 | Pending |
 | MAP-03 | Phase 3 | Pending |
 | MAP-04 | Phase 6 | Pending |

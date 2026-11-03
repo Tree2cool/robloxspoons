@@ -75,14 +75,18 @@ return function(t: Test.Runner)
 		t.equal(#project.servePlaceIds, 1)
 		t.equal(project.servePlaceIds[1], Environments.DEV_PLACE_ID)
 		for _, id in project.servePlaceIds do
-			t.truthy(
-				id ~= Environments.PRODUCTION_UNIVERSE_ID,
-				"servePlaceIds must never name the production experience"
-			)
+			-- Against the production PLACE id, not the universe id. Those are separate id spaces,
+			-- so the original form of this check could never fire however wrong the file got.
+			t.truthy(id ~= Environments.PRODUCTION_PLACE_ID, "servePlaceIds must never name the production place")
 		end
 	end)
 
 	t.test("vendored Roblox definitions are the pinned copy", function()
-		t.equal(#fs.readFile("tools/types/globalTypes.None.d.luau"), 677555)
+		-- Hash, not byte length. 01-01-SUMMARY called this file "sha256-pinned" while the only gate
+		-- was its length, so any same-length substitution passed. The recorded hash is from the
+		-- luau-lsp 1.70.1 tag; it matched the committed file when this check was tightened.
+		local body = fs.readFile("tools/types/globalTypes.None.d.luau")
+		t.equal(#body, 677555)
+		t.equal(serde.hash("sha256", body), "9ad75109b8dc9197f6d1726208bfa0b12de47c3a43672a4fa43227f0cec609ee")
 	end)
 end

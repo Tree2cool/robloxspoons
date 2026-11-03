@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 01-11-PLAN.md
+status: phase-1-complete
+stopped_at: Phase 1 verified and closed (01-12 + VERIFICATION.md)
 last_updated: "2026-11-03T02:34:40.412Z"
 last_activity: 2026-11-03
 progress:
   total_phases: 8
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 12
-  completed_plans: 11
-  percent: 92
+  completed_plans: 12
+  percent: 100
 ---
 
 # Project State
@@ -25,12 +25,17 @@ See: .planning/PROJECT.md (updated 2026-11-02)
 
 ## Current Position
 
-Phase: 1 (Foundations, Contracts and Spec Lock) — EXECUTING
-Plan: 11 of 12 complete (next: 01-12 owner gate)
-Status: Ready to execute
+Phase: 1 (Foundations, Contracts and Spec Lock) — **COMPLETE and verified**
+Plan: 12 of 12 complete
+Status: Ready to plan Phase 2
 Last activity: 2026-11-03
 
-Progress: [█████████░] 92%
+Progress: [██████████] 100% of Phase 1
+
+Verified at commit `70fd9ce` by gsd-verifier: 9 of Phase 1's 10 requirements COMPLETE,
+FOUND-08 PARTIAL. 333 tests pass, 14/14 verify steps green locally and in CI.
+Note: **G1 is Phase 2's gate, not Phase 1's** — Phase 1 is ungated. The spec-lock items that
+feed G1 (CARD-09, CARD-10, CARD-12) are three `t.todo` entries; Phase 2 must drive that count to 0.
 
 ## Performance Metrics
 
@@ -83,7 +88,15 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+From Phase 1 verification (`01-VERIFICATION.md`), each cheap now and expensive later:
+
+| For | Item |
+|-----|------|
+| **Phase 5** | `R4`'s `netOwners` guard covers only `Remote*` members. `ProximityPrompt.Triggered`, `ClickDetector.MouseClick`, `Tool.Activated` and `Humanoid.Touched` are unguarded client-to-server paths that bypass the gateway entirely. Phase 5's spoon-pickup affordance is exactly where the first one appears. One-line fix to the guard. |
+| **Phase 6** | Wire `PlayerGate.canStart`. It has zero callers today, which is why FOUND-08 is PARTIAL. `Admission.luau` forbids anything else deciding a match may start, and that invariant is currently unenforceable because there are no call sites to inspect. |
+| **Phase 7 (before authoring any cosmetics module)** | `FOUND-05` is a **filename deny-list** and the verifier confirmed it can be made vacuous by naming alone: `Scoring.luau` importing `Wardrobe.luau` leaves `check-guards` green. This is inside the guard's declared threat model (accident and drift), not outside it, but the no-pay-to-win rule is Non-Negotiable Rule 1. Require cosmetics/shop code under `cosmetics/` and `shop/` directories (path-segment matching already supports it), or invert R2 to an import allow-list. |
+| **Phase 7 (start, and before any real DataStore write)** | Re-run M-04 check 2. FOUND-07's enforcing control is a Creator Hub toggle **outside the repo**; Phase 1 proved empirically it can be wrong while all 14 gates are green, and nothing in the repo can detect it being flipped back. Also close M-04 check 3 before the first real write. |
+| **Phase 2** | The fuzz harness has only ever run toy properties at 200 iterations, never the 100k-action scale Phase 2 needs. |
 
 ### Blockers/Concerns
 

@@ -16,6 +16,10 @@
 -- would leave it inert, so never reset it to a placeholder.
 return {
 	PRODUCTION_UNIVERSE_ID = 10774453248,
+	-- Recorded so `servePlaceIds` can be asserted against the production PLACE. Comparing a place
+	-- id to a universe id is a namespace error: the two id spaces never collide, so such a check
+	-- can never fire. Phase 1 verification caught exactly that mistake in project.spec.luau.
+	PRODUCTION_PLACE_ID = 123236339661606,
 	DEV_UNIVERSE_ID = 10774461969,
 	DEV_PLACE_ID = 120922388251092,
 }
