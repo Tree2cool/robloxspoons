@@ -194,28 +194,35 @@ ids with no zeros, `default.project.json` has `"servePlaceIds": [120922388251092
 that dev and production are different universes, and that `servePlaceIds` never names production.
 Each of those assertions was mutation-proven to fail when its subject is broken.
 
-M-04's three command-bar checks (all unblocked now that the production id is live) — **1 passed, 1 FAILED, 1 unrun**:
+M-04's three command-bar checks (all unblocked now that the production id is live) — **2 of 3 passed, 1 unrun**:
 
 1. ~~In **`Spoons Dev`** the DataStore write must succeed.~~ **PASSED 2026-11-03.** Observed:
    `GameId 10774461969 -> WROTE | nil`. The line printed `game.GameId` alongside the result, so the
    pass is tied to the dev experience and cannot have come from the wrong place open in Studio.
-2. In **`SPOONS [BETA]`** the same line must **fail** with `StudioAccessToApisNotAllowed`.
-   **FAILED 2026-11-03.** Observed: `GameId 10774453248 -> WROTE | nil` — the production id, and the
-   write went through. "Enable Studio Access to API Services" is still ON for the production
-   experience, so a Studio session can read and write live player data today. This is the finding
-   M-04 exists to produce, and it is the reason the box below stays unticked.
+2. ~~In **`SPOONS [BETA]`** the same line must **fail** with `StudioAccessToApisNotAllowed`.~~
+   **FAILED then PASSED 2026-11-03.**
 
-   Fix: Creator Hub, `SPOONS [BETA]`, Settings, Security, turn **off** "Enable Studio Access to API
-   Services" (or in Studio: File, Game Settings, Security). Then re-run the line; it must come back
-   `REFUSED | ...StudioAccessToApisNotAllowed...`. Note the in-code tripwire (check 3) does **not**
-   cover this hole: it guards the server boot path, not a hand-run command-bar write, which is
-   exactly why D-13 makes the toggle the primary control and the tripwire only defence in depth.
+   First run: `GameId 10774453248 -> WROTE | nil`. The write to a production data store went
+   through from Studio, so "Enable Studio Access to API Services" was still ON for production and
+   FOUND-07's primary control was not in place. Worth keeping on the record: the in-code
+   PersistenceMode tripwire would NOT have covered this, because it guards the server boot path and
+   not a hand-run command-bar write. That is why D-13 makes the toggle the primary control.
+
+   After turning the toggle off: `GameId 10774453248 -> REFUSED | 403: Cannot write to DataStore
+   from studio if API access is not enabled.`, with Studio also logging
+   `DataStoreService: StudioAccessToApisNotAllowed`. Refused, by the specific expected reason, in
+   the experience named by its own printed GameId.
+
+   One side effect of the first run is recorded deliberately: key `k` was written to the real
+   production `m04` data store. Nothing reads that store, so it is inert, but it is a live
+   production write and should be treated as one.
+
 3. In **`SPOONS [BETA]`**, re-sync this build and press **Play**: the server must refuse to boot with
    `Refusing real persistence: this is a Studio session and game.GameId matches the production
    universe id 10774453248`. This is the in-code tripwire firing for real; it was inert while
    `PRODUCTION_UNIVERSE_ID` was 0.
 
-- [ ] M-04 signed off: <name> <date>   (FAILING: production Studio API access is ON — check 2 above)
+- [ ] M-04 signed off: <name> <date>   (isolation verified both ways; check 3, the boot tripwire, is unrun)
 
 ---
 
