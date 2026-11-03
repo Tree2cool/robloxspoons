@@ -117,6 +117,48 @@ k=1, and k=0 is retained only as a documented negative result.
 them in `check-guards` R3 is zero-churn and makes Non-Negotiable Rules 5 and 6 actually enforced
 instead of merely stated. This phase should do it.
 
+**A7. (2026-11-03, owner) The engine gets an anti-livelock safety valve, and G1 no longer rests on an
+assumption about how humans play.** This SUPERSEDES A1's mechanism, though not its reasoning.
+
+Measured at N=10, k=2, j=1, 4,000 rounds per cell:
+
+| deviation per pass | stall rate |
+|--------------------|-----------|
+| 0% (pure greedy)   | **0.25%** |
+| 0.001%             | 0.20%     |
+| 0.01%              | 0.05%     |
+| 0.03%              | **0%**    |
+| 0.1%               | 0%        |
+
+The cliff is near **0.03%**, not the 2% research assumed — research only sampled 0% and 2%, so it
+never saw where the edge actually is.
+
+Why A1's auto-pass is not enough on its own: the firing rate is exactly the tail of the reaction-time
+distribution past the deadline. At 1.0s that is 2.9%, at 1.5s 0.21%, at 3.0s 0.0003%. Only deadlines
+around 1.0–1.5s clear the cliff, and **a 1.5-second pass deadline is not an AFK mechanic** — CARD-16
+auto-passes an idle player *and benches them after repeated strikes*, so at that deadline it would be
+striking ordinary players several times a round. At any deadline a real AFK feature would use, the
+mechanism fires essentially never and the gate silently reduces to pure greedy, which livelocks.
+
+**The valve:** the engine detects a repeated whole-table state with no completion since the previous
+repeat, and forces one random pass. Zero-stall becomes a theorem about the engine instead of a claim
+about players. It fires in roughly 0.25% of rounds and is invisible otherwise. The machinery already
+exists in the plans — `Invariants.hash` and the simulator's cycle detection — so this largely moves
+it from `scripts/sim/` into `src/server/engine/`.
+
+**What this does to the gate.** G1's zero-stall bar is now met by construction, so the simulator's job
+changes: it must prove the valve FIRES when needed and that stalls are zero *with it enabled*, and it
+must still report the pure-greedy and auto-pass curves as evidence about the margin. The valve's
+firing rate becomes a first-class metric; a pool whose valve fires often is a bad pool even at zero
+stalls.
+
+**Auto-pass is retained as a real mechanic but demoted** from "the thing that makes G1 pass" to a
+secondary mitigation, with its deadline free to take a realistic AFK value.
+
+**AUTO_PASS_SELECTION must be recorded alongside the deadline.** Deviation comes from auto-pass
+choosing a card the player would NOT have chosen. If Phase 4 ships the obvious "pass your worst card",
+deviation is exactly zero and the simulator's result transfers nothing to the shipped game.
+
 ### Claude's Discretion
 
 - Engine module decomposition, type shapes, and the exact `apply`/event vocabulary, subject to
