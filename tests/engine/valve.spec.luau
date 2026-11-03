@@ -36,8 +36,10 @@ type Run = {
 	checkEach: boolean,
 }
 
-local function newRun(valveOn: boolean, seed: number): Run
-	local state = Livelock.build({ antiLivelockValve = valveOn, valveSeed = seed })
+-- Takes the fixture's own options table rather than two positional booleans, so that the flag the
+-- MUTATION case turns off is spelled out in the case that depends on it.
+local function newRun(opts: { antiLivelockValve: boolean, valveSeed: number? }): Run
+	local state = Livelock.build(opts)
 	return {
 		state = state,
 		fx = Livelock.newDriver(state),
@@ -131,7 +133,7 @@ return function(t: Test.Runner)
 		-- The cost-gate assertion. If the valve hashed from action 1 the CI subset's wall-time
 		-- budget would be gone (plan 02-09 derives that budget; quoting a number here would go
 		-- stale the first time it is re-measured).
-		local run = newRun(true, 1)
+		local run = newRun({ antiLivelockValve = true, valveSeed = 1 })
 		drive(run, ARM_AT - 1)
 		t.equal(run.state.valve.firings, 0, "the valve fired inside the arm window")
 		t.equal(run.state.valve.armed, false, `armed before {ARM_AT} actions without progress`)
@@ -141,7 +143,7 @@ return function(t: Test.Runner)
 
 	-- 2 ----------------------------------------------------------------------------------------
 	t.test("the valve arms and then fires on the repeated state", function()
-		local run = newRun(true, 1)
+		local run = newRun({ antiLivelockValve = true, valveSeed = 1 })
 		drive(run, 256)
 		t.equal(run.armedAt, ARM_AT, "the arm point moved; the arm constant or the driver changed")
 		t.truthy(run.state.valve.firings >= 1, "the valve never fired on a verified cycle")
@@ -157,7 +159,7 @@ return function(t: Test.Runner)
 		local distinct: { [Types.CardId]: true } = {}
 		local count = 0
 		for seed = 1, 200 do
-			local run = newRun(true, seed)
+			local run = newRun({ antiLivelockValve = true, valveSeed = seed })
 			drive(run, FIRST_FIRE)
 			t.equal(run.firstFire, FIRST_FIRE, `seed {seed} did not fire on action {FIRST_FIRE}`)
 			t.equal(run.forcedJokers, 0, `seed {seed} forced a joker out of the hand`)
@@ -174,7 +176,7 @@ return function(t: Test.Runner)
 	t.test("MUTATION: with the valve disabled, nothing escapes", function()
 		-- The proof that the valve is load-bearing rather than decorative. A valve that could not
 		-- fire, or a fixture that was not really a cycle, fails exactly one half of this case.
-		local off = newRun(false, 1)
+		local off = newRun({ antiLivelockValve = false, valveSeed = 1 })
 		off.checkEach = true
 		drive(off, 2000)
 		t.equal(off.state.valve.firings, 0, "a disabled valve fired")
@@ -186,7 +188,7 @@ return function(t: Test.Runner)
 		t.equal(off.hashes[17], off.hashes[17 + 2 * CYCLE], "the state at action 49 left the cycle")
 		t.equal(off.hashes[2000], off.hashes[2000 - CYCLE], "still cycling at action 2,000")
 
-		local on = newRun(true, 1)
+		local on = newRun({ antiLivelockValve = true, valveSeed = 1 })
 		on.checkEach = true
 		drive(on, 2000)
 		t.truthy(on.state.valve.firings >= 1, "the valve never fired on the same 2,000 actions")
@@ -212,7 +214,7 @@ return function(t: Test.Runner)
 		-- The firing point is immediately after a non-completing draw, because that is the only
 		-- instant at which a known seat provably has a legal pass. Firing elsewhere would be a
 		-- different mechanism with no measurement behind it.
-		local run = newRun(true, 1)
+		local run = newRun({ antiLivelockValve = true, valveSeed = 1 })
 		drive(run, FIRST_FIRE - 1)
 		t.equal(run.firstFire, nil, "a firing landed before the first recurrence")
 		local intent = Livelock.nextIntent(run.fx)
@@ -237,7 +239,7 @@ return function(t: Test.Runner)
 		-- recurring afterwards is not a cycle -- which is why the window must clear. The arm is a
 		-- cost gate and not a soundness gate, which is why it must not: a round that has already
 		-- paid 96 actions of no progress must not be handed a fresh arm period by one completion.
-		local run = newRun(true, 1)
+		local run = newRun({ antiLivelockValve = true, valveSeed = 1 })
 		drive(run, ARM_AT + 1)
 		local valve = run.state.valve
 		t.equal(valve.armed, true, "the fixture did not arm")
@@ -264,7 +266,7 @@ return function(t: Test.Runner)
 		-- CONTEXT requires a failing simulator trial to paste straight into a unit test, and a
 		-- valve firing that did not replay would break that for every round the valve touched.
 		local function forcedList(seed: number): string
-			local run = newRun(true, seed)
+			local run = newRun({ antiLivelockValve = true, valveSeed = seed })
 			drive(run, 600)
 			return table.concat(run.forced, ",")
 		end
@@ -279,7 +281,7 @@ return function(t: Test.Runner)
 	t.test("exactly one observation per action", function()
 		-- Plan 02-08's fuzz suite compares this counter against its accepted-action count, so the
 		-- valve cannot be skipped inside a conditional and read green.
-		local run = newRun(true, 1)
+		local run = newRun({ antiLivelockValve = true, valveSeed = 1 })
 		local calls = 0
 		for _ = 1, 7 do
 			Valve.afterAction(run.state, nil)
@@ -303,7 +305,7 @@ return function(t: Test.Runner)
 		-- DISTINCT armed observations are unreachable on it at any wall-time budget. The arithmetic
 		-- is what matters -- an unbounded set in a 300-second round is a memory leak nobody would
 		-- notice until a 10-player server.
-		local run = newRun(true, 1)
+		local run = newRun({ antiLivelockValve = true, valveSeed = 1 })
 		run.state.valve.armed = true
 		drive(run, 1) -- seat 1 now holds five cards, so afterAction's precondition holds
 		local valve = run.state.valve
@@ -323,7 +325,7 @@ return function(t: Test.Runner)
 	t.test("a malformed call is a loud error", function()
 		-- Silently returning nil would make a wiring bug in `Engine.apply` look like a mechanism
 		-- that simply never fires, which is the failure mode this whole plan exists to prevent.
-		local run = newRun(true, 1)
+		local run = newRun({ antiLivelockValve = true, valveSeed = 1 })
 		t.throws(function()
 			Valve.afterAction(run.state, 1) -- seat 1 is resting on four cards
 		end, "holds 4 cards")
@@ -336,7 +338,7 @@ return function(t: Test.Runner)
 		end, "is not live")
 		-- The clean call alongside the mutations: a guard that rejects everything is as useless as
 		-- one that rejects nothing.
-		local clean = newRun(true, 1)
+		local clean = newRun({ antiLivelockValve = true, valveSeed = 1 })
 		drive(clean, 1)
 		t.equal(Valve.afterAction(clean.state, 1), nil, "a well-formed call was rejected")
 	end)
@@ -350,7 +352,7 @@ return function(t: Test.Runner)
 		local distinct: { [Types.CardId]: true } = {}
 		local count = 0
 		for seed = 1, 60 do
-			local run = newRun(true, seed)
+			local run = newRun({ antiLivelockValve = true, valveSeed = seed })
 			run.state.valve.armed = true
 			drive(run, 1) -- seat 1 draws card 9 and holds {1,2,3,4,9}
 			local state = run.state
@@ -370,7 +372,7 @@ return function(t: Test.Runner)
 
 		-- The fallback: a hand with no natural at all. Unreachable at j <= 2, where a five-card
 		-- hand holds at least three naturals, so this is the only thing that covers the branch.
-		local run = newRun(true, 1)
+		local run = newRun({ antiLivelockValve = true, valveSeed = 1 })
 		run.state.valve.armed = true
 		drive(run, 1)
 		local state = run.state
