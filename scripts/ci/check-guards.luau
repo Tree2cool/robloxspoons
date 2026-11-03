@@ -13,7 +13,8 @@
 --   R2  FOUND-05: no transitive literal-require path from a guarded root to a forbidden   (src/ roots)
 --       module family (cosmetics, shop, ...). The message names the whole chain.
 --   R3  inside pure zones, guarded roots and everything they require: no require that is not a
---       literal string, and no getfenv / setfenv / loadstring / rawget(_G / _G[
+--       literal string, and no getfenv / setfenv / loadstring / rawget(_G / _G[ / coroutine / os.
+--       (coroutine and os. are CLAUDE.md rules 6 and 5: no yields mid-mutation, server is the only clock)
 --   R3b inside pure zones: no suppression comment (selene: allow, --# selene, --!nocheck, ...)
 --   R4  Net hygiene: Remote entry points may appear only in their owner file             (shippedDirs)
 --   R5  hidden-data vocabulary must not appear under src/client or src/shared            (shippedDirs)
@@ -47,7 +48,13 @@ type Mount = { path: { string }, dm: { string } }
 type Edge = { target: string, line: number, kind: string, path: string }
 
 local SUPPRESSIONS = { "selene: allow", "--# selene", "--!nocheck", "--!nonstrict", "-- luau-lsp:", "--!native" }
-local BANNED_CONSTRUCTS = { "getfenv", "setfenv", "loadstring" }
+-- `coroutine` and `os.` are banned in pure zones for CLAUDE.md rules 5 and 6, not for rule 2:
+-- selene.pure.toml sets std = "luau", so coroutine.* and os.* are STANDARD Luau and pass the
+-- allow-list lint with 0 errors (measured, 02-RESEARCH.md section 1). Without this ban an engine
+-- module can yield mid-mutation and read a real clock while all 14 gates stay green.
+-- `coroutine` is a findWord entry, so `coroutine.yield`, `.resume`, `.wrap` and `.create` are one
+-- rule while an identifier such as `coroutines` or `myCoroutineHelper` is not a false hit.
+local BANNED_CONSTRUCTS = { "getfenv", "setfenv", "loadstring", "coroutine" }
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- Small string and path helpers
@@ -384,7 +391,11 @@ local function check(root: string): number
 				from = b + 1
 			end
 		end
-		for _, needle in { "rawget(_G", "rawget( _G", "_G[" } do
+		-- `os.` is a needle and NOT a findWord entry on purpose: the bare word `os` appears legitimately in
+		-- prose and inside identifiers, while the dotted namespace access is unambiguous. Because sf.text keeps
+		-- string literals, a pure-zone file may not contain the substring `os.` even inside a string. That
+		-- over-strictness is intentional in a zone whose whole point is having no clock.
+		for _, needle in { "rawget(_G", "rawget( _G", "_G[", "os." } do
 			local from = 1
 			while true do
 				local a, b = string.find(sf.text, needle, from, true)
