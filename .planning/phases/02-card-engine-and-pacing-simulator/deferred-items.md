@@ -1,79 +1,50 @@
-# Phase 2 — Deferred Items
+# Deferred items — Phase 2
 
-Out-of-scope discoveries logged during execution. Each names the plan that found it, why it was
-not fixed in place, and what a fix would cost.
+Out-of-scope discoveries logged rather than fixed. Each one was found while executing a plan in this
+phase and is NOT caused by that plan's changes.
 
-## D-02-01 — ~~`Rng` needs a warm-up: the FIRST draw from a small seed is not uniform~~ **RESOLVED**
+## From plan 02-09 (the bot simulator and its CI subset), 2026-11-03
 
-**Resolved 2026-11-03 by the orchestrator**, before wave 3, because plan 02-04's Fisher-Yates deal
-and every seeded simulator trial are downstream of it and would have inherited the bias silently.
-`Rng.new` now runs the recurrence `WARM_UP_STEPS = 3` times before handing out any value. Measured
-over seeds 1..2000, the first `nextInt(1, 9)` went from chi-square **13051.60** (counts
-1820,180,0,0,0,0,0,0,0) to **0.05**. One step already suffices; three is margin.
+### D-02-09-1 — `grep -rq 'DestroyRemovedCards\|destroy' src/` can never fail
 
-The recurrence itself is untouched, so `rng.spec.luau` still tests the same xorshift32 — its two
-reference vectors were recomputed independently in Python rather than by running the changed code,
-preserving the reason they exist. A new case asserts first-draw uniformity across 2,000 sequential
-seeds and was mutation-proven: at `WARM_UP_STEPS = 0` it fails, at 1 it passes (genuinely uniform),
-so it tests the property rather than the constant.
+Plan 02-09's task-2 acceptance criteria require that grep to exit 1. It exits 0 against
+**pre-existing** code and always would have:
 
-Original report follows.
+- `src/server/services/PlayerGate.luau:22,64` and `src/server/services/NetServer.luau:31,75` declare
+  lifecycle `destroy` methods — correct, unrelated to cards.
+- `src/server/engine/Types.luau:86`, `src/server/engine/Invariants.luau:133` and
+  `src/server/engine/Ring.luau:27,28,29,183` carry the prose "never destroyed" / "destroying the
+  cards would break Rule 8", which is the *statement* of Rule 8.
 
+NOT fixed: nothing here is a defect, and renaming shipped lifecycle methods or deleting the prose
+that records Rule 8 to satisfy a grep would be strictly worse. The criterion's intent is asserted the
+meaningful way instead — `grep -rq 'DestroyRemovedCards' src/` **fails** — and the sabotage path
+exists only in `scripts/sim/Simulator.luau`.
 
-**Found by:** plan 02-02 (`SeatOrder`'s round-1 seeded shuffle), 2026-11-03
-**File:** `src/server/engine/Rng.luau` (not a plan 02-02 file)
-**Severity:** affects fairness of any seeded shuffle driven by a small or sequential seed
+**Action for whoever owns VALIDATION.md / the plan set:** reword the criterion to name the sabotage
+symbol rather than the English word.
 
-xorshift32 with no warm-up returns a tiny first value for a small state, because its first three
-shifts cannot spread the low bits. Measured against the shipped module:
+### D-02-09-2 — `--filter engine` now picks up one non-engine case by label
 
-```
-seeds 1..1000 whose FIRST nextInt(1, 9) is 1:   1000 / 1000   (should be ~111)
-same seeds, hashed before use:                   120 / 1000   (uniform)
-second-draw histogram, seeds 1..1000:            1=119 2=112 3=112 4=112 5=112 6=110 7=106 8=111 9=106
-```
+`tests/run.luau` matches the filter against the whole label (`path::case name`), and
+`tests/sim/subset.spec.luau` has a case called "MUTATION: a deliberately broken **engine** is
+reported as a FAILURE". So `--filter engine` reports `140 passed ... 3.06s` where 02-08 recorded
+`139 ... 2.32s`. The extra case and ~0.7s are that collision, not an engine regression.
 
-So the first draw is unusable for small seeds and every draw after it is fine. Consequence for a
-Fisher-Yates shuffle, which spends its first draw on the last position: with a sequential match seed,
-`roster[1]` lands in the LAST seat every round. Observed in `SeatOrder` round 1 for seeds 7, 99 and
-100 on a 9-seeker roster — all three put the same player last.
+NOT fixed: renaming the case would make its name worse, and narrowing the filter semantics is a
+change to the shared runner that no plan in this phase owns. Anyone comparing `--filter engine`
+numbers across plans should use `--filter tests/engine/` instead.
 
-**Why plan 02-02 did not fix it:** `Rng.luau` is outside this plan's file list, it is a shared
-dependency of the deck shuffle being written in the same wave (plan 02-01), and
-`tests/engine/rng.spec.luau` pins exact reference outputs computed outside Luau — a warm-up changes
-every one of them. Patching it locally inside `SeatOrder` would hide the defect from the other
-consumers rather than remove it.
+### D-02-09-3 — the suite is at 23.4-24.5s against CONTEXT's locked "~20s"
 
-**Suggested fix (one plan, ~30 lines):** discard the first N draws (N = 4 is enough for xorshift32) or
-hash the seed inside `Rng.new`, then recompute the reference vectors in `rng.spec.luau` and add a
-case asserting the first draw is uniform across seeds 1..1000. Plan 02-07 or the phase's simulator
-plans are the natural home, because they are the first code whose *results* depend on it.
+Recorded in 02-08-SUMMARY as already unreachable at 17.9s, and now measured at
+`493 passed, 0 failed, 3 todo in 23.41-24.45s` with `scripts/verify.luau` at 26.1s. Nothing was
+trimmed to fit a wall clock. NOT fixed here: it is an owner decision at plan 02-12's checkpoint.
 
-**Interim guidance for consumers:** do not hand `Rng.new` a small sequential counter. Hash the seed
-at the call site, or draw and discard once before the first meaningful draw.
+### D-02-09-4 — Gate G1's zero-stall bar and the ~1% valve firing-rate bar are both unmet at every pool measured
 
----
-
-## D-02-02 — `--filter` cannot isolate your own spec during a parallel wave
-
-**Found by:** plans 02-04, 02-05 and 02-13 independently, wave 3, 2026-11-03
-**File:** `tests/run.luau` (nobody's plan file)
-**Severity:** process friction, not a product defect — but it wastes time and invites wrong conclusions
-
-`tests/run.luau` **loads every discovered spec before applying `--filter`**. So while a parallel wave
-is in flight, a sibling's RED spec — a test written before its module exists, which is exactly what
-TDD produces — fails the run regardless of the filter. Three executors hit this independently:
-`--filter engine/hand` reported failures that were entirely 02-04's and 02-06's half-written files.
-
-The exit code of a filtered run is therefore untrustworthy precisely when you most want to isolate
-your own work. It also produces alarming-looking artifacts: one whole-suite snapshot read
-`420 passed, 9 failed` and the next `429 passed, 0 failed` with no commit in between — sibling
-agents mid-write, not flakiness. Anyone chasing that as a real failure loses an hour.
-
-**Workaround used (correct, costs nothing):** a throwaway `tests/_wave_isolated_NN/` directory
-re-exporting your own spec, run with `--root`, deleted before the first commit.
-
-**A fix would be:** apply `--filter` at discovery time rather than after load, so an unrelated spec
-that cannot even be required is never loaded. Not done here because `tests/run.luau` is shared by
-every plan in the wave and this is harness ergonomics, not correctness. Worth doing before the next
-phase that runs a wide parallel wave.
+The full measurement, its cause (amendment A3's completion target, i.e. research OQ-B's off-by-one)
+and the k-sweep that rules out a pool change are in `02-09-SUMMARY.md` under "THE FINDING" and in the
+header of `tests/sim/subset.spec.luau`. NOT fixed here: `evaluateBars` is untouched, neither bar was
+relaxed, `Types.VALVE_ARM_ACTIONS_PER_SEAT` was not changed, and the pool was not moved to make the
+gate green. It is an owner decision at plan 02-12's checkpoint, informed by plan 02-10's sweep.
