@@ -121,7 +121,9 @@ directory, in both `sourcemap` and `build`. Fixed with a committed `src/shared/.
 
 ## The `luau-lsp analyze` detector, settled (waves 1, 3/01-04 and 3/01-05)
 
-Three plans hit this from different directions and each found the obvious detector wrong.
+FIVE plans hit this from different directions and each found the then-current detector wrong.
+It is the single most slippery thing in this phase: every refinement looked complete until the
+next plan ran a case nobody had tried.
 **Plans 01-10 and 01-11 must implement exactly this.**
 
 What `luau-lsp analyze` actually does:
@@ -141,8 +143,14 @@ So:
   a false green).
 - **Exit code alone is wrong too** — both sourcemap failures exit 0.
 
-**The correct gate is: exit code 0 AND the output contains neither `Failed to load` nor
-`Sourcemap parsing failed`.** The exit code catches type and lint errors; the string match catches
+**FIFTH REFINEMENT (plan 01-10): some genuine `TypeError`s exit 0.** 01-10 hit a
+`TypeError` from comparing a non-nil-typed `Parent` against `nil` — luau-lsp **printed the
+TypeError and still exited 0**. So exit code does NOT reliably catch type errors either, and the
+previous "settled" gate would have passed it. 01-09 had independently started grepping for
+`TypeError` as well, which is what the gate needs.
+
+**The correct gate is: exit code 0 AND the output contains none of `Failed to load`,
+`Sourcemap parsing failed`, or `TypeError`.** The exit code catches type and lint errors; the string match catches
 the two silent-degradation paths. Neither check subsumes the other, and `--formatter plain` must
 never appear in a gate because it defeats the exit code entirely.
 
