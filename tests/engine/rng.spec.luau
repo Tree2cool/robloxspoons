@@ -16,7 +16,35 @@ return function(t: Test.Runner)
 	t.test("nextUint matches an independently computed xorshift32 reference", function()
 		-- Reference values computed outside Luau (Python, 64-bit ints masked to 32), so this catches a
 		-- precision or truncation bug that a self-consistency check could not.
-		t.deepEqual(draw(1, 5), { 270369, 67634689, 2647435461, 307599695, 2398689233 })
+		-- Recomputed in Python after the seed warm-up landed (3 recurrence steps before the first
+		-- value is handed out). The recurrence is unchanged, so this still tests the same xorshift32.
+		t.deepEqual(draw(1, 5), { 307599695, 2398689233, 745495504, 632435482, 435756210 })
+	end)
+
+	t.test("the FIRST draw is uniform across small sequential seeds (warm-up regression)", function()
+		-- The defect this guards: xorshift32 seeded directly with a small integer yields a tiny first
+		-- output, so `Rng.new(s):nextInt(1, 9)` returned 1 for EVERY seed 1..1000 -- constant, not
+		-- merely skewed. It reached here from Phase 1 and would have silently biased this phase's
+		-- deals and every seeded simulator trial, because Fisher-Yates spends its first draw on the
+		-- last position. Seeds are sequential counters in practice, which is exactly the worst case.
+		local N = 2000
+		local counts: { number } = {}
+		for v = 1, 9 do
+			counts[v] = 0
+		end
+		for seed = 1, N do
+			local v = Rng.new(seed):nextInt(1, 9)
+			counts[v] += 1
+		end
+		local expected = N / 9
+		local chi = 0
+		for v = 1, 9 do
+			local d = counts[v] - expected
+			chi += (d * d) / expected
+		end
+		-- 8 degrees of freedom: 20.09 is p=0.01. Unfixed this value is ~13051, so the bar is not
+		-- delicate -- it separates "constant" from "uniform" by three orders of magnitude.
+		t.truthy(chi < 20.09, `first-draw chi-square {chi} over {N} seeds; expected < 20.09`)
 	end)
 
 	t.test("same seed gives an identical sequence, run twice", function()
@@ -35,7 +63,7 @@ return function(t: Test.Runner)
 	end)
 
 	t.test("a zero seed is normalised and does not get stuck at zero", function()
-		t.deepEqual(draw(0, 2), { 1359758873, 3761132862 })
+		t.deepEqual(draw(0, 2), { 25405621, 3862129951 })
 		t.truthy(draw(0, 50)[50] ~= 0)
 	end)
 

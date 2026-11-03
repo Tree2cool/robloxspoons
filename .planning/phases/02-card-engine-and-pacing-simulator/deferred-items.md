@@ -3,7 +3,22 @@
 Out-of-scope discoveries logged during execution. Each names the plan that found it, why it was
 not fixed in place, and what a fix would cost.
 
-## D-02-01 — `Rng` needs a warm-up: the FIRST draw from a small seed is not uniform
+## D-02-01 — ~~`Rng` needs a warm-up: the FIRST draw from a small seed is not uniform~~ **RESOLVED**
+
+**Resolved 2026-11-03 by the orchestrator**, before wave 3, because plan 02-04's Fisher-Yates deal
+and every seeded simulator trial are downstream of it and would have inherited the bias silently.
+`Rng.new` now runs the recurrence `WARM_UP_STEPS = 3` times before handing out any value. Measured
+over seeds 1..2000, the first `nextInt(1, 9)` went from chi-square **13051.60** (counts
+1820,180,0,0,0,0,0,0,0) to **0.05**. One step already suffices; three is margin.
+
+The recurrence itself is untouched, so `rng.spec.luau` still tests the same xorshift32 — its two
+reference vectors were recomputed independently in Python rather than by running the changed code,
+preserving the reason they exist. A new case asserts first-draw uniformity across 2,000 sequential
+seeds and was mutation-proven: at `WARM_UP_STEPS = 0` it fails, at 1 it passes (genuinely uniform),
+so it tests the property rather than the constant.
+
+Original report follows.
+
 
 **Found by:** plan 02-02 (`SeatOrder`'s round-1 seeded shuffle), 2026-11-03
 **File:** `src/server/engine/Rng.luau` (not a plan 02-02 file)
