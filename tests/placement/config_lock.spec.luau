@@ -9,6 +9,7 @@
 -- it fail. Later plans (03-05, 03-08) extend this file with the PlacementConfig type lock, the arity lock
 -- and the MapLoader source assertion; the cases are independent so they can be appended.
 local Placement = require("../../src/shared/Config/Placement")
+local SpoonPlacement = require("../../src/server/core/SpoonPlacement")
 local Test = require("../harness/Test")
 
 -- Research's two measured per-spot requirements against the committed graybox (03-RESEARCH.md, "The
@@ -107,5 +108,126 @@ return function(t: Test.Runner)
 			local n: any = v
 			t.truthy(type(n) == "number" and n == n and n > 0 and n < math.huge, `{key} = {tostring(n)}`)
 		end
+	end)
+
+	t.test("the shipped config satisfies the PlacementConfig type with no adapter", function()
+		-- This is the whole reason PlacementConfig's keys are UPPER_SNAKE. There is no adapter between the
+		-- shipped numbers and the rules, so there is no second place where CI and the live game could disagree
+		-- about a number. assertConfig returning the same table proves it validated rather than copied.
+		local shipped: SpoonPlacement.PlacementConfig = Placement
+		t.equal(SpoonPlacement.assertConfig(shipped), shipped)
+	end)
+
+	t.test("check takes exactly two parameters: the world and the point (D-10 / HIDE-07)", function()
+		-- Vacuous-pass gate 6. HIDE-07 says placement validity is unaffected by the hider's avatar scale; D-10
+		-- makes that true BY CONSTRUCTION by giving the rule function no avatar argument. This assertion is the
+		-- lock. The world holds the config it was baked with, so there is no config parameter either, which is
+		-- what makes an arity of exactly 2 meaningful rather than decorative. debug.info(fn, "a") returns
+		-- (arity, isVararg).
+		-- The idiom itself is validated first: a lock built on a misunderstood primitive is the Phase 1
+		-- sourcemap trap in a new costume.
+		t.equal(
+			debug.info(function(a, b, c)
+				return a, b, c
+			end, "a"),
+			3
+		)
+		local arity, isVararg = debug.info(SpoonPlacement.check, "a")
+		t.equal(arity, 2)
+		t.equal(isVararg, false)
+	end)
+
+	t.test("a nil config is a loud error, never a silent default", function()
+		t.throws(function()
+			SpoonPlacement.assertConfig(nil)
+		end, "a PlacementConfig is required")
+		-- The same through the other door, so the error cannot be bypassed by entering through bake.
+		t.throws(function()
+			SpoonPlacement.bake({}, { min = { x = 0, y = 0, z = 0 }, max = { x = 4, y = 4, z = 4 } }, {}, nil :: any)
+		end, "a PlacementConfig is required")
+	end)
+
+	t.test("a partial config is a loud error from bake too", function()
+		t.throws(function()
+			SpoonPlacement.bake(
+				{},
+				{ min = { x = 0, y = 0, z = 0 }, max = { x = 4, y = 4, z = 4 } },
+				{},
+				{ GRID_SIZE = 1 } :: any
+			)
+		end, "config.STEP_UP must be a positive finite number")
+	end)
+
+	t.test("a malformed config names the offending key", function()
+		local keys = {
+			"GRID_SIZE",
+			"STEP_UP",
+			"MAX_SLOPE_DEGREES",
+			"CAPSULE_RADIUS",
+			"CAPSULE_HEIGHT",
+			"REACH_HEIGHT",
+			"EYE_HEIGHT",
+			"SPOT_CLEARANCE",
+			"PICKUP_RANGE",
+			"PICKUP_MARGIN",
+		}
+		local bads: { { label: string, value: any } } = {
+			{ label = "nil", value = nil },
+			{ label = "zero", value = 0 },
+			{ label = "negative", value = -1 },
+			{ label = "NaN", value = 0 / 0 },
+			{ label = "infinity", value = math.huge },
+			{ label = "string", value = "1" },
+		}
+		for _, key in keys do
+			for _, bad in bads do
+				local copy: any = table.clone(Placement)
+				copy[key] = bad.value
+				local ok, err = pcall(SpoonPlacement.assertConfig, copy)
+				t.falsy(ok, `{key} = {bad.label} was accepted`)
+				t.contains(tostring(err), `config.{key} must be a positive finite number`, `{key} = {bad.label}`)
+			end
+		end
+	end)
+
+	t.test("the cross-field invariants are enforced at the door", function()
+		local function with(overrides: { [string]: number }): any
+			local copy: any = table.clone(Placement)
+			for key, value in overrides do
+				copy[key] = value
+			end
+			return copy
+		end
+		t.throws(function()
+			SpoonPlacement.assertConfig(with({ PICKUP_MARGIN = 7.0 }))
+		end, "PICKUP_MARGIN")
+		t.throws(function()
+			SpoonPlacement.assertConfig(with({ EYE_HEIGHT = 7.0 }))
+		end, "CAPSULE_HEIGHT > EYE_HEIGHT")
+		t.throws(function()
+			SpoonPlacement.assertConfig(with({ REACH_HEIGHT = 4.5 }))
+		end, "EYE_HEIGHT >= REACH_HEIGHT")
+	end)
+
+	t.test("a shared reach and eye height is legal, because it is the configuration research measured", function()
+		-- assertConfig enforces CAPSULE_HEIGHT > EYE_HEIGHT >= REACH_HEIGHT. The lower comparison is NON-STRICT
+		-- on purpose. Research measured that with one shared reach/eye height the crate-top spot needs an
+		-- effective range of 8.75, is culled, and the reference map falls to 15 survivors, which is the entire
+		-- justification for EYE_HEIGHT being a separate constant. A strict > would make that exact configuration
+		-- inexpressible, so the negative control that proves the point (graybox_spots.spec.luau case 7, plan
+		-- 03-06) could not be baked at all. Do not "tidy" assertConfig to >: this case is what goes red if
+		-- someone does.
+		local shared: any = table.clone(Placement)
+		shared.EYE_HEIGHT = 2.5
+		shared.REACH_HEIGHT = 2.5
+		t.equal(SpoonPlacement.assertConfig(shared), shared)
+	end)
+
+	t.test("a coarse GRID_SIZE is not a hard error", function()
+		-- The STEP_UP / GRID_SIZE coupling is a config-authoring invariant owned by the cases above, not a hard
+		-- error, so a deliberate diagnostic run at a coarse resolution still works.
+		local coarse: any = table.clone(Placement)
+		coarse.GRID_SIZE = 4
+		t.equal(SpoonPlacement.assertConfig(coarse), coarse)
 	end)
 end
