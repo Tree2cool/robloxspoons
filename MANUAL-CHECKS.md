@@ -356,9 +356,12 @@ Record the observed value even when it passes.
 
 **Blocking: yes for Phase 3's close.** It is a one-reading check against a value that already defaults correctly.
 
-Observed: _
+Observed: **PASSES 2026-11-04.** `StarterPlayer.CharacterMaxSlopeAngle = 89` in `build/spoons.rbxl`,
+read in Studio. That is the platform default and the project sets no override, so it clears the
+`MAX_SLOPE_DEGREES = 30` requirement with 59 degrees of headroom. Recorded as the check asks even
+though it passes: nothing in the repo can detect it being lowered later.
 
-- [ ] M-08 signed off: <name> <date>   (Studio reading; blocking Phase 3)
+- [x] M-08 signed off: alejandrog_m 2026-11-04   (Studio reading; blocking Phase 3)
 
 ---
 
@@ -410,6 +413,26 @@ clean load is the evidence.
 **Blocking: yes for Phase 3's close.** It is the same Studio session as M-08, so it costs nothing extra, and the thing
 it covers is the one named structural gap in the phase's evidence.
 
-Observed: _
+Observed: **PASSES 2026-11-04.** Studio, `build/spoons.rbxl`, same session as M-08.
+1. Output carried `[Spoons] map loaded: GrayBox  -  Server - Main:33` with **no `MapValidator`
+   error**, between `persistence mode: Mock` and `server ready (round driver: true)`. A clean load
+   is the evidence: `MapLoader` ran the same `MapValidator.validate` over its own snapshot of the
+   live tree against the same `Config.Placement`, so no value-level disagreement between the two
+   snapshotters is large enough to change a verdict.
+2. `ServerStorage.Maps.GrayBox` present with both `Geometry` and `Data` (command bar, Edit mode:
+   `GrayBox: yes | Geometry: yes | Data: yes`).
+3. **`Workspace` held `Geometry` only — `Data` and `GrayBox` both absent.** This is the anti-ESP
+   property (CLAUDE.md rule 3) and M-06's note records it as never previously eyeballed; this is
+   its first direct observation. `Workspace.Geometry` showed `Lobby`, `Perimeter`, `Rooms`,
+   `Core`, `CrateEastHall`, `CrateNorthEastRoom`, `CrateSouthWestRoom`, `Floor`, `Ledge`,
+   `PillarEast`, `PillarWest`, `Ramp`, `ShelfSouthEastRoom` — `CrateNorthEastRoom` confirms the
+   v2 map, since plan 03-06 added it for the fourth spot height.
+4. `CollectionService:GetTagged("SpoonDefaultSpot")` returned **21**. (Used in place of the Tag
+   Editor visualiser, which this Studio build does not list under View.)
 
-- [ ] M-10 signed off: <name> <date>   (Studio; blocking Phase 3)
+Note: `ServerStorage` reads as EMPTY in the Explorer while Playing, because it does not replicate
+to clients — that is the anti-ESP property working, not a missing map, and `MapLoader.luau:91`
+would have thrown `ServerStorage.Maps does not exist` otherwise. An unrelated Studio warning,
+`rbxassetid://203785492 ... Asset type does not match requested type`, is not from this repo.
+
+- [x] M-10 signed off: alejandrog_m 2026-11-04   (Studio; blocking Phase 3)

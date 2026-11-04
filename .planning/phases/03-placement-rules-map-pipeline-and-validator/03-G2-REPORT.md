@@ -275,3 +275,59 @@ the `E == 5.5` equality before the slack assertions. 03-03: swapped slab test, f
 shift. 03-04: dropped link condition 3 and a generator floor that caught over-partitioning. 03-05: precedence, empty
 seed exclusion, forbidden shortcut, reason coverage, silent default. 03-09: M3 (sum-to-360 load-bearing), M4 and M5
 (tolerance bounded both ways).
+
+---
+
+## Owner sign-off
+
+**Gate G2: PASSED (owner, 2026-11-04).**
+
+Phase 7a may author the five map builds against the rules in section 5.
+
+### What the owner verified directly
+
+Both blocking manual checks were observed in one Studio session on `build/spoons.rbxl`, and both
+are recorded with their readings in `MANUAL-CHECKS.md`:
+
+- **M-08 — PASSES.** `StarterPlayer.CharacterMaxSlopeAngle = 89`, against the `MAX_SLOPE_DEGREES = 30`
+  requirement. 59 degrees of headroom, and the value is the platform default with no project override.
+- **M-10 — PASSES.** `[Spoons] map loaded: GrayBox` with **no `MapValidator` error**;
+  `ServerStorage.Maps.GrayBox` present with `Geometry` and `Data`; `Workspace` held `Geometry` only;
+  `CollectionService:GetTagged("SpoonDefaultSpot")` returned **21**.
+
+**M-10's clean load is the evidence that closes gate 8's named structural gap** as far as it can be
+closed. `MapLoader` ran the same `MapValidator.validate` over its **own** snapshot of the live tree
+against the same `Config.Placement` values, so any value-level disagreement between the runtime and
+CI snapshotters large enough to change a verdict would have surfaced here as a validation failure
+naming an issue code. It did not. CI compares their key sets only, and no CI arrangement can do more.
+
+**The anti-ESP property has now been observed directly for the first time.** `Data` and `GrayBox`
+were both absent from `Workspace`; only `Geometry` was cloned. M-06's own note recorded that this
+had never been eyeballed. `CrateNorthEastRoom` appearing in `Workspace.Geometry` independently
+confirms the session ran against the ContractVersion 2 map, since plan 03-06 added that crate for
+the fourth spot height.
+
+### Decisions taken at sign-off
+
+- **CI suite timing: ACCEPTED as a second approved departure.** 15.94 s (Phase 1) -> ~25-26 s
+  (Phase 2, accepted) -> **29.9 s** (Phase 3), with the `verify.luau` chain at **32.6 s**. Nothing
+  was trimmed to reach it: the 21-spot graybox bake, the maze oracle, the differential fuzzes and
+  all nine gate mutations are intact, and the quick runs stay fast (`--filter placement` 2.91 s,
+  `--filter maps` 1.55 s), so per-task feedback is unharmed. Recorded the way Phase 2's overshoot
+  was — measured, dated and approved rather than silent. **Phase 4 should expect to revisit it**, as
+  it adds the most test weight of any remaining phase.
+- **Section 5's Phase 7a authoring rules were reviewed and stand**, including "no walkable ceiling
+  below 7 studs", "corridors at least 4.0 studs wide" and "model floors as block-shaped Parts,
+  because a MeshPart yields no footing".
+
+### What remains open, carried not closed
+
+- **M-09** (the reference capsule at the avatar scale extremes) is **not blocking** and needs a
+  full-roster playtest in Phase 4/6. It is the human gate under **V-19**, the phase's one genuinely
+  soft claim: the per-axis avatar scale limits, the R15 default `HipHeight` and any camera-height
+  formula were never found in primary documentation. Until it is signed, **D-11's bias toward
+  rejecting is the mitigation, not a verification.**
+- **M-07** (simulator human-model calibration) is Phase 2's and is unaffected by this phase.
+- The three things Phase 5 must not rediscover stand as written in section 6, chief among them that
+  **`RaycastParams.RespectCanCollide` defaults to `false`** — the opposite of this phase's collision
+  model (D-03).
