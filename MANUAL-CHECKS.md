@@ -279,8 +279,8 @@ claimed, and is carried in `NEEDS_HUMAN.md` for the first playtest that reaches 
 
 1. Open `build/spoons.rbxl` in Studio and Play (watch the Output window for errors from `MapLoader`).
 2. In Explorer confirm `ServerStorage.Maps.GrayBox` exists with `Geometry` and `Data` children.
-3. Open View, Tag Editor. Select the tag `SpoonDefaultSpot` and use its visualiser: **18** tagged parts are listed.
-   (`lune run scripts/maps/validate-map.luau maps/gray-box.rbxm` reports 18 spots and 9 seats; the contract minimum is 16.)
+3. Open View, Tag Editor. Select the tag `SpoonDefaultSpot` and use its visualiser: ~~**18**~~ **21** tagged parts are listed.
+   (`lune run scripts/maps/validate-map.luau maps/gray-box.rbxm` reports ~~18~~ **21** spots and 9 seats; the contract minimum is 16.)
 4. Under `Data`, confirm the **9** seat anchors (`Seat1` to `Seat9`) ring the table anchor.
 5. Confirm only `Geometry` was cloned into `Workspace` (`Data` must not appear there).
 6. Walk the sightlines from the seeker spawn: at least some spots must be hidden from the nearest seeker spawn.
@@ -299,6 +299,13 @@ NOTE: the Workspace-contents half of this check (Geometry present; `Data` and `G
 which is the anti-ESP property) was not separately confirmed in the Explorer. Re-confirm when
 convenient; `tests/maps/graybox.spec.luau` asserts it statically and `MapLoader` clones only
 `Geometry`, but the live tree was not eyeballed.
+
+2026-11-04 (Phase 3, plan 03-06): the signed observation above was made against the
+ContractVersion 1 map with 18 default spots. That map no longer exists -- the reference map is now
+ContractVersion 2 with 21 spots, every one of which passes the real placement rules
+(`tests/placement/graybox_spots.spec.luau`). The steps above have been renumbered to 21. The
+claim M-06 signs -- "the map loads and reads sanely" -- is unchanged, but it has NOT been
+re-observed in Studio against the v2 map. `M-10` is that re-run.
 
 - [x] M-06 signed off: alejandrog_m 2026-11-03
 

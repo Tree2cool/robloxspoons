@@ -77,7 +77,7 @@ return function(t: Test.Runner)
 	t.test("the real CLI validates the committed gray-box clean", function()
 		local r = runCli(GRAYBOX)
 		t.equal(r.code, 0, `expected exit 0, got {r.code}: {r.stdout}{r.stderr}`)
-		t.contains(r.stdout, "validate-map: ok (18 spots, 9 seats)")
+		t.contains(r.stdout, "validate-map: ok (21 spots, 9 seats)")
 	end)
 
 	t.test("the committed file deserializes to exactly one root, a Model named GrayBox", function()
@@ -181,13 +181,13 @@ return function(t: Test.Runner)
 		t.equal(spec.metadata.maxPlayers, 10)
 		t.equal(spec.metadata.sizeClass, "Medium")
 		t.equal(spec.metadata.id, "GrayBox")
-		t.equal(#spec.defaultSpots, 18)
+		t.equal(#spec.defaultSpots, 21)
 		t.equal(#spec.cardTable.seats, 9)
 		t.equal(#spec.seekerSpawns, 4)
 		t.equal(#spec.decoyAnchors, 4)
 	end)
 
-	t.test("tag and seat counts straight from the tree: 18 spots, 4 spawns, 4 decoys, exactly 9 seats", function()
+	t.test("tag and seat counts straight from the tree: 21 spots, 4 spawns, 4 decoys, exactly 9 seats", function()
 		local all = descendants(loadGrayBox())
 		local spots, spawns, decoys, seats = 0, 0, 0, 0
 		for _, n in all do
@@ -204,7 +204,7 @@ return function(t: Test.Runner)
 				seats += 1
 			end
 		end
-		t.equal(spots, 18)
+		t.equal(spots, 21)
 		t.equal(spawns, 4)
 		t.equal(decoys, 4)
 		t.equal(seats, 9)
@@ -219,23 +219,43 @@ return function(t: Test.Runner)
 		end
 	end)
 
-	t.test("spots are at varied heights: at least four at y >= 6 and at least four distinct heights", function()
+	t.test("spots are at exactly four heights: 14 floor, 1 at 2, 2 crate tops, 4 on the ledge", function()
+		-- The anchor sits half a stud above its surface, so these are surface heights 0, 2, 4 and 6.5. Exact
+		-- counts rather than "at least": the loose form stayed green while the real spot table changed under
+		-- it, which is the vacuous-assertion class this phase is trying to retire.
 		local root = loadGrayBox()
 		local high = 0
-		local heights: { [number]: boolean } = {}
-		local distinct = 0
+		local counts: { [number]: number } = {}
+		local heights: { number } = {}
 		for _, spot in child(child(root, "Data"), "DefaultSpots").children do
 			local y = (spot.position :: MapContract.Vec3).y
 			if y >= 6 then
 				high += 1
 			end
-			if not heights[y] then
-				heights[y] = true
-				distinct += 1
+			if counts[y] == nil then
+				counts[y] = 0
+				table.insert(heights, y)
 			end
+			counts[y] += 1
 		end
-		t.truthy(high >= 4, `only {high} spots at y >= 6`)
-		t.truthy(distinct >= 4, `only {distinct} distinct spot heights`)
+		table.sort(heights)
+		t.equal(high, 4)
+		t.deepEqual(heights, { 0.5, 2.5, 4.5, 7.0 })
+		t.equal(counts[0.5], 14)
+		t.equal(counts[2.5], 1)
+		t.equal(counts[4.5], 2)
+		t.equal(counts[7.0], 4)
+	end)
+
+	t.test("the authored spot count carries margin above the contract minimum", function()
+		-- D-15 requires the map to carry spare so a future rule change has somewhere to go that is not the
+		-- rules. 21 against 16 is five spare; the previous 18 left zero once the real rules ran.
+		local _, spec = MapValidator.validate(loadGrayBox())
+		assert(spec ~= nil, "gray-box must produce a MapSpec")
+		t.truthy(
+			#spec.defaultSpots >= MapContract.MIN_DEFAULT_SPOTS + 4,
+			`{#spec.defaultSpots} spots against a minimum of {MapContract.MIN_DEFAULT_SPOTS}`
+		)
 	end)
 
 	t.test("hidden data stays out of Geometry, which is the only thing ever cloned to Workspace (rule 3)", function()
