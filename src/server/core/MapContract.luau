@@ -14,6 +14,15 @@
 --       CardTable/       Folder
 --         TableAnchor    Part
 --         Seats/         Folder  exactly Seat1..Seat9 (9 = 10 players minus the hider, D-11)
+--
+-- Contract version 2 decisions, recorded so a later reader does not re-open them:
+--   * `shape` is in scope for v2 (research Pitfall 9, assumption A4). Part.Shape reads under Lune 0.11.1, but a
+--     Ball or Cylinder Part has className "Part", so without `shape` a sphere would be modelled as a box. The
+--     geometry layer is reject-biased: only className == "Part" with shape == "Block" is a standable, blocking
+--     box; every other collidable BasePart contributes its bounding box as blocking-only and never standable. A
+--     mesh floor therefore yields no footing and the map author fixes it by modelling floors as Parts.
+--   * A ContractVersion 1 map is rejected outright, not migrated. The version check is exact equality against
+--     CONTRACT_VERSION, so this is free; the graybox is the only v1 map and it is regenerated in this phase.
 export type Vec3 = { x: number, y: number, z: number }
 export type Pose = { position: Vec3, look: Vec3 }
 export type SizeClass = "Small" | "Medium" | "Large"
@@ -35,8 +44,16 @@ export type MapSpec = {
 	decoyAnchors: { Pose },
 	cardTable: { anchor: Pose, seats: { Pose } },
 }
--- The plain-data snapshot the validator consumes. Both snapshotters (the Lune CLI and the runtime loader) MUST
--- emit exactly this shape. position/size/look are present for Parts and absent for Models and Folders.
+-- The plain-data snapshot the validator consumes. Both snapshotters (the Lune CLI and the runtime
+-- loader) MUST emit exactly this shape, field for field. position/size/look/up/anchored/canCollide
+-- are present for BaseParts and absent for Models and Folders. `shape` is present only when
+-- className == "Part" (Shape is a Part property; a MeshPart or WedgePart has no Shape).
+--
+-- CONTRACT VERSION 2 (D-02, D-03). `up` is the part's CFrame.UpVector: without it a roll about the
+-- look axis is invisible and the graybox Ramp snapshots as a flat floating slab, which culls the
+-- four ledge spots and fails MIN_DEFAULT_SPOTS. The third basis vector is `look x up` (verified
+-- against the committed Ramp: look = (0,0,-1), up = (0.42111206, 0.90701294, 0), and
+-- look x up = (0.90701294, -0.42111206, 0) = the part's RightVector).
 export type Node = {
 	name: string,
 	className: string,
@@ -45,13 +62,16 @@ export type Node = {
 	position: Vec3?,
 	size: Vec3?,
 	look: Vec3?,
+	up: Vec3?,
 	anchored: boolean?,
+	canCollide: boolean?,
+	shape: string?,
 	children: { Node },
 }
 export type Issue = { code: string, path: string, message: string }
 
 local MapContract = {
-	CONTRACT_VERSION = 1,
+	CONTRACT_VERSION = 2,
 	MIN_DEFAULT_SPOTS = 16,
 	SEAT_COUNT = 9, -- max seekers = 10 players - 1 hider (D-11)
 	MAX_DISPLAY_NAME = 48,
@@ -66,6 +86,7 @@ local MapContract = {
 		"MAP_META_INVALID",
 		"MAP_MISSING_FOLDER",
 		"MAP_MISSING_PART",
+		"MAP_NODE_BASIS_INVALID",
 		"MAP_OUT_OF_BOUNDS",
 		"MAP_ROOT_INVALID",
 		"MAP_SCRIPT_FORBIDDEN",

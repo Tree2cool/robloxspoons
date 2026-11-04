@@ -26,6 +26,7 @@ local BOUNDS_INVALID = "MAP_BOUNDS_INVALID"
 local META_INVALID = "MAP_META_INVALID"
 local MISSING_FOLDER = "MAP_MISSING_FOLDER"
 local MISSING_PART = "MAP_MISSING_PART"
+local NODE_BASIS_INVALID = "MAP_NODE_BASIS_INVALID"
 local OUT_OF_BOUNDS = "MAP_OUT_OF_BOUNDS"
 local ROOT_INVALID = "MAP_ROOT_INVALID"
 local SCRIPT_FORBIDDEN = "MAP_SCRIPT_FORBIDDEN"
@@ -37,6 +38,7 @@ local TAG_OUTSIDE_FOLDER = "MAP_TAG_OUTSIDE_FOLDER"
 
 local CODE_CLASSES: { [string]: boolean } = { Script = true, LocalScript = true, ModuleScript = true }
 local DEFAULT_LOOK: Vec3 = { x = 0, y = 0, z = -1 }
+local DEFAULT_UP: Vec3 = { x = 0, y = 1, z = 0 }
 local LOOK_EPSILON = 1e-3
 
 local function hasTag(node: Node, tag: string): boolean
@@ -78,6 +80,14 @@ local function inside(box: Aabb, p: Vec3): boolean
 		and p.z <= box.max.z
 end
 
+local function lengthOf(v: Vec3): number
+	return math.sqrt(v.x * v.x + v.y * v.y + v.z * v.z)
+end
+
+local function dotOf(a: Vec3, b: Vec3): number
+	return a.x * b.x + a.y * b.y + a.z * b.z
+end
+
 local function validate(root: Node): ({ Issue }, MapSpec?)
 	local issues: { Issue } = {}
 	local function report(code: string, path: string, message: string)
@@ -96,6 +106,43 @@ local function validate(root: Node): ({ Issue }, MapSpec?)
 	local function walk(node: Node, path: string, parentPath: string)
 		if CODE_CLASSES[node.className] then
 			report(SCRIPT_FORBIDDEN, path, `{node.className} is not allowed anywhere in a map`)
+		end
+		-- Contract version 2 field check: at most one issue per node, first failing condition wins.
+		local look, up = node.look, node.up
+		if node.position ~= nil and node.size ~= nil and look ~= nil then
+			if up == nil then
+				report(
+					NODE_BASIS_INVALID,
+					path,
+					`a BasePart node must carry an up vector (contract version {MapContract.CONTRACT_VERSION})`
+				)
+			elseif node.canCollide == nil then
+				report(
+					NODE_BASIS_INVALID,
+					path,
+					`a BasePart node must carry canCollide (contract version {MapContract.CONTRACT_VERSION})`
+				)
+			elseif node.className == "Part" and node.shape == nil then
+				report(
+					NODE_BASIS_INVALID,
+					path,
+					`a Part node must carry shape (contract version {MapContract.CONTRACT_VERSION})`
+				)
+			elseif node.className ~= "Part" and node.shape ~= nil then
+				report(NODE_BASIS_INVALID, path, `shape is a Part property and must be absent on a {node.className}`)
+			elseif
+				math.abs(lengthOf(look) - 1) > LOOK_EPSILON
+				or math.abs(lengthOf(up) - 1) > LOOK_EPSILON
+				or math.abs(dotOf(look, up)) > LOOK_EPSILON
+			then
+				report(
+					NODE_BASIS_INVALID,
+					path,
+					`look and up must be unit length and perpendicular within {LOOK_EPSILON}`
+				)
+			end
+		elseif node.shape ~= nil then
+			report(NODE_BASIS_INVALID, path, `shape is a Part property and must be absent on a {node.className}`)
 		end
 		if hasTag(node, MapContract.TAG_DEFAULT_SPOT) then
 			if parentPath ~= defaultSpotsPath then
@@ -203,15 +250,19 @@ local function validate(root: Node): ({ Issue }, MapSpec?)
 			local size = bounds.size :: Vec3
 			local centre = bounds.position :: Vec3
 			local look = bounds.look
+			local up = bounds.up
 			if size.x <= 0 or size.y <= 0 or size.z <= 0 then
 				report(BOUNDS_INVALID, boundsPath, "Bounds size must be positive on all three axes")
 			elseif
 				look ~= nil
-				and (
-					math.abs(look.x - DEFAULT_LOOK.x) > LOOK_EPSILON
-					or math.abs(look.y - DEFAULT_LOOK.y) > LOOK_EPSILON
-					or math.abs(look.z - DEFAULT_LOOK.z) > LOOK_EPSILON
-				)
+					and (math.abs(look.x - DEFAULT_LOOK.x) > LOOK_EPSILON or math.abs(look.y - DEFAULT_LOOK.y) > LOOK_EPSILON or math.abs(
+						look.z - DEFAULT_LOOK.z
+					) > LOOK_EPSILON)
+				-- v2: a roll about the look axis is now visible, so an axis-aligned Bounds (D-19) is actually checkable.
+				or up ~= nil
+					and (math.abs(up.x - DEFAULT_UP.x) > LOOK_EPSILON or math.abs(up.y - DEFAULT_UP.y) > LOOK_EPSILON or math.abs(
+						up.z - DEFAULT_UP.z
+					) > LOOK_EPSILON)
 			then
 				report(BOUNDS_INVALID, boundsPath, "Bounds must be axis-aligned (identity rotation)")
 			else
