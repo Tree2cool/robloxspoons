@@ -171,6 +171,63 @@ builds the rules those phases consume, not the experiences that consume them.
     operating point with the trade-off visible, rather than ratifying a threshold nobody has
     seen the effect of.
 
+### Confirmed after research (owner, 2026-11-04)
+
+- **D-17: STRICT exclusion policy, and the graybox is regenerated.** Resolves Open Question 1
+  above. Every authored default spot must pass; one issue per failing spot; any failure fails
+  the build. Because the confirmed values leave exactly 16 of 18 surviving with zero spare,
+  regenerating `scripts/maps/generate-graybox.luau` with spots that **all** pass, plus real
+  margin above 16, is in scope for this phase. `Spot08` (shelf centre) is genuinely unfindable —
+  blocked by line of sight from every floor position within 12.36 studs — and must not be
+  re-authored in place. The tests that assert exactly 18 spots change with it
+  (`tests/maps/graybox.spec.luau`, and the ~12 `validate(` call sites research identified).
+
+- **D-18: the placement constants are CONFIRMED at research's recommended set.** These are the
+  D-16 values, now locked, to live in `src/shared/Config/Placement.luau` per D-13:
+
+  | Constant | Value |
+  |---|---|
+  | `GRID_SIZE` | 1.0 |
+  | `STEP_UP` | 1.0 |
+  | `MAX_SLOPE_DEGREES` | 30 |
+  | `CAPSULE_RADIUS` | 1.5 |
+  | `CAPSULE_HEIGHT` | 7.0 |
+  | `REACH_HEIGHT` (root) | 2.5 |
+  | `EYE_HEIGHT` | 4.0 |
+  | `SPOT_CLEARANCE` | 0.25 |
+  | `PICKUP_RANGE` | 7.0 |
+  | `PICKUP_MARGIN` | 1.5 (effective range 5.5) |
+
+  - **`EYE_HEIGHT` is a SEPARATE constant and that is load-bearing, not tidiness.** With one
+    shared reach/eye height the crate-top spot (`Spot06`) requires an effective range of 8.75,
+    gets culled, and the map falls to 15 — failing MAP-03. With a separate 4.0 eye height it
+    requires 4.06. **Phase 5's hunt must consume the same `EYE_HEIGHT` and the same
+    `PICKUP_RANGE`**, measured from the same root point.
+  - **`PICKUP_RANGE` 7.0 was chosen for clean separation, not to rescue a spot.** At range 8.0
+    with margin 1.5, `Spot09`'s verdict flips on a **0.04-stud** difference — decided by float32
+    rounding. At 7.0 every authored spot sits at least 1 stud clear of a flip (`Spot06` 1.44,
+    `Spot09` 1.04). Range 8.5 would buy a 17th survivor; it was rejected because choosing a
+    gameplay constant to make map validation pass is D-15 running backwards.
+  - **Two coupling invariants need their own tests, not comments.** `STEP_UP >= GRID_SIZE *
+    tan(MAX_SLOPE_DEGREES)` — at `GRID_SIZE` 4 with step 1.0 the ramp disconnects. And
+    `PICKUP_MARGIN >= GRID_SIZE * sqrt(2) / 2` (0.71 at g=1), so a later resolution change
+    cannot silently invalidate the margin.
+  - **The clearance cliff:** `SPOT_CLEARANCE >= 0.5` culls **all 18** spots, because every
+    authored spot sits exactly 0.5 above its surface. 0.25 is deliberate headroom under a cliff
+    edge; a test should assert the cliff exists so nobody "rounds it up" later.
+
+- **D-19: the over-a-void corpus case is a synthetic micro-world fixture.** The graybox has no
+  void (corrected above — the perimeter walls fill the ±60..62 band). A small hand-built
+  geometry fixture in the test suite carries "no footing" and any other corpus case the
+  reference map cannot express. Keeps corpus cases independent of map geometry, so regenerating
+  the graybox under D-17 cannot silently delete a test case.
+
+- **D-20: seat winding and seat-facing validation IS in scope.** Resolves the scope note below.
+  Research sizes it at 60-90 lines, 2 issue codes, ~6 fixtures, about half a day, and it does
+  **not** need the `up` vector (only the Bounds-roll item did, and D-02 closes that). Without
+  it, every Phase 7a map could author seats in the wrong order with only a graybox-specific test
+  to catch it.
+
 ### Claude's Discretion
 
 - Internal structure of `SpoonPlacement` — whether the OBB/raycast/grid primitives split into
@@ -187,7 +244,7 @@ builds the rules those phases consume, not the experiences that consume them.
 </decisions>
 
 <scope_note>
-## One scope question the planner must settle explicitly
+## One scope question the planner must settle explicitly — RESOLVED by D-20 (include it)
 
 `MapValidator.luau`'s deferred-checks comment (written in Phase 1, D-12) lists **six** items as
 Phase 3 work. Four are placement rules and clearly in scope. Two are not placement rules at all:
@@ -207,36 +264,24 @@ nobody's.
 
 </scope_note>
 
-<open_question_1>
-## Open Question 1 — what "after exclusions" means (OWNER DECISION, blocks planning)
+<resolved_question_1>
+## Open Question 1 — RESOLVED 2026-11-04 (owner): STRICT
 
-Surfaced by 03-RESEARCH and not resolvable from `.planning/` as written. Three sources
-disagree and the phrase "after exclusions" is defined nowhere:
+"After exclusions" was undefined, and MAP-02 ("fails the build on **any** that would be
+unfindable"), ROADMAP criterion 3 ("at least 16 ... after exclusions") and Phase 1's 18-spot
+rationale ("so one can be culled") could not all hold.
 
-- **MAP-02** (REQUIREMENTS.md:107): the validator "fails the build on **any** that would be
-  unfindable."
-- **ROADMAP criterion 3**: "passes the reference map with **at least 16** default spots that
-  each survive the real placement rules **after exclusions**."
-- **Phase 1 (01-07-PLAN.md:323)**: authored **18** spots, "two above the 16 minimum **so one
-  can be culled by Phase 3's placement rules** without breaking the contract."
+**The owner chose STRICT: one issue per failing spot; every authored default spot must pass, and
+the build fails on any failure.** It matches MAP-02's literal text and the phase goal. The
+tolerant reading and a tag-based opt-out were both rejected — the latter because an author-
+settable escape hatch reproduces the FOUND-05 filename-deny-list weakness the project already
+knows about.
 
-The two coherent policies:
+**Direct consequence, now in scope:** research measures exactly 16 of 18 graybox spots surviving
+at the confirmed values, so under STRICT the **graybox must be regenerated** (D-17). This is
+mandatory work in this phase, not a follow-up.
 
-- **STRICT** — every authored spot must pass; one issue per failing spot; the build fails on any
-  failure. Matches MAP-02's literal text and the phase goal ("no map can ship an unfindable
-  spoon"). Makes regenerating the graybox mandatory, because research measures exactly 16 of 18
-  surviving at the recommended values.
-- **TOLERANT** — spots may fail and be silently excluded; the build fails only when survivors
-  drop below `MIN_DEFAULT_SPOTS`. Matches Phase 1's comment and criterion 3's "after
-  exclusions". The recommended values then pass the graybox untouched, at exactly 16 with zero
-  spare.
-
-Research recommends STRICT. Until this is settled the planner cannot size the phase, because
-STRICT adds graybox regeneration (and updating the tests that assert exactly 18 spots) while
-TOLERANT does not.
-
-</open_question_1>
-
+</resolved_question_1>
 <must_haves>
 ## Non-negotiable for this phase
 

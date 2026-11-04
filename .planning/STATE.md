@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 3 context gathered (03-CONTEXT.md committed); ready to plan Phase 3
+stopped_at: Phase 3 context + research complete, numbers confirmed; ready to plan Phase 3
 last_updated: "2026-11-04T05:02:35.909Z"
 last_activity: 2026-11-04
 progress:
@@ -202,6 +202,7 @@ rows below (Phases 5, 6 and 7) are untouched and still open.
 | For | Item |
 |-----|------|
 | **Phase 5** | `R4`'s `netOwners` guard covers only `Remote*` members. `ProximityPrompt.Triggered`, `ClickDetector.MouseClick`, `Tool.Activated` and `Humanoid.Touched` are unguarded client-to-server paths that bypass the gateway entirely. Phase 5's spoon-pickup affordance is exactly where the first one appears. One-line fix to the guard. |
+| **Phase 5** | **`RaycastParams.RespectCanCollide` defaults to `false`** — the opposite of Phase 3's D-03, which treats only `CanCollide = true` parts as solid. Phase 5's line-of-sight raycast MUST set it to `true`, or CI and the live game will disagree about what blocks sight and a spot the validator passed can hide a spoon in play. Found by 03-RESEARCH while re-checking V-18 against primary docs (the one Roblox doc host reachable that run). One-line fix, invisible until it bites. |
 | **Phase 6** | Wire `PlayerGate.canStart`. It has zero callers today, which is why FOUND-08 is PARTIAL. `Admission.luau` forbids anything else deciding a match may start, and that invariant is currently unenforceable because there are no call sites to inspect. |
 | **Phase 7 (before authoring any cosmetics module)** | `FOUND-05` is a **filename deny-list** and the verifier confirmed it can be made vacuous by naming alone: `Scoring.luau` importing `Wardrobe.luau` leaves `check-guards` green. This is inside the guard's declared threat model (accident and drift), not outside it, but the no-pay-to-win rule is Non-Negotiable Rule 1. Require cosmetics/shop code under `cosmetics/` and `shop/` directories (path-segment matching already supports it), or invert R2 to an import allow-list. |
 | **Phase 7 (start, and before any real DataStore write)** | Re-run M-04 check 2. FOUND-07's enforcing control is a Creator Hub toggle **outside the repo**; Phase 1 proved empirically it can be wrong while all 14 gates are green, and nothing in the repo can detect it being flipped back. Also close M-04 check 3 before the first real write. |
@@ -250,6 +251,12 @@ inherited explicitly so the next phase does not have to infer it):
 - Verification debt: every Roblox platform claim in research is unverified (doc hosts DNS-blocked). Each phase's research step starts by re-checking SUMMARY.md Verification Debt rows for that phase. Add the blocked hosts to the environment's allowed domains.
 - Owner decisions CONFIRMED during initialization: hider-score denominator = fixed 300 s (OQ 7); mid-round leaver = finish the round then end on current totals, no win credit (OQ 8); free/earned cosmetic baseline = free defaults plus an achievement-unlocked set (OQ 11); player cap = 10 (OQ 17).
 - Owner decisions still open: match tiebreak (OQ 5, default: higher best-round then earlier four-of-a-kind placement), VIP route (OQ 14, Phase 7b), Game Pass versus Developer Product switch point (OQ 15, Phase 7b), rejoin policy confirmation (OQ 18, derived default in MATCH-08), cold-start and bot-fill decision (OQ 13, Phase 8 on telemetry).
+- **Phase 3 Open Question 1 RESOLVED (owner, 2026-11-04): STRICT.** "After exclusions" was
+  undefined and MAP-02, ROADMAP criterion 3 and Phase 1's 18-spot rationale could not all hold.
+  Every authored default spot must pass; one issue per failing spot; any failure fails the build.
+  **Consequence: the graybox is regenerated inside Phase 3** (D-17), because the confirmed
+  constants leave exactly 16 of 18 surviving with zero spare, and `Spot08` is genuinely
+  unfindable (line of sight blocked from every floor position within 12.36 studs).
 - **OQ 12 RESOLVED (Phase 3 discuss, 2026-11-04):** avatar normalisation scope is a **canonical
   reference avatar** — one fixed capsule for every validity test, biased toward rejecting (short reach,
   tall headroom). The rule function takes no avatar argument, so HIDE-07's scale-invariance is true by
@@ -304,13 +311,15 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-11-04
-Stopped at: Phase 3 context gathered — 16 decisions across 4 gray areas, Open Question 12 resolved
+Stopped at: Phase 3 researched and numbers confirmed — 20 decisions, OQ-12 and OQ-1 resolved
 Resume file: .planning/phases/03-placement-rules-map-pipeline-and-validator/03-CONTEXT.md
 
-**Next:** plan Phase 3 (`/gsd-plan-phase 3`). CONTEXT.md is written and committed; the research step
-must open by re-checking Verification Debt rows V-17..V-20 and V-4 in `.planning/research/SUMMARY.md`,
-then propose the placement numbers with their per-spot consequences on the graybox for owner
-confirmation (D-16).
+**Next:** `/gsd-autonomous --only 3` (plan + execute; discuss and research both already done, so
+plan-phase skips them). 03-CONTEXT.md carries 20 owner decisions and 03-RESEARCH.md carries the
+measured number ladder. The Verification Debt re-check is DONE: V-17 and V-18 retired for this
+phase by D-05/D-01, V-20 deferred to Phase 6, V-4 answered by a Lune 0.11.1 spike and
+independently re-verified, V-19 only partly primary-sourced (per-axis avatar scale limits remain
+LOW confidence — the one soft spot under D-10's capsule).
 
 **Carried into planning as the phase's live risk:** the `Node` contract bump to v2 (adding `up` and
 `canCollide`) makes the two snapshotters' shape agreement the correctness foundation rather than
