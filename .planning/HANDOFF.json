@@ -1,0 +1,47 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-11-04T03:54:25.744Z",
+  "phase": "2",
+  "phase_name": "Card Engine and Pacing Simulator",
+  "phase_dir": ".planning/phases/02-card-engine-and-pacing-simulator",
+  "plan": 14,
+  "task": 14,
+  "total_tasks": 14,
+  "status": "phase_complete_between_phases",
+  "completed_tasks": [
+    {"id": 1, "name": "02-03 pure-zone R3 guard (coroutine + os. bans)", "status": "done", "commit": "168515e"},
+    {"id": 2, "name": "02-01 engine types and invariants", "status": "done", "commit": "0e3bbba"},
+    {"id": 3, "name": "02-02 SeatOrder and dealer", "status": "done", "commit": "c3ecd7b"},
+    {"id": 4, "name": "02-04 Pool and the deal (CARD-09)", "status": "done", "commit": "33cb7c4"},
+    {"id": 5, "name": "02-05 Hand completion (CARD-01/07/10)", "status": "done", "commit": "8b78d9f"},
+    {"id": 6, "name": "02-06 Ring, pass/draw, Rule 8 removal", "status": "done", "commit": "c7d1d6d"},
+    {"id": 7, "name": "02-13 the anti-livelock Valve", "status": "done", "commit": "426461c"},
+    {"id": 8, "name": "02-07 Engine.apply and newRound", "status": "done", "commit": "10f049d"},
+    {"id": 9, "name": "02-08 the 100k-action fuzz (194,567 actions)", "status": "done", "commit": "7d366c0"},
+    {"id": 10, "name": "02-09 Simulator, Bots, CI subset", "status": "done", "commit": "ca067e9"},
+    {"id": 11, "name": "02-10 the staged sweep CLI", "status": "done", "commit": "7beb742"},
+    {"id": 12, "name": "02-14 the G1 sweep run (ran twice; k=6 then k=3)", "status": "done", "commit": "0d76087"},
+    {"id": 13, "name": "02-11 CardPool constants, todo count to 0", "status": "done", "commit": "c0813b3"},
+    {"id": 14, "name": "02-12 record the G1 verdict in the planning documents", "status": "done", "commit": "a9e9dbd"}
+  ],
+  "remaining_tasks": [
+    {"id": 15, "name": "Phase 3: Placement Rules, Map Pipeline and Validator", "status": "not_started"}
+  ],
+  "blockers": [],
+  "human_actions_pending": [
+    {"action": "Unblock the Roblox documentation hosts in the cloud environment's network policy (create.roblox.com, devforum.roblox.com, robloxapi.github.io)", "context": "Verification Debt carried since project init. Irrelevant to Phases 1-3 because the engine touches no Roblox API, but Phases 4 and 5 are networking, replication and anti-ESP, all resting on platform behaviour nobody has confirmed against primary docs.", "blocking": false},
+    {"action": "MANUAL-CHECKS M-04 check 3 - press Play in SPOONS [BETA] and confirm the server refuses to boot on the persistence tripwire", "context": "Deferred by owner decision; needs a publish over the live production place, disproportionate for a secondary control whose logic is unit-tested.", "blocking": false},
+    {"action": "MANUAL-CHECKS M-05 - confirm the 11th join is refused", "context": "Needs ten simultaneous real clients. The cap setting itself is confirmed on both places.", "blocking": false},
+    {"action": "MANUAL-CHECKS M-07 (new) - calibrate the simulator's human model at the first full-roster playtest", "context": "The only thing that can tell us whether 16.2s to first completion is true of people rather than bots. G1's solvability half is a theorem and does not depend on it; its pacing half does.", "blocking": false}
+  ],
+  "decisions": [
+    {"decision": "Anti-livelock valve added to the engine (not in the original phase scope)", "rationale": "Pure greedy play livelocks ~10% of rounds at a full roster. The valve makes zero-stall a property of the engine rather than a bet on player behaviour. Valve-off twins stall 3.58-8.31% at N=10 against a 0.0116% residual.", "phase": "2"},
+    {"decision": "Shipped pool k=3, j=1, Wild default, 8.0s auto-pass deadline", "rationale": "Owner chose k=3 from the bar-sensitivity ladder over the bar's own k=6. Every candidate k=2..k=6 cleared all five bars and the firing-rate curve has no elbow, so the bar chooses rather than discovers. k=3 is the tightest pool reaching a clean zero stall rate.", "phase": "2"},
+    {"decision": "G1's literal zero-stall bar replaced by a 0.500% residual ceiling", "rationale": "No pool this engine has reaches literal zero. Owner-approved, dated, with the measured residual (37 in 320,000) printed everywhere rather than rounded away. evaluateBars was not relaxed and still fails in 20 of 32 gated cells in the committed artefact.", "phase": "2"},
+    {"decision": "CI suite accepted at ~25s against CONTEXT's locked ~20s", "rationale": "Owner accepted the overshoot. Nothing trimmed to meet it: the 500-round floor, every mutation case and every bar are intact.", "phase": "2"},
+    {"decision": "Rng seed warm-up (WARM_UP_STEPS = 3)", "rationale": "xorshift32 returned 1 for every seed 1..1000 on its first draw. Fisher-Yates spends its first draw on the last position, so every deal and every seeded trial would have been biased identically.", "phase": "2"}
+  ],
+  "uncommitted_files": [],
+  "next_action": "Start Phase 3 (Placement Rules, Map Pipeline and Validator) with /gsd-autonomous --only 3, or /gsd-plan-phase 3. Phase 3 depends only on Phase 1 and is independent of Phase 2.",
+  "context_notes": "Phase 2 is closed and verified: 14 plans, 11/11 requirements, 16/16 must-haves, 509 tests, 0 todo, Gate G1 passed. Nothing is blocking. The dominant lesson of the phase, which the resuming agent should carry: roughly 22 plan assertions proved structurally incapable of passing or firing, most found by executors mutation-testing their own gates. A green check is evidence only once someone has watched it go red."
+}
