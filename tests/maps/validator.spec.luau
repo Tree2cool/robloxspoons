@@ -28,6 +28,24 @@ local function part(name: string, x: number, y: number, z: number, tag: string?)
 	return p
 end
 
+-- Nine seats at the given radius and bearings (degrees, clockwise from north) around the TableAnchor at
+-- (0, 3, -40), each facing the anchor. Every seat case then states only what it varies.
+local function seatRing(radius: number, bearings: { number }): { Node }
+	local seats: { Node } = {}
+	local anchorX, anchorY, anchorZ = 0, 3, -40
+	for i, bearing in bearings do
+		local a = math.rad(bearing)
+		local sx = anchorX + radius * math.sin(a)
+		local sz = anchorZ - radius * math.cos(a)
+		local seat = part(`Seat{i}`, sx, anchorY, sz)
+		local dx, dz = anchorX - sx, anchorZ - sz
+		local d = math.sqrt(dx * dx + dz * dz)
+		seat.look = { x = dx / d, y = 0, z = dz / d }
+		table.insert(seats, seat)
+	end
+	return seats
+end
+
 -- The placement stage runs whenever the structural pass is clean, so the baseline has to be a world the
 -- rules accept. A 1x1x1 floor with spots floating 11 studs up would make every case in this file report a
 -- placement issue and the exact-set assertions would all fail for the wrong reason. Note that only the handful
@@ -38,10 +56,10 @@ local function validSnapshot(): Node
 	for i = 1, 16 do
 		table.insert(spots, part(`Spot{i}`, (i - 8) * 5, 0.5, 10, MapContract.TAG_DEFAULT_SPOT))
 	end
-	local seats: { Node } = {}
-	for i = 1, 9 do
-		table.insert(seats, part(`Seat{i}`, (i - 5) * 2, 3, -40))
-	end
+	-- The baseline's seats were a straight line until D-20's winding rule landed, which is exactly the class of
+	-- fixture that passes while asserting nothing about geometry. A real radius-6 ring at 40-degree spacing, the
+	-- same construction generate-graybox.luau uses, is now the baseline because every seat case has to be surgical.
+	local seats = seatRing(6, { 0, 40, 80, 120, 160, 200, 240, 280, 320 })
 	local bounds = part("Bounds", 0, 14, 0)
 	bounds.size = { x = 124, y = 30, z = 124 }
 	local floor = part("Floor", 0, -0.5, 0)
@@ -97,6 +115,13 @@ end
 
 local function geometryOf(root: Node): Node
 	return find(root, "Geometry")
+end
+
+-- Rotates a node's look vector about y by `degrees`.
+local function rotateLook(n: Node, degrees: number)
+	local look = n.look :: MapContract.Vec3
+	local c, sn = math.cos(math.rad(degrees)), math.sin(math.rad(degrees))
+	n.look = { x = look.x * c + look.z * sn, y = look.y, z = -look.x * sn + look.z * c }
 end
 
 local function removeChild(parent: Node, name: string)
@@ -382,6 +407,59 @@ local cases: { Case } = {
 		end,
 	},
 	{
+		name = "seats wound anticlockwise",
+		code = "MAP_SEAT_ORDER",
+		pathContains = "Seat",
+		mutate = function(r)
+			find(r, "Data/CardTable").children[2].children = seatRing(6, { 0, 320, 280, 240, 200, 160, 120, 80, 40 })
+		end,
+	},
+	{
+		name = "two adjacent seats swapped",
+		code = "MAP_SEAT_ORDER",
+		pathContains = "Seat5",
+		mutate = function(r)
+			local a, b = find(r, "Data/CardTable/Seats/Seat4"), find(r, "Data/CardTable/Seats/Seat5")
+			a.position, b.position = b.position, a.position
+			a.look, b.look = b.look, a.look
+		end,
+	},
+	{
+		name = "a seat facing away from the table",
+		code = "MAP_SEAT_FACING",
+		pathContains = "Seat3",
+		mutate = function(r)
+			local look = find(r, "Data/CardTable/Seats/Seat3").look :: MapContract.Vec3
+			find(r, "Data/CardTable/Seats/Seat3").look = { x = -look.x, y = -look.y, z = -look.z }
+		end,
+	},
+	{
+		name = "a seat 8 degrees off the anchor",
+		code = "MAP_SEAT_FACING",
+		pathContains = "Seat7",
+		mutate = function(r)
+			rotateLook(find(r, "Data/CardTable/Seats/Seat7"), 8)
+		end,
+	},
+	{
+		name = "a seat on the table anchor",
+		code = "MAP_SEAT_ORDER",
+		pathContains = "Seat2",
+		mutate = function(r)
+			find(r, "Data/CardTable/Seats/Seat2").position = { x = 0, y = 3, z = -40 }
+		end,
+	},
+	{
+		-- Every step is 80 degrees, inside (0, 180), but 9 * 80 = 720: the ring winds twice. Only the
+		-- sum-to-360 condition catches this, which is why it is not belt-and-braces.
+		name = "seats wound twice round",
+		code = "MAP_SEAT_ORDER",
+		pathContains = "Seat",
+		mutate = function(r)
+			find(r, "Data/CardTable").children[2].children = seatRing(6, { 0, 80, 160, 240, 320, 40, 120, 200, 280 })
+		end,
+	},
+	{
 		name = "nine seats but one is named Chair9",
 		code = "MAP_SEAT_NAME",
 		pathContains = "Chair9",
@@ -466,7 +544,11 @@ local cases: { Case } = {
 		code = "MAP_OUT_OF_BOUNDS",
 		pathContains = "Seat4",
 		mutate = function(r)
-			find(r, "Data/CardTable/Seats/Seat4").position = { x = 0, y = 3, z = -900 }
+			-- Slide Seat4 outward along its own bearing (120 degrees) so winding and facing stay valid and only
+			-- the bounds rule fires. At radius 100 it is at x = 86.6, outside the +-62 Bounds.
+			local seat = find(r, "Data/CardTable/Seats/Seat4")
+			local a = math.rad(120)
+			seat.position = { x = 100 * math.sin(a), y = 3, z = -40 - 100 * math.cos(a) }
 		end,
 	},
 	{
@@ -610,8 +692,35 @@ return function(t: Test.Runner)
 		local issues, spec = MapValidator.validate(root, PLACEMENT)
 		t.deepEqual(issues, {})
 		assert(spec ~= nil, "expected a MapSpec")
-		t.deepEqual(spec.cardTable.seats[1].position, { x = -8, y = 3, z = -40 })
-		t.deepEqual(spec.cardTable.seats[9].position, { x = 8, y = 3, z = -40 })
+		-- Seat 1 is due north of the anchor; seat 9 is at bearing 320 degrees (sin = -0.6428, cos = 0.7660).
+		t.deepEqual(spec.cardTable.seats[1].position, { x = 0, y = 3, z = -46 })
+		t.truthy(math.abs(spec.cardTable.seats[9].position.x - 6 * math.sin(math.rad(320))) < 1e-9)
+		t.truthy(math.abs(spec.cardTable.seats[9].position.z - (-40 - 6 * math.cos(math.rad(320)))) < 1e-9)
+	end)
+
+	t.test("a valid ring at a different radius with uneven clockwise spacing passes", function()
+		-- Every step is inside (0, 180) and they sum to 360: the rule checks winding, not the graybox's geometry.
+		local root = validSnapshot()
+		find(root, "Data/CardTable").children[2].children = seatRing(11, { 0, 25, 70, 110, 150, 200, 250, 300, 335 })
+		local issues, spec = MapValidator.validate(root, PLACEMENT)
+		t.deepEqual(issues, {})
+		t.truthy(spec ~= nil)
+	end)
+
+	t.test("a seat 3 degrees off the anchor is within tolerance", function()
+		-- 5 degrees is deliberate slack for hand authoring in Studio; a generated seat passes exactly.
+		local root = validSnapshot()
+		rotateLook(find(root, "Data/CardTable/Seats/Seat7"), 3)
+		local issues, spec = MapValidator.validate(root, PLACEMENT)
+		t.deepEqual(issues, {})
+		t.truthy(spec ~= nil)
+	end)
+
+	t.test("a map missing a seat reports MAP_SEAT_COUNT and not MAP_SEAT_ORDER", function()
+		local root = validSnapshot()
+		removeChild(find(root, "Data/CardTable/Seats"), "Seat9")
+		local issues = MapValidator.validate(root, PLACEMENT)
+		t.deepEqual(codesOf(issues), { "MAP_SEAT_COUNT" })
 	end)
 
 	t.test("exactly 16 tagged spots passes (the boundary is inclusive)", function()
@@ -677,7 +786,7 @@ return function(t: Test.Runner)
 			coveredCount += 1
 		end
 		t.equal(coveredCount, #MapContract.ISSUE_CODES)
-		t.equal(#MapContract.ISSUE_CODES, 21)
+		t.equal(#MapContract.ISSUE_CODES, 23)
 	end)
 
 	t.test("issues are sorted by code then path and identical across runs", function()
