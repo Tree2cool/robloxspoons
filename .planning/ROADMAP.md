@@ -14,7 +14,7 @@ Every Roblox platform claim in the research is unverified against primary docs (
 
 - [x] **Phase 1: Foundations, Contracts and Spec Lock** - Toolchain, CI, typed gateway, lint guards, FSM skeleton, map contract, persistence skeleton, and the two blocking card-engine specs
 - [x] **Phase 2: Card Engine and Pacing Simulator** - Pure headless card ring, fuzz suite, and the simulator gate that decides jokers-as-wilds versus blockers
-- [ ] **Phase 3: Placement Rules, Map Pipeline and Validator** - Shared placement rules and a validator that runs every default spot through them (parallel with Phase 2)
+- [x] **Phase 3: Placement Rules, Map Pipeline and Validator** - Shared placement rules and a validator that runs every default spot through them (parallel with Phase 2)
 - [ ] **Phase 4: Live Card Table** - Server card shell, prediction/reconcile, AFK auto-pass, and the PC and mobile card UI (parallel with Phase 5)
 - [ ] **Phase 5: Hunt, Anti-ESP, Claim and Scoring** - Server-only spoon data, per-client reveal, atomic claim, scoring ledger, round end (parallel with Phase 4; ends at the vertical-slice gate)
 - [ ] **Phase 6: Hide Phase, Match Lifecycle and Churn** - Free placement UI, parkour room, full match flow, joiners/leavers, scoreboard and podium

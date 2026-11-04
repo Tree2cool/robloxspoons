@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 3 waves 1-7 EXECUTED (10/11 plans, Gate G2 PASSED with debt); wave 8 is the owner Studio checkpoint
+stopped_at: Phase 3 COMPLETE (11/11 plans, Gate G2 PASSED by owner); ready to plan Phase 4 or 5
 last_updated: "2026-11-04T05:02:35.909Z"
 last_activity: 2026-11-04
 progress:
   total_phases: 8
-  completed_phases: 2
-  total_plans: 26
-  completed_plans: 26
+  completed_phases: 3
+  total_plans: 37
+  completed_plans: 37
   percent: 100
 ---
 
@@ -369,40 +369,31 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-11-04
-Stopped at: Phase 3 waves 1-7 executed — 10 of 11 plans complete, Gate G2 PASSED with named debt; wave 8 (03-11) awaits the owner in Studio
-Resume file: .planning/phases/03-placement-rules-map-pipeline-and-validator/03-CONTEXT.md
+Stopped at: **Phase 3 COMPLETE.** 11/11 plans, Gate G2 PASSED by the owner in Studio.
+Resume file: `.planning/phases/03-placement-rules-map-pipeline-and-validator/03-G2-REPORT.md`
 
-**Next: TWO OWNER ACTIONS, both blocking Phase 3's close.** Everything automatable is done.
+**Final measured state:** 657 tests passed / 0 failed / 0 todo; `verify.luau` 14/14 exit 0;
+`validate-map` ok (21 spots, 9 seats); `ISSUE_CODES` 23; MANUAL-CHECKS 8 signed, 2 unsigned.
 
-1. **The Studio session (plan 03-11, non-autonomous).** Four manual checks now sit unsigned, and
-   but only **TWO block Phase 3**: **M-08** (the place's `CharacterMaxSlopeAngle` is at least 30 —
-   a one-reading check against a value that already defaults to 89) and **M-10** (the v2 21-spot
-   graybox loads through `MapLoader` and validates in Studio — the only check that can observe
-   value-level parity between the two snapshotters, which no CI arrangement can). Both are the same
-   Studio session.
-   **M-09 does NOT block Phase 3** — its own text says so: standing avatars at the scale extremes
-   needs a full roster, so it is a Phase 4/6 playtest item. It is the human gate under V-19, the
-   phase's one genuinely soft claim, and until it is signed D-11's bias-toward-rejecting is the
-   mitigation rather than a verification. M-07 is Phase 2's playtest calibration and is unaffected.
-2. **The CI suite timing decision — CLOSED 2026-11-04, owner ACCEPTED.** 15.94s (Phase 1) ->
-   ~25-26s (Phase 2, accepted) -> **29.9s** (Phase 3), with the `verify.luau` chain at **32.6s**.
-   Recorded as a **second approved departure**, the same way Phase 2's was: measured, dated and
-   approved rather than silent. **Nothing was trimmed to reach it** — the 21-spot graybox bake, the
-   maze oracle, the differential fuzzes and all nine gate mutations are intact. Quick runs stay fast
-   (`--filter placement` 2.91s, `--filter maps` 1.55s), so per-task feedback is unharmed; it is the
-   full chain that overshoots. `03-VALIDATION.md`'s latency item is now ticked with that rationale.
-   **Phase 4 should expect to revisit this** — it adds the most test weight of any remaining phase.
+**Next:** Phase 4 (Live Card Table) or Phase 5 (Hunt, Anti-ESP, Claim and Scoring). The roadmap
+pairs them and they merge at Gate G3, the vertical slice. Phase 5 depends on Phase 3 and is now
+unblocked; Phase 4 depends on Phase 2. Phase 7a is also unblocked by Gate G2 but waits on Gate G3
+per the roadmap.
 
-**Measured state at wave 7:** 657 tests passed / 0 failed / 0 todo, `verify.luau` 14/14 (exit 0),
-23 issue codes, graybox 21 authored spots all passing under STRICT with five spare over the 16
-minimum. Evidence: `03-G2-REPORT.md`. 03-CONTEXT.md carries 20 owner decisions and 03-RESEARCH.md carries the
-measured number ladder. The Verification Debt re-check is DONE: V-17 and V-18 retired for this
-phase by D-05/D-01, V-20 deferred to Phase 6, V-4 answered by a Lune 0.11.1 spike and
-independently re-verified, V-19 only partly primary-sourced (per-axis avatar scale limits remain
-LOW confidence — the one soft spot under D-10's capsule).
-
-**Carried into planning as the phase's live risk:** the `Node` contract bump to v2 (adding `up` and
-`canCollide`) makes the two snapshotters' shape agreement the correctness foundation rather than
-hygiene — with one pure geometry model, `scripts/maps/snapshot.luau` and
-`src/server/services/MapLoader.luau` disagreeing means CI and the live game disagree about whether a
-spoon is findable.
+**Carried into Phase 4/5/6 — do not rediscover:**
+- **`RaycastParams.RespectCanCollide` defaults to `false`**, the opposite of D-03. Phase 5's
+  line-of-sight raycast must set it `true` or CI and the live game will disagree about what blocks
+  sight. This is the highest-value single fact this phase produced for a later one.
+- **M-09 is the open human gate under V-19**, the phase's one genuinely soft claim: per-axis avatar
+  scale limits, the R15 default `HipHeight` and any camera-height formula were never found in
+  primary docs. Until signed, D-11's bias toward rejecting is the mitigation, not a verification.
+  Needs a full-roster playtest; pair it with M-07.
+- **Phase 5 must consume the same `EYE_HEIGHT` and `PICKUP_RANGE`** from
+  `src/shared/Config/Placement.luau`, measured from the same root point. A separate `EYE_HEIGHT` is
+  load-bearing: sharing one height culls the crate-top spots and drops the map below MAP-03.
+- **CI timing will need revisiting in Phase 4**, which adds the most test weight of any remaining
+  phase. Accepted at 29.9 s here as a second approved departure.
+- **The process finding worth more than any fix:** nine assertions structurally incapable of firing
+  were found in Phase 3 alone — three by the plan-checker across three passes, six by executors.
+  Phase 2 found ~22. The pattern recurs even when everyone is actively looking for it, so budget
+  for mutation-testing every gate rather than treating it as optional.
