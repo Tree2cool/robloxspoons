@@ -133,9 +133,9 @@ local function describeLayout(boxes: { Obb.Box }): string
 				box.h[1],
 				box.h[2],
 				box.h[3],
-				box.az[3],
+				box.ax[3],
 				box.ay[3],
-				box.ax[3]
+				box.az[3]
 			)
 		)
 	end
@@ -245,12 +245,37 @@ return function(t: Test.Runner)
 		expectRegion(t, baked, world.probes.onLedge, 0, "ledge")
 	end)
 
-	t.test("slope allowance: the ramp connects at STEP_UP = 0.5, below CAPSULE_RADIUS * tan(24.9) = 0.696", function()
+	t.test(
+		"ramp connects at STEP_UP = 0.5, GRID_SIZE 1 (does not discriminate the allowance, see the next case)",
+		function()
+			local world = MicroWorld.ramp(RAMP_DEGREES)
+			local baked = bake(world, { STEP_UP = 0.5 })
+			expectRegion(t, baked, world.probes.onFloor, 1, "floor")
+			expectRegion(t, baked, world.probes.onLedge, 1, "ledge")
+		end
+	)
+
+	-- PLAN DEFECT, found by performing the mutation: the case above does NOT discriminate. At GRID_SIZE 1 and
+	-- CAPSULE_RADIUS 1.5 the erosion window only reaches +-1 cell (the lattice has no neighbour at distance 1.5),
+	-- so the worst rise it sees is 1 * tan(24.9) = 0.466 < 0.5 and dropping the allowance changes nothing. The
+	-- allowance matters only when the window reaches CAPSULE_RADIUS: at GRID_SIZE 0.5 it reaches 3 cells, a rise of
+	-- 1.5 * tan(24.9) = 0.696 > STEP_UP 0.5, while the link rule only needs 0.5 * tan(24.9) = 0.232.
+	t.test("slope allowance (discriminating): at GRID_SIZE 0.5 the ramp connects at STEP_UP = 0.5 < 0.696", function()
 		local world = MicroWorld.ramp(RAMP_DEGREES)
-		local baked = bake(world, { STEP_UP = 0.5 })
+		local baked = bake(world, { GRID_SIZE = 0.5, STEP_UP = 0.5 })
 		expectRegion(t, baked, world.probes.onFloor, 1, "floor")
 		expectRegion(t, baked, world.probes.onLedge, 1, "ledge")
 	end)
+
+	t.test(
+		"negative control: at GRID_SIZE 0.5 STEP_UP = 0.2, below 0.5 * tan(24.9) = 0.232, disconnects the ledge",
+		function()
+			local world = MicroWorld.ramp(RAMP_DEGREES)
+			local baked = bake(world, { GRID_SIZE = 0.5, STEP_UP = 0.2 })
+			expectRegion(t, baked, world.probes.onFloor, 1, "floor")
+			expectRegion(t, baked, world.probes.onLedge, 0, "ledge")
+		end
+	)
 
 	t.test("negative control: STEP_UP = 0.4, below GRID_SIZE * tan(24.9) = 0.464, disconnects the ledge", function()
 		local world = MicroWorld.ramp(RAMP_DEGREES)
