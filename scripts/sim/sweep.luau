@@ -74,10 +74,29 @@
 --     Wild at 0.076. The bar must stay below it, or a pool the engine rescues in one round in
 --     thirteen passes and the firing rate stops discriminating -- which is the whole reason A7 made
 --     it a first-class metric.
--- VALVE_RATE_MAX_SWEEP = 0.07 is the round value inside [0.060, 0.076). It is NOT a design target:
--- that no pool in the searched grid gets the rescue rate below ~2% is itself the finding, and the
--- report prints a bar-sensitivity table so plan 02-11 can see which pool every candidate bar would
--- have selected.
+-- VALVE_RATE_MAX_SWEEP was 0.07, the round value inside [0.060, 0.076), which selected k=6.
+-- IT IS NOW 0.20, AND THE REASON IS AN OWNER DECISION, NOT A MEASUREMENT.
+--
+-- The 0.07 run's own bar-sensitivity ladder is what settled it. The curve is smooth and monotone
+-- with no elbow, so the bar does not discover a pool -- it CHOOSES one, and every candidate from
+-- k=2 to k=6 cleared all five bars. That made the choice a question about how the game feels,
+-- which no bar can measure, so it went to the owner with the ladder:
+--
+--   bar    pool   first completion   p95     occupancy   valve fires   stalls
+--   40%    k=2    14.5s              21.8s   0.789       15.5%         0.100%
+--   20%    k=3    16.4s              23.5s   0.825        9.4%         0.000%
+--   10%    k=4    18.2s              26.2s   0.838        4.9%         0.000%
+--   7%     k=6    20.9s              32.1s   0.856        2.5%         0.000%
+--
+-- The owner chose k=3: it is the tightest pool that reaches a clean zero stall rate, it gives up
+-- ~2s of starting-gun speed against k=2 while cutting forced passes by a third, and it avoids
+-- k=6's ~45% slower start. A valve firing is not invisible -- a card leaves a hand the player did
+-- not choose -- so the firing rate is a FEEL cost, not just a safety statistic.
+--
+-- 0.20 is the candidate bar whose full selection rule (including the half-the-bar margin) yields
+-- k=3, j=1 at an 8.0s deadline with marginal = false. The bar is therefore a REGRESSION GUARD
+-- around a chosen operating point, not a discovery mechanism: it still rejects the k=1 and k=2
+-- neighbourhood, and the report prints the whole ladder so the choice stays arguable.
 --
 -- WHAT IS AND IS NOT CLAIMED. The honest claim this file's report makes is about the SELECTED
 -- pool at the confirmed round count, with the measured residual printed rather than rounded away.
@@ -164,7 +183,7 @@ local REFERENCE_MODE: Types.JokerMode = "Wild"
 -- below the 10.6% a valve regression produces. The MEASURED residual is printed in the report.
 local STALL_RATE_MAX = 0.005
 -- A8 resolution 1, pinned by the two measured bounds in the header.
-local VALVE_RATE_MAX_SWEEP = 0.07
+local VALVE_RATE_MAX_SWEEP = 0.20
 -- The bar-sensitivity ladder printed in the report, so the choice above is auditable against the
 -- pool each alternative bar would have selected.
 local VALVE_RATE_LADDER = { 0.40, 0.20, 0.15, 0.10, 0.07, 0.05, 0.04, 0.03, 0.02, 0.01 }
