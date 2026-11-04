@@ -375,16 +375,23 @@ Resume file: .planning/phases/03-placement-rules-map-pipeline-and-validator/03-C
 **Next: TWO OWNER ACTIONS, both blocking Phase 3's close.** Everything automatable is done.
 
 1. **The Studio session (plan 03-11, non-autonomous).** Four manual checks now sit unsigned, and
-   three of them are Phase 3's: **M-08** (the place's `CharacterMaxSlopeAngle` is at least 30),
-   **M-09** (the reference capsule covers real avatars at the scale extremes — the human gate under
-   V-19, the phase's one genuinely soft claim), and **M-10** (the v2 21-spot graybox loads through
-   `MapLoader` and validates in Studio — the only check that closes gate 8's value-level parity gap,
-   which no CI arrangement can). M-07 is Phase 2's and is unaffected. All three can be done in one
-   session.
-2. **The CI suite timing decision.** 15.94s baseline -> ~25-26s at Phase 2 close (accepted) -> now
-   **29.9s**, with the whole `verify.luau` chain at **32.6s**. Deliberately NOT recorded as
-   accepted, and `03-VALIDATION.md`'s "Feedback latency < 30s" box is left unticked with the reason
-   beside it. The owner has not been asked. Accept or trim.
+   but only **TWO block Phase 3**: **M-08** (the place's `CharacterMaxSlopeAngle` is at least 30 —
+   a one-reading check against a value that already defaults to 89) and **M-10** (the v2 21-spot
+   graybox loads through `MapLoader` and validates in Studio — the only check that can observe
+   value-level parity between the two snapshotters, which no CI arrangement can). Both are the same
+   Studio session.
+   **M-09 does NOT block Phase 3** — its own text says so: standing avatars at the scale extremes
+   needs a full roster, so it is a Phase 4/6 playtest item. It is the human gate under V-19, the
+   phase's one genuinely soft claim, and until it is signed D-11's bias-toward-rejecting is the
+   mitigation rather than a verification. M-07 is Phase 2's playtest calibration and is unaffected.
+2. **The CI suite timing decision — CLOSED 2026-11-04, owner ACCEPTED.** 15.94s (Phase 1) ->
+   ~25-26s (Phase 2, accepted) -> **29.9s** (Phase 3), with the `verify.luau` chain at **32.6s**.
+   Recorded as a **second approved departure**, the same way Phase 2's was: measured, dated and
+   approved rather than silent. **Nothing was trimmed to reach it** — the 21-spot graybox bake, the
+   maze oracle, the differential fuzzes and all nine gate mutations are intact. Quick runs stay fast
+   (`--filter placement` 2.91s, `--filter maps` 1.55s), so per-task feedback is unharmed; it is the
+   full chain that overshoots. `03-VALIDATION.md`'s latency item is now ticked with that rationale.
+   **Phase 4 should expect to revisit this** — it adds the most test weight of any remaining phase.
 
 **Measured state at wave 7:** 657 tests passed / 0 failed / 0 todo, `verify.luau` 14/14 (exit 0),
 23 issue codes, graybox 21 authored spots all passing under STRICT with five spare over the 16
