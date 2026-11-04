@@ -10,6 +10,7 @@ local roblox = require("@lune/roblox")
 local MapContract = require("../../src/server/core/MapContract")
 local MapValidator = require("../../src/server/core/MapValidator")
 local Snapshot = require("../../scripts/maps/snapshot")
+local Lex = require("../../scripts/ci/lex")
 local Test = require("../harness/Test")
 
 type Node = MapContract.Node
@@ -89,7 +90,7 @@ return function(t: Test.Runner)
 	t.test("attributes, tags, CFrame and Size round-trip out of the .rbxm (A4/A5)", function()
 		local root = loadGrayBox()
 		-- Attributes keep their Luau types.
-		t.equal(root.attributes.ContractVersion, 1)
+		t.equal(root.attributes.ContractVersion, 2)
 		t.equal(root.attributes.DisplayName, "Gray Box")
 		t.equal(root.attributes.MinPlayers, 3)
 		t.equal(root.attributes.MaxPlayers, 10)
@@ -104,13 +105,77 @@ return function(t: Test.Runner)
 		local bounds = child(child(root, "Data"), "Bounds")
 		t.deepEqual(bounds.size, { x = 124, y = 30, z = 124 })
 		t.deepEqual(bounds.position, { x = 0, y = 14, z = 0 })
+		-- D-02: the Ramp is built by a roll about Z, which does NOT change the look vector. Under
+		-- contract version 1 it snapshotted as a flat floating slab, which culled the four ledge
+		-- spots and failed MIN_DEFAULT_SPOTS. These numbers are V-4's measured values under Lune
+		-- 0.11.1; acos(0.90701294) = 24.90 degrees, matching the generator's atan(6.5 / 14).
+		local ramp = child(child(root, "Geometry"), "Ramp")
+		local rampUp = ramp.up :: MapContract.Vec3
+		t.truthy(math.abs(rampUp.x - 0.42111206) < 1e-5, `Ramp up.x is {rampUp.x}`)
+		t.truthy(math.abs(rampUp.y - 0.90701294) < 1e-5, `Ramp up.y is {rampUp.y}`)
+		t.truthy(math.abs(rampUp.z) < 1e-5, `Ramp up.z is {rampUp.z}`)
+		t.equal(ramp.canCollide, true)
+		t.equal(ramp.shape, "Block")
+		-- An anchor under Data is non-collidable and must say so, or it would invent a standable surface.
+		t.equal(spot.canCollide, false)
+		t.deepEqual(spot.up, { x = 0, y = 1, z = 0 })
+	end)
+
+	t.test("both snapshotters emit the identical Node key set (must_have 1)", function()
+		-- The runtime snapshotter cannot run under Lune, so assert against its comment-stripped source that it
+		-- assigns every field. A field named only in a comment does not satisfy the gate.
+		local loader = Lex.stripComments(fs.readFile("src/server/services/MapLoader.luau"))
+		for _, field in { "position", "size", "look", "up", "anchored", "canCollide", "shape" } do
+			t.contains(loader, `node.{field}`, `MapLoader does not assign node.{field}`)
+		end
+		local expected = {
+			"anchored",
+			"attributes",
+			"canCollide",
+			"children",
+			"className",
+			"look",
+			"name",
+			"position",
+			"shape",
+			"size",
+			"tags",
+			"up",
+		}
+		local function keysOf(n: Node): { string }
+			local list: { string } = {}
+			for key in n :: any do
+				table.insert(list, key)
+			end
+			table.sort(list)
+			return list
+		end
+		local function keysMatch(n: Node): boolean
+			local actual = keysOf(n)
+			if #actual ~= #expected then
+				return false
+			end
+			for i, key in expected do
+				if actual[i] ~= key then
+					return false
+				end
+			end
+			return true
+		end
+		local floor = child(child(loadGrayBox(), "Geometry"), "Ramp")
+		t.deepEqual(keysOf(floor), expected)
+		t.truthy(keysMatch(floor))
+		-- The gate can fail: removing canCollide from the snapshotted Node makes the comparison differ.
+		local withoutCanCollide = table.clone(floor)
+		withoutCanCollide.canCollide = nil
+		t.falsy(keysMatch(withoutCanCollide))
 	end)
 
 	t.test("the snapshot yields the expected MapSpec through the shared validator", function()
 		local issues, spec = MapValidator.validate(loadGrayBox())
 		t.deepEqual(issues, {})
 		assert(spec ~= nil, "gray-box must produce a MapSpec")
-		t.equal(spec.metadata.contractVersion, 1)
+		t.equal(spec.metadata.contractVersion, 2)
 		t.equal(spec.metadata.displayName, "Gray Box")
 		t.equal(spec.metadata.minPlayers, 3)
 		t.equal(spec.metadata.maxPlayers, 10)

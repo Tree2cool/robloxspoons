@@ -17,7 +17,10 @@ local function part(name: string, x: number, y: number, z: number, tag: string?)
 	p.position = { x = x, y = y, z = z }
 	p.size = { x = 1, y = 1, z = 1 }
 	p.look = { x = 0, y = 0, z = -1 }
+	p.up = { x = 0, y = 1, z = 0 }
 	p.anchored = true
+	p.canCollide = true
+	p.shape = "Block"
 	if tag ~= nil then
 		p.tags = { tag }
 	end
@@ -53,7 +56,7 @@ local function validSnapshot(): Node
 		}),
 	})
 	root.attributes = {
-		ContractVersion = 1,
+		ContractVersion = 2,
 		DisplayName = "Test Map",
 		MinPlayers = 3,
 		MaxPlayers = 10,
@@ -163,11 +166,70 @@ local cases: { Case } = {
 		end,
 	},
 	{
-		name = "ContractVersion not 1",
+		name = "ContractVersion not 2",
 		code = "MAP_META_INVALID",
 		pathContains = "ContractVersion",
 		mutate = function(r)
-			r.attributes.ContractVersion = 2
+			r.attributes.ContractVersion = 3
+		end,
+	},
+	{
+		name = "ContractVersion 1 is rejected outright, not migrated",
+		code = "MAP_META_INVALID",
+		pathContains = "ContractVersion",
+		mutate = function(r)
+			r.attributes.ContractVersion = 1
+		end,
+	},
+	{
+		name = "a Part node with no up vector",
+		code = "MAP_NODE_BASIS_INVALID",
+		pathContains = "Floor",
+		mutate = function(r)
+			find(r, "Geometry/Floor").up = nil
+		end,
+	},
+	{
+		name = "a Part node with no canCollide",
+		code = "MAP_NODE_BASIS_INVALID",
+		pathContains = "Floor",
+		mutate = function(r)
+			find(r, "Geometry/Floor").canCollide = nil
+		end,
+	},
+	{
+		name = "a Part node with no shape",
+		code = "MAP_NODE_BASIS_INVALID",
+		pathContains = "Floor",
+		mutate = function(r)
+			find(r, "Geometry/Floor").shape = nil
+		end,
+	},
+	{
+		name = "shape set on a Folder",
+		code = "MAP_NODE_BASIS_INVALID",
+		pathContains = "Geometry",
+		mutate = function(r)
+			find(r, "Geometry").shape = "Block"
+		end,
+	},
+	{
+		name = "look and up not perpendicular",
+		code = "MAP_NODE_BASIS_INVALID",
+		pathContains = "Floor",
+		mutate = function(r)
+			find(r, "Geometry/Floor").up = { x = 0, y = 0, z = -1 }
+		end,
+	},
+	{
+		-- The ONLY fixture for the up half of the Bounds rotation check. look is unchanged, so under contract
+		-- version 1 this map validated clean. Note the rotation does not change the axis-aligned min/max the bounds
+		-- volume is computed from, so no MAP_OUT_OF_BOUNDS cascades.
+		name = "Bounds rolled about the look axis",
+		code = "MAP_BOUNDS_INVALID",
+		pathContains = "Bounds",
+		mutate = function(r)
+			find(r, "Data/Bounds").up = { x = 0.7071067811865476, y = 0.7071067811865476, z = 0 }
 		end,
 	},
 	{
@@ -491,7 +553,7 @@ return function(t: Test.Runner)
 			coveredCount += 1
 		end
 		t.equal(coveredCount, #MapContract.ISSUE_CODES)
-		t.equal(#MapContract.ISSUE_CODES, 12)
+		t.equal(#MapContract.ISSUE_CODES, 13)
 	end)
 
 	t.test("issues are sorted by code then path and identical across runs", function()
