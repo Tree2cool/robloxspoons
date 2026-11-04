@@ -1,7 +1,10 @@
 # Manual Checks (D-04)
 
-Phase 1 produced everything the automated chain can verify. These six checks need Roblox Studio or the Creator
-Hub, which the build container does not have. **Phase 1 closes only when every box below is ticked.** Silence is
+Phase 1 produced everything the automated chain can verify. These nine checks need Roblox Studio, the Creator
+Hub or a real playtest, which the build container does not have. Each check is owned by the phase that raised it:
+M-01 to M-06 belong to Phase 1 (**Phase 1 closes only when those boxes are ticked**), M-07 to Phase 2's pacing
+claim, and M-08 and M-09 to Phase 3's placement constants. Phase 3's closure depends on M-08 but not on M-09,
+which needs a full-roster playtest that does not exist yet. Silence is
 not success: `lune run scripts/verify.luau` prints every unticked check after a green run.
 
 How to use this file:
@@ -328,3 +331,47 @@ solvability.
 Observed: _
 
 - [ ] M-07 signed off: <name> <date>   (Phase 4/6 playtest; not blocking Phase 2)
+
+---
+
+## M-08 (HIDE-06 / D-18) The place's CharacterMaxSlopeAngle is at least 30
+
+**Why manual:** it is a place setting outside the repo, like `Players.MaxPlayers` (M-05) and the FOUND-07
+persistence toggle. Nothing in the repo can detect it being changed back.
+
+Steps: open `build/spoons.rbxl` in Studio, select `StarterPlayer`, read `CharacterMaxSlopeAngle`. The platform
+default is 89 and `src/shared/Config/Placement.luau` sets `MAX_SLOPE_DEGREES = 30`, so the default already
+satisfies this. **Expected:** the value is at or above 30. If it is ever lowered below 30, the live game will
+refuse a slope the validator accepted and a validated spot on the graybox ramp becomes unreachable in play.
+Record the observed value even when it passes.
+
+**Blocking: yes for Phase 3's close.** It is a one-reading check against a value that already defaults correctly.
+
+Observed: _
+
+- [ ] M-08 signed off: <name> <date>   (Studio reading; blocking Phase 3)
+
+---
+
+## M-09 (HIDE-07 / D-10) The reference capsule covers real avatars at the scale extremes
+
+**Why manual:** V-19 is only partly primary-sourced. The per-axis avatar scale limits, the R15 default
+`HipHeight` and any camera-height formula were **not found in primary documentation**; the 90-105 percent height
+and 70-100 percent width figures come from a web-search summary (assumption A6). D-10 makes placement validity
+scale-**independent** by construction (the rule function takes no avatar argument), but the canonical capsule's
+dimensions are only exact for avatars inside that envelope, and Avatar Settings' Custom Scale or a script can
+leave it.
+
+Steps: at the first playtest that reaches a full roster, stand avatars at the scale extremes beside a validated
+default spot on the graybox and confirm each can reach the spoon. Also record whether the place uses Player
+Choice or Custom Scale in Avatar Settings.
+
+**Expected:** every avatar in the place's envelope can reach a validated spot. Until this is signed off, D-11's
+bias toward rejecting is the mitigation, not a verification. A failure means the capsule is too permissive in
+the reach direction and `REACH_HEIGHT` must come down.
+
+**Blocking: no for Phase 3.** It needs a Phase 4/6 playtest. Carried, not deferred silently.
+
+Observed: _
+
+- [ ] M-09 signed off: <name> <date>   (Phase 4/6 full-roster playtest; not blocking Phase 3)
