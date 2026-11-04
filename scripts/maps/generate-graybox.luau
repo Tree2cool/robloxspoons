@@ -9,7 +9,9 @@
 --
 -- D-08: mechanically complete, no art. Four corner rooms joined by doorways, a ring corridor around a solid core,
 -- a lobby holding the visible card table, a raised ledge with a ramp, pillars, a shelf and crates, so spots exist
--- at several heights and some sightlines are broken. Real placement/reachability rules are Phase 3's (D-12).
+-- at several heights and some sightlines are broken. The placement rules now exist in
+-- src/server/core/SpoonPlacement.luau and the authored spot table is validated against them by
+-- tests/placement/graybox_spots.spec.luau (plan 03-06).
 --
 -- Layout (x east, z south, y up, studs; floor top is y = 0):
 --
@@ -78,7 +80,7 @@ local function block(
 	sz: number
 ): Inst
 	local part = make("Part", name, parent)
-	setProps(part, { Size = vec3(sx, sy, sz), CFrame = cframeAt(x, y, z), Anchored = true })
+	setProps(part, { Size = vec3(sx, sy, sz), CFrame = cframeAt(x, y, z), Anchored = true, CanCollide = true })
 	return part
 end
 
@@ -168,6 +170,7 @@ local function buildGeometry(geometry: Inst)
 		-- Negative roll about z: rises toward -x.
 		CFrame = cframeAt(centreX, centreY, 0) * rbx.CFrame.Angles(0, 0, -angle),
 		Anchored = true,
+		CanCollide = true,
 	})
 
 	-- Pillars in the south hall (occlusion in an open room), crates, and a high shelf.
@@ -253,7 +256,7 @@ end
 
 local function build(): Inst
 	local root = make("Model", "GrayBox", nil)
-	root:SetAttribute("ContractVersion", 1)
+	root:SetAttribute("ContractVersion", 2)
 	root:SetAttribute("DisplayName", "Gray Box")
 	root:SetAttribute("MinPlayers", 3)
 	root:SetAttribute("MaxPlayers", 10)

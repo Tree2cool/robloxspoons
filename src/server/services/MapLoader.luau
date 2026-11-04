@@ -6,6 +6,10 @@
 -- There is deliberately NO per-map branch here: every map goes through the same contract. Tag names come from
 -- MapContract so the hidden-data vocabulary lives in exactly one place (guard rule R5).
 --
+-- Node v2 adds up, canCollide and (className == "Part" only) shape. This file and scripts/maps/snapshot.luau are
+-- deliberate twins: a field added to one and not the other means CI and the live game disagree about whether a
+-- spoon is findable.
+--
 -- Position and look are derived from CFrame only. On a deserialized Part the derived Position property errors
 -- (plan 01-07, assumption A5), so CFrame.Position and CFrame.LookVector are the one readable source.
 local CollectionService = game:GetService("CollectionService")
@@ -51,8 +55,13 @@ function MapLoader.snapshot(instance: Instance): Node
 		local cframe = instance.CFrame
 		node.position = vec3Of(cframe.Position)
 		node.look = vec3Of(cframe.LookVector)
+		node.up = vec3Of(cframe.UpVector)
 		node.size = vec3Of(instance.Size)
 		node.anchored = instance.Anchored
+		node.canCollide = instance.CanCollide
+		if instance.ClassName == "Part" then
+			node.shape = (instance :: Part).Shape.Name
+		end
 	end
 	for _, child in instance:GetChildren() do
 		table.insert(node.children, MapLoader.snapshot(child))

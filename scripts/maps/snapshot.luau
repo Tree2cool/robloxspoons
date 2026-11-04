@@ -4,7 +4,10 @@
 --
 -- Node shape emitted (see src/server/core/MapContract.luau):
 --   { name, className, attributes = { [string]: string|number|boolean }, tags = { string } (sorted),
---     position/size/look/anchored = present for BasePart descendants only, children = { Node } (document order) }
+--     position/size/look/up/anchored/canCollide = present for BasePart descendants only,
+--     shape = present only when className == "Part", children = { Node } (document order) }
+-- Twin of src/server/services/MapLoader.luau: a field added to one and not the other means CI and the live game
+-- disagree about whether a spoon is findable.
 --
 -- Position and look are read from the CFrame (assumption A5): the derived Position property is NOT readable on a
 -- deserialized Part under Lune 0.11.1 ("Failed to get property 'Position' - missing default value").
@@ -50,8 +53,17 @@ local function snapshot(inst: roblox.Instance): Node
 		local cframe = part.CFrame
 		node.position = vec3Of(cframe.Position)
 		node.look = vec3Of(cframe.LookVector)
+		node.up = vec3Of(cframe.UpVector)
 		node.size = vec3Of(part.Size)
 		node.anchored = part.Anchored == true
+		node.canCollide = part.CanCollide == true
+		if inst.ClassName == "Part" then
+			-- Shape is a Part property only. Enum values are untyped in @lune/roblox, so go through
+			-- the Name field and fall back to tostring (V-4: Part.Shape reads as Enum.PartType.Block
+			-- or Ball on a deserialized Part, and a Ball Part still has className "Part").
+			local shape: any = part.Shape
+			node.shape = tostring(shape.Name or shape)
+		end
 	end
 	for _, child in inst:GetChildren() do
 		table.insert(node.children, snapshot(child))
