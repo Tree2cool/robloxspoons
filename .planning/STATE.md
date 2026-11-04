@@ -276,8 +276,9 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-11-04
-Stopped at: Phase 2 COMPLETE — 14/14 plans, Gate G1 PASSED and recorded (plan 02-12)
-Resume file: None
+Stopped at: Session resumed from HANDOFF.json (status: phase_complete_between_phases, no blockers);
+owner chose discuss-before-plan for Phase 3, proceeding to /gsd-discuss-phase 3
+Resume file: .planning/HANDOFF.json (still present — delete once Phase 3 work actually starts)
 
 **Next:** plan Phase 3 (Placement Rules, Map Pipeline and Validator). Phase 3 depends only on Phase 1 and
 was always the parallel partner of Phase 2.
