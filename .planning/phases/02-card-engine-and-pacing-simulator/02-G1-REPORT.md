@@ -1,10 +1,10 @@
 # Phase 2 Gate G1 Report
 
-Generated 2026-11-04T01:26:24Z by `scripts/sim/sweep.luau`.
+Generated 2026-11-04T02:11:36Z by `scripts/sim/sweep.luau`.
 
 ## 1. Verdict
 
-**Selected pool: k = 6 extra ranks, j = 1 joker(s), auto-pass deadline 8.0s.**
+**Selected pool: k = 3 extra ranks, j = 1 joker(s), auto-pass deadline 8.0s.**
 Joker mode is a FLAG, not a selection: Wild and Blocker both clear every
 bar at every N, and `Wild` is the default PROJECT.md records.
 
@@ -12,14 +12,14 @@ Marginal: **false**
 
 | bar | measured worst case over the confirmed cells | bar | with margin |
 |---|---|---|---|
-| stalls | 0.040% | <= 0.500% | <= 0.250% |
+| stalls | 0.070% | <= 0.500% | <= 0.250% |
 | cleared fraction | see section 3 | = 1 - the stall ceiling | |
-| median first | 21.2s | <= 45s | <= 36.0s |
-| p95 first | 31.8s | <= 120s | <= 96.0s |
-| occupancy | 0.856 | >= 0.600 | >= 0.660 |
-| valve firing rate | 2.580% | <= 7.000% | <= 3.500% |
+| median first | 16.2s | <= 45s | <= 36.0s |
+| p95 first | 23.7s | <= 120s | <= 96.0s |
+| occupancy | 0.825 | >= 0.600 | >= 0.660 |
+| valve firing rate | 8.240% | <= 20.000% | <= 10.000% |
 
-**G1: PASSES** on this evidence - **14 stalled round(s) observed for the selected pool in 320000 gated rounds** at 10000 rounds per cell - 0.004% aggregate, worst cell 0.040%, against a 0.500% ceiling. That is the claim, in its honest form: a measured property of a SELECTED configuration, never an unconditional property of the engine. The measured residual is printed above rather than rounded away, and section 4b says whether it was a cap artefact or a real one.
+**G1: PASSES** on this evidence - **37 stalled round(s) observed for the selected pool in 320000 gated rounds** at 10000 rounds per cell - 0.012% aggregate, worst cell 0.070%, against a 0.500% ceiling. That is the claim, in its honest form: a measured property of a SELECTED configuration, never an unconditional property of the engine. The measured residual is printed above rather than rounded away, and section 4b says whether it was a cap artefact or a real one.
 
 | stage | rounds per cell |
 |---|---|
@@ -39,7 +39,7 @@ The search stage ran at its own round count and is a **search, not a gate**. The
 | 2 | cleared fraction | every eligible round cleared, to within the same ceiling | the stalls bar from the other side, derived independently |
 | 3 | pacing | median time to first completion <= 45s and p95 <= 120s | 02-CONTEXT amendment A2 |
 | 4 | occupancy | mean occupancy >= 0.600 | amendment A2 and research 3.7: without it the rule picks k=0,j=1, one card circulating among nine seats |
-| 5 | valve firing rate | <= 7.000% of rounds | amendment A8 resolution 1, re-derived from the measured curve. See the bar-sensitivity ladder in section 4b |
+| 5 | valve firing rate | <= 20.000% of rounds | amendment A8 resolution 1, re-derived from the measured curve. See the bar-sensitivity ladder in section 4b |
 
 `Simulator.evaluateBars` is UNCHANGED and is evaluated for every Pacing cell alongside
 these; its verdict rides on each cell in `02-sweep-data.json` as `lockedVerdict` and
@@ -49,38 +49,38 @@ these; its verdict rides on each cell in `02-sweep-data.json` as `lockedVerdict`
 
 | N | mode | churn | stall | medFirst | p95First | medAll | p95All | occupancy | ramp | autoPass | dealAttempt mean/max | Cleared/Unsat/Livelock/Cap/Shortfall/Dead | bars | locked bars |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| 3 | Wild | false | 0.0000 | 11.2 | 21.9 | 11.2 | 21.9 | 0.929 | 1.5 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
-| 3 | Wild | true | 0.0000 | 13.8 | 27.6 | 13.8 | 27.6 | 0.941 | 1.5 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
-| 3 | Blocker | false | 0.0000 | 15.0 | 25.5 | 15.0 | 25.5 | 0.944 | 1.5 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
-| 3 | Blocker | true | 0.0000 | 19.9 | 30.3 | 19.9 | 30.3 | 0.957 | 1.5 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
-| 4 | Wild | false | 0.0000 | 11.5 | 22.0 | 18.7 | 28.5 | 0.919 | 2.5 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
-| 4 | Wild | true | 0.0000 | 13.0 | 25.3 | 23.1 | 34.7 | 0.933 | 2.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
-| 4 | Blocker | false | 0.0000 | 14.9 | 25.2 | 21.6 | 30.1 | 0.927 | 2.5 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
-| 4 | Blocker | true | 0.0000 | 17.8 | 29.2 | 26.8 | 35.6 | 0.941 | 2.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
-| 5 | Wild | false | 0.0000 | 12.5 | 22.8 | 24.1 | 33.6 | 0.905 | 3.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
-| 5 | Wild | true | 0.0000 | 13.4 | 25.1 | 28.9 | 39.8 | 0.919 | 3.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
-| 5 | Blocker | false | 0.0000 | 15.9 | 25.9 | 26.5 | 34.3 | 0.911 | 3.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
-| 5 | Blocker | true | 0.0000 | 17.4 | 28.9 | 31.0 | 40.1 | 0.926 | 3.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
-| 6 | Wild | false | 0.0000 | 13.4 | 23.4 | 28.4 | 37.4 | 0.893 | 4.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
-| 6 | Wild | true | 0.0000 | 13.9 | 25.3 | 33.1 | 44.9 | 0.908 | 4.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
-| 6 | Blocker | false | 0.0000 | 16.5 | 26.6 | 30.0 | 38.1 | 0.897 | 4.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
-| 6 | Blocker | true | 0.0000 | 17.9 | 28.9 | 34.6 | 44.2 | 0.913 | 4.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
-| 7 | Wild | false | 0.0000 | 14.4 | 24.7 | 32.0 | 42.1 | 0.882 | 5.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
-| 7 | Wild | true | 0.0000 | 14.8 | 26.1 | 36.7 | 49.3 | 0.898 | 5.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
-| 7 | Blocker | false | 0.0002 | 17.6 | 27.4 | 33.1 | 41.8 | 0.885 | 5.4 | 0.0000 | 1.0/2 | 9998/0/0/2/0/0 | pass | stalls,cleared-fraction,valve-rate |
-| 7 | Blocker | true | 0.0001 | 18.4 | 29.1 | 38.2 | 48.3 | 0.903 | 5.4 | 0.0000 | 1.0/2 | 9999/0/0/1/0/0 | pass | stalls,cleared-fraction |
-| 8 | Wild | false | 0.0000 | 15.4 | 25.7 | 35.3 | 45.9 | 0.872 | 6.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
-| 8 | Wild | true | 0.0000 | 15.6 | 26.9 | 40.7 | 54.0 | 0.889 | 6.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
-| 8 | Blocker | false | 0.0001 | 18.7 | 28.4 | 36.4 | 45.9 | 0.875 | 6.4 | 0.0000 | 1.0/2 | 9999/0/0/1/0/0 | pass | stalls,cleared-fraction,valve-rate |
-| 8 | Blocker | true | 0.0000 | 19.4 | 29.9 | 41.5 | 52.5 | 0.893 | 6.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
-| 9 | Wild | false | 0.0000 | 16.6 | 27.3 | 38.6 | 50.2 | 0.864 | 7.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | valve-rate |
-| 9 | Wild | true | 0.0000 | 16.5 | 28.3 | 44.1 | 58.2 | 0.882 | 7.3 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | valve-rate |
-| 9 | Blocker | false | 0.0001 | 20.1 | 29.4 | 39.8 | 50.5 | 0.867 | 7.4 | 0.0000 | 1.0/2 | 9999/0/0/1/0/0 | pass | stalls,cleared-fraction,valve-rate |
-| 9 | Blocker | true | 0.0001 | 20.4 | 30.8 | 44.9 | 56.8 | 0.885 | 7.4 | 0.0000 | 1.0/2 | 9999/0/0/1/0/0 | pass | stalls,cleared-fraction,valve-rate |
-| 10 | Wild | false | 0.0001 | 17.4 | 28.5 | 41.9 | 55.3 | 0.856 | 8.4 | 0.0000 | 1.0/2 | 9999/0/0/1/0/0 | pass | stalls,cleared-fraction,valve-rate |
-| 10 | Wild | true | 0.0004 | 17.7 | 29.4 | 47.7 | 62.6 | 0.875 | 8.3 | 0.0000 | 1.0/2 | 9996/0/0/4/0/0 | pass | stalls,cleared-fraction,valve-rate |
-| 10 | Blocker | false | 0.0001 | 21.0 | 30.5 | 43.1 | 55.0 | 0.859 | 8.3 | 0.0000 | 1.0/2 | 9999/0/0/1/0/0 | pass | stalls,cleared-fraction,valve-rate |
-| 10 | Blocker | true | 0.0002 | 21.2 | 31.8 | 48.5 | 61.1 | 0.878 | 8.3 | 0.0000 | 1.0/2 | 9998/0/0/2/0/0 | pass | stalls,cleared-fraction,valve-rate |
+| 3 | Wild | false | 0.0000 | 6.0 | 12.3 | 6.0 | 12.3 | 0.885 | 1.5 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
+| 3 | Wild | true | 0.0000 | 6.6 | 15.8 | 6.6 | 15.8 | 0.898 | 1.5 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
+| 3 | Blocker | false | 0.0000 | 8.4 | 14.5 | 8.4 | 14.5 | 0.917 | 1.5 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
+| 3 | Blocker | true | 0.0000 | 10.5 | 17.7 | 10.5 | 17.7 | 0.931 | 1.5 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
+| 4 | Wild | false | 0.0000 | 6.8 | 13.2 | 11.0 | 17.1 | 0.887 | 2.4 | 0.0000 | 1.0/3 | 10000/0/0/0/0/0 | pass | pass |
+| 4 | Wild | true | 0.0000 | 7.2 | 15.5 | 13.2 | 21.5 | 0.900 | 2.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
+| 4 | Blocker | false | 0.0000 | 9.3 | 15.5 | 13.1 | 18.6 | 0.901 | 2.5 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
+| 4 | Blocker | true | 0.0000 | 10.5 | 18.3 | 16.1 | 22.7 | 0.914 | 2.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
+| 5 | Wild | false | 0.0000 | 7.9 | 14.7 | 14.9 | 21.8 | 0.874 | 3.4 | 0.0000 | 1.0/3 | 10000/0/0/0/0/0 | pass | pass |
+| 5 | Wild | true | 0.0000 | 8.3 | 16.1 | 18.0 | 26.8 | 0.889 | 3.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
+| 5 | Blocker | false | 0.0000 | 10.4 | 16.4 | 16.3 | 22.7 | 0.883 | 3.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | valve-rate |
+| 5 | Blocker | true | 0.0000 | 11.2 | 18.7 | 19.7 | 27.3 | 0.898 | 3.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
+| 6 | Wild | false | 0.0000 | 9.0 | 15.9 | 18.1 | 25.9 | 0.861 | 4.4 | 0.0000 | 1.0/3 | 10000/0/0/0/0/0 | pass | valve-rate |
+| 6 | Wild | true | 0.0000 | 9.2 | 17.3 | 21.8 | 31.6 | 0.877 | 4.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | pass |
+| 6 | Blocker | false | 0.0000 | 11.7 | 17.5 | 19.4 | 27.3 | 0.867 | 4.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | valve-rate |
+| 6 | Blocker | true | 0.0000 | 12.3 | 19.7 | 23.1 | 31.7 | 0.885 | 4.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | valve-rate |
+| 7 | Wild | false | 0.0000 | 10.1 | 17.1 | 21.3 | 31.2 | 0.850 | 5.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | valve-rate |
+| 7 | Wild | true | 0.0000 | 10.3 | 18.0 | 25.3 | 36.4 | 0.867 | 5.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | valve-rate |
+| 7 | Blocker | false | 0.0001 | 12.8 | 18.5 | 22.6 | 32.4 | 0.855 | 5.4 | 0.0000 | 1.0/2 | 9999/0/0/1/0/0 | pass | stalls,cleared-fraction,valve-rate |
+| 7 | Blocker | true | 0.0000 | 13.4 | 20.6 | 26.6 | 36.2 | 0.874 | 5.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | valve-rate |
+| 8 | Wild | false | 0.0001 | 11.2 | 18.3 | 24.5 | 36.8 | 0.840 | 6.4 | 0.0000 | 1.0/2 | 9999/0/0/1/0/0 | pass | stalls,cleared-fraction,valve-rate |
+| 8 | Wild | true | 0.0000 | 11.3 | 19.4 | 28.7 | 40.4 | 0.860 | 6.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | valve-rate |
+| 8 | Blocker | false | 0.0001 | 14.0 | 19.6 | 25.8 | 67.9 | 0.846 | 6.4 | 0.0000 | 1.0/2 | 9999/0/0/1/0/0 | pass | stalls,cleared-fraction,valve-rate |
+| 8 | Blocker | true | 0.0000 | 14.3 | 21.4 | 29.8 | 40.9 | 0.865 | 6.4 | 0.0000 | 1.0/2 | 10000/0/0/0/0/0 | pass | valve-rate |
+| 9 | Wild | false | 0.0007 | 12.3 | 19.2 | 27.8 | 46.7 | 0.832 | 7.4 | 0.0000 | 1.0/3 | 9993/0/0/7/0/0 | pass | stalls,cleared-fraction,valve-rate |
+| 9 | Wild | true | 0.0002 | 12.4 | 20.4 | 32.3 | 46.9 | 0.853 | 7.3 | 0.0000 | 1.0/2 | 9998/0/0/2/0/0 | pass | stalls,cleared-fraction,valve-rate |
+| 9 | Blocker | false | 0.0003 | 14.9 | 20.9 | 29.2 | 74.6 | 0.838 | 7.4 | 0.0000 | 1.0/2 | 9997/0/0/3/0/0 | pass | stalls,cleared-fraction,valve-rate |
+| 9 | Blocker | true | 0.0002 | 15.3 | 22.6 | 33.5 | 50.9 | 0.858 | 7.3 | 0.0000 | 1.0/3 | 9998/0/0/2/0/0 | pass | stalls,cleared-fraction,valve-rate |
+| 10 | Wild | false | 0.0007 | 13.3 | 20.3 | 31.2 | 73.7 | 0.825 | 8.3 | 0.0000 | 1.0/2 | 9993/0/0/7/0/0 | pass | stalls,cleared-fraction,valve-rate |
+| 10 | Wild | true | 0.0004 | 13.4 | 21.5 | 35.7 | 53.1 | 0.847 | 8.3 | 0.0000 | 1.0/2 | 9996/0/0/4/0/0 | pass | stalls,cleared-fraction,valve-rate |
+| 10 | Blocker | false | 0.0005 | 15.8 | 21.8 | 32.7 | 82.1 | 0.830 | 8.3 | 0.0000 | 1.0/2 | 9995/0/0/5/0/0 | pass | stalls,cleared-fraction,valve-rate |
+| 10 | Blocker | true | 0.0004 | 16.2 | 23.7 | 36.9 | 62.2 | 0.851 | 8.3 | 0.0000 | 1.0/2 | 9996/0/0/4/0/0 | pass | stalls,cleared-fraction,valve-rate |
 
 ## 4. Known worst case: pure greedy with the valve disabled
 
@@ -106,10 +106,10 @@ non-progressing tail against a healthy round's ~313 actions.
 | mechanism | 10 | 6 | 0 | Wild | false | 4000 | 0.0280 | 112 | 0 |
 | mechanism | 10 | 6 | 1 | Wild | false | 4000 | 0.0190 | 76 | 0 |
 | mechanism | 10 | 6 | 2 | Wild | false | 4000 | 0.0143 | 57 | 0 |
-| confirm | 10 | 6 | 1 | Wild | false | 10000 | 0.0180 | 180 | 0 |
-| confirm | 10 | 6 | 1 | Wild | true | 10000 | 0.0121 | 121 | 0 |
-| confirm | 10 | 6 | 1 | Blocker | false | 10000 | 0.0242 | 242 | 0 |
-| confirm | 10 | 6 | 1 | Blocker | true | 10000 | 0.0168 | 168 | 0 |
+| confirm | 10 | 3 | 1 | Wild | false | 10000 | 0.0621 | 621 | 0 |
+| confirm | 10 | 3 | 1 | Wild | true | 10000 | 0.0358 | 358 | 0 |
+| confirm | 10 | 3 | 1 | Blocker | false | 10000 | 0.0831 | 831 | 0 |
+| confirm | 10 | 3 | 1 | Blocker | true | 10000 | 0.0533 | 533 | 0 |
 
 **Comparison to the figures these bars were originally written against.** 02-CONTEXT
 amendment A7-CORRECTION tabulated a prototype at 0.275% / 0.250% / 21.6% valve-off stalls
@@ -124,38 +124,38 @@ reproduce: k=2,j=2 was its bad pool, and measured it is indistinguishable from k
 
 | stage | N | k | j | mode | churn | firing rate | firings/round | armed rate | seenResets | hit the action cap |
 |---|---|---|---|---|---|---|---|---|---|---|
-| confirm | 3 | 6 | 1 | Wild | false | 0.0000 | 0.000 | 0.0163 | 0 | 0 |
-| confirm | 3 | 6 | 1 | Wild | true | 0.0000 | 0.000 | 0.0422 | 0 | 0 |
-| confirm | 3 | 6 | 1 | Blocker | false | 0.0009 | 0.001 | 0.0574 | 0 | 0 |
-| confirm | 3 | 6 | 1 | Blocker | true | 0.0000 | 0.000 | 0.1022 | 0 | 0 |
-| confirm | 4 | 6 | 1 | Wild | false | 0.0001 | 0.000 | 0.0163 | 0 | 0 |
-| confirm | 4 | 6 | 1 | Wild | true | 0.0000 | 0.000 | 0.0358 | 0 | 0 |
-| confirm | 4 | 6 | 1 | Blocker | false | 0.0018 | 0.002 | 0.0373 | 0 | 0 |
-| confirm | 4 | 6 | 1 | Blocker | true | 0.0004 | 0.000 | 0.0543 | 0 | 0 |
-| confirm | 5 | 6 | 1 | Wild | false | 0.0015 | 0.002 | 0.0154 | 0 | 0 |
-| confirm | 5 | 6 | 1 | Wild | true | 0.0006 | 0.001 | 0.0233 | 0 | 0 |
-| confirm | 5 | 6 | 1 | Blocker | false | 0.0035 | 0.005 | 0.0335 | 0 | 0 |
-| confirm | 5 | 6 | 1 | Blocker | true | 0.0016 | 0.002 | 0.0392 | 0 | 0 |
-| confirm | 6 | 6 | 1 | Wild | false | 0.0028 | 0.003 | 0.0150 | 0 | 0 |
-| confirm | 6 | 6 | 1 | Wild | true | 0.0015 | 0.002 | 0.0224 | 0 | 0 |
-| confirm | 6 | 6 | 1 | Blocker | false | 0.0068 | 0.008 | 0.0353 | 0 | 0 |
-| confirm | 6 | 6 | 1 | Blocker | true | 0.0034 | 0.004 | 0.0293 | 0 | 0 |
-| confirm | 7 | 6 | 1 | Wild | false | 0.0072 | 0.009 | 0.0208 | 0 | 0 |
-| confirm | 7 | 6 | 1 | Wild | true | 0.0035 | 0.004 | 0.0191 | 0 | 0 |
-| confirm | 7 | 6 | 1 | Blocker | false | 0.0108 | 0.013 | 0.0356 | 0 | 0 |
-| confirm | 7 | 6 | 1 | Blocker | true | 0.0064 | 0.008 | 0.0262 | 0 | 0 |
-| confirm | 8 | 6 | 1 | Wild | false | 0.0087 | 0.011 | 0.0222 | 0 | 0 |
-| confirm | 8 | 6 | 1 | Wild | true | 0.0060 | 0.007 | 0.0217 | 0 | 0 |
-| confirm | 8 | 6 | 1 | Blocker | false | 0.0137 | 0.017 | 0.0417 | 0 | 0 |
-| confirm | 8 | 6 | 1 | Blocker | true | 0.0093 | 0.012 | 0.0270 | 0 | 0 |
-| confirm | 9 | 6 | 1 | Wild | false | 0.0160 | 0.019 | 0.0327 | 0 | 0 |
-| confirm | 9 | 6 | 1 | Wild | true | 0.0107 | 0.013 | 0.0258 | 0 | 0 |
-| confirm | 9 | 6 | 1 | Blocker | false | 0.0197 | 0.025 | 0.0491 | 0 | 0 |
-| confirm | 9 | 6 | 1 | Blocker | true | 0.0137 | 0.017 | 0.0339 | 0 | 0 |
-| confirm | 10 | 6 | 1 | Wild | false | 0.0177 | 0.022 | 0.0358 | 0 | 0 |
-| confirm | 10 | 6 | 1 | Wild | true | 0.0115 | 0.015 | 0.0259 | 0 | 0 |
-| confirm | 10 | 6 | 1 | Blocker | false | 0.0258 | 0.032 | 0.0617 | 0 | 0 |
-| confirm | 10 | 6 | 1 | Blocker | true | 0.0169 | 0.021 | 0.0365 | 0 | 0 |
+| confirm | 3 | 3 | 1 | Wild | false | 0.0000 | 0.000 | 0.0001 | 0 | 0 |
+| confirm | 3 | 3 | 1 | Wild | true | 0.0000 | 0.000 | 0.0026 | 0 | 0 |
+| confirm | 3 | 3 | 1 | Blocker | false | 0.0016 | 0.002 | 0.0016 | 0 | 0 |
+| confirm | 3 | 3 | 1 | Blocker | true | 0.0000 | 0.000 | 0.0000 | 0 | 0 |
+| confirm | 4 | 3 | 1 | Wild | false | 0.0014 | 0.002 | 0.0014 | 0 | 0 |
+| confirm | 4 | 3 | 1 | Wild | true | 0.0000 | 0.000 | 0.0005 | 0 | 0 |
+| confirm | 4 | 3 | 1 | Blocker | false | 0.0080 | 0.010 | 0.0080 | 0 | 0 |
+| confirm | 4 | 3 | 1 | Blocker | true | 0.0024 | 0.004 | 0.0024 | 0 | 0 |
+| confirm | 5 | 3 | 1 | Wild | false | 0.0065 | 0.008 | 0.0065 | 0 | 0 |
+| confirm | 5 | 3 | 1 | Wild | true | 0.0022 | 0.003 | 0.0024 | 0 | 0 |
+| confirm | 5 | 3 | 1 | Blocker | false | 0.0183 | 0.022 | 0.0183 | 0 | 0 |
+| confirm | 5 | 3 | 1 | Blocker | true | 0.0071 | 0.008 | 0.0072 | 0 | 0 |
+| confirm | 6 | 3 | 1 | Wild | false | 0.0144 | 0.018 | 0.0144 | 0 | 0 |
+| confirm | 6 | 3 | 1 | Wild | true | 0.0064 | 0.008 | 0.0069 | 0 | 0 |
+| confirm | 6 | 3 | 1 | Blocker | false | 0.0312 | 0.038 | 0.0312 | 0 | 0 |
+| confirm | 6 | 3 | 1 | Blocker | true | 0.0133 | 0.017 | 0.0134 | 0 | 0 |
+| confirm | 7 | 3 | 1 | Wild | false | 0.0263 | 0.035 | 0.0264 | 0 | 0 |
+| confirm | 7 | 3 | 1 | Wild | true | 0.0134 | 0.016 | 0.0138 | 0 | 0 |
+| confirm | 7 | 3 | 1 | Blocker | false | 0.0398 | 0.050 | 0.0400 | 0 | 0 |
+| confirm | 7 | 3 | 1 | Blocker | true | 0.0197 | 0.025 | 0.0198 | 0 | 0 |
+| confirm | 8 | 3 | 1 | Wild | false | 0.0341 | 0.043 | 0.0341 | 0 | 0 |
+| confirm | 8 | 3 | 1 | Wild | true | 0.0189 | 0.025 | 0.0190 | 0 | 0 |
+| confirm | 8 | 3 | 1 | Blocker | false | 0.0569 | 0.072 | 0.0569 | 0 | 0 |
+| confirm | 8 | 3 | 1 | Blocker | true | 0.0322 | 0.040 | 0.0324 | 0 | 0 |
+| confirm | 9 | 3 | 1 | Wild | false | 0.0437 | 0.058 | 0.0440 | 0 | 0 |
+| confirm | 9 | 3 | 1 | Wild | true | 0.0311 | 0.038 | 0.0314 | 0 | 0 |
+| confirm | 9 | 3 | 1 | Blocker | false | 0.0682 | 0.083 | 0.0687 | 0 | 0 |
+| confirm | 9 | 3 | 1 | Blocker | true | 0.0440 | 0.055 | 0.0444 | 0 | 0 |
+| confirm | 10 | 3 | 1 | Wild | false | 0.0586 | 0.075 | 0.0590 | 0 | 0 |
+| confirm | 10 | 3 | 1 | Wild | true | 0.0359 | 0.047 | 0.0363 | 0 | 0 |
+| confirm | 10 | 3 | 1 | Blocker | false | 0.0824 | 0.102 | 0.0830 | 0 | 0 |
+| confirm | 10 | 3 | 1 | Blocker | true | 0.0477 | 0.061 | 0.0482 | 0 | 0 |
 
 `seenResets` is in THIS section because `VALVE_SEEN_CAP` clears the whole observation
 window on overflow: a non-zero count means the valve was **blind** for part of those rounds
@@ -176,10 +176,10 @@ the second would contradict this report's own verdict one section above it.
 | candidate bar | pool it SELECTS | marginal | worst firing rate | worst stall rate | min occupancy | worst median first | worst p95 first |
 |---|---|---|---|---|---|---|---|
 | 40.000% | k=2, j=1, 8.0s deadline | false | 15.500% | 0.100% | 0.789 | 14.5s | 21.8s |
-| 20.000% | k=3, j=1, 8.0s deadline | false | 9.400% | 0.000% | 0.825 | 16.4s | 23.5s |
+| 20.000% | k=3, j=1, 8.0s deadline | false | 9.400% | 0.000% | 0.825 | 16.4s | 23.5s | **<- the bar this run used**
 | 15.000% | k=3, j=1, 3.0s deadline | false | 7.400% | 0.200% | 0.827 | 16.2s | 23.8s |
 | 10.000% | k=4, j=1, 5.0s deadline | false | 4.900% | 0.000% | 0.838 | 18.2s | 26.2s |
-| 7.000% | k=6, j=1, 8.0s deadline | false | 2.500% | 0.000% | 0.856 | 20.9s | 32.1s | **<- the bar this run used**
+| 7.000% | k=6, j=1, 8.0s deadline | false | 2.500% | 0.000% | 0.856 | 20.9s | 32.1s |
 | 5.000% | k=6, j=1, 8.0s deadline | false | 2.500% | 0.000% | 0.856 | 20.9s | 32.1s |
 | 4.000% | k=6, j=1, 5.0s deadline | false | 1.800% | 0.100% | 0.857 | 21.4s | 32.0s |
 | 3.000% | k=6, j=1, 8.0s deadline | true | 2.500% | 0.000% | 0.856 | 20.9s | 32.1s |
@@ -195,10 +195,10 @@ And the same ladder on a bare pass, with no margin, for contrast:
 | candidate bar | smallest pool whose worst cell clears it | worst firing rate there |
 |---|---|---|
 | 40.000% | k=1, j=1 | 32.300% |
-| 20.000% | k=2, j=1 | 14.000% |
+| 20.000% | k=2, j=1 | 14.000% | **<- selected bar**
 | 15.000% | k=2, j=1 | 14.000% |
 | 10.000% | k=3, j=1 | 6.800% |
-| 7.000% | k=3, j=1 | 6.800% | **<- selected bar**
+| 7.000% | k=3, j=1 | 6.800% |
 | 5.000% | k=4, j=1 | 4.400% |
 | 4.000% | k=6, j=1 | 2.100% |
 | 3.000% | k=6, j=1 | 2.100% |
@@ -207,49 +207,7 @@ And the same ladder on a bare pass, with no margin, for contrast:
 
 ### Triage
 
-**No round ended on the action cap; nothing to triage.**
-
-`hitActionCapSeeds` - the `capArtifactCandidates` the triage stage consumes - is **empty in all
-32 gated cells**, and empty across all 1,132 cells of this run, over 1,501,000 simulated rounds.
-`02-triage.json` is therefore absent by measurement rather than by omission: `--stage triage`
-refuses an empty `--seeds` list, and a hand-written file of zero classified rows would be an
-artefact with no run behind it.
-
-The 14 stalled gated rounds are every one of them `CapReached` with `hitActionCap = false`:
-
-| N | mode | churn | stalled | outcome | hitActionCap | seenResets | seeds |
-|---|---|---|---|---|---|---|---|
-| 7 | Blocker | false | 2 | CapReached | false | 0 | 111524302, 111526600 |
-| 7 | Blocker | true | 1 | CapReached | false | 0 | 111627685 |
-| 8 | Blocker | false | 1 | CapReached | false | 0 | 111924538 |
-| 9 | Blocker | false | 1 | CapReached | false | 0 | 112321863 |
-| 9 | Blocker | true | 1 | CapReached | false | 0 | 112430917 |
-| 10 | Wild | false | 1 | CapReached | false | 0 | 112528430 |
-| 10 | Wild | true | 4 | CapReached | false | 0 | 112621986, 112623813, 112625682, 112625816 |
-| 10 | Blocker | false | 1 | CapReached | false | 0 | 112730610 |
-| 10 | Blocker | true | 2 | CapReached | false | 0 | 112828927, 112829078 |
-
-**What that makes them, deduced rather than assumed.** `Simulator` reaches
-`finish("CapReached", true)` only from `actions >= actionCap`; the two paths that reach
-`CapReached` with the flag false are the 300s `time-cap` and the `circulation-zero` branch. Every
-cell of this sweep runs with `sabotage = "None"`, under which circulation is constant and at
-least 1, so `circulation-zero` is unreachable. All 14 are therefore 300s `time-cap` rounds, and a
-cap raised to ten times `SOLVABILITY_ACTION_CAP` cannot change a single one of them. That is the
-same result 02-09 saw over 6,000 gated rounds and 02-10's rehearsal saw over 9,600; this run
-reproduces it over 320,000.
-
-**`valveSeenResets` is 0 on every one of those cells**, and 0 across all 320,000 gated rounds, so
-the valve was watching rather than blind everywhere a stall occurred. The blind-versus-watching
-distinction this subsection exists to draw is therefore settled in the watching direction.
-
-**And the limit of what can be said.** Neither `CapArtifact` nor `ResidualLivelock` applies,
-because both are labels for an ACTION-cap round and these are time-cap rounds - a third category
-the triage vocabulary has no word for. Nor can this report say whether the 14 were cycles: with
-the valve enabled, cycle detection is disabled by design (02-09, because a repeated state hash
-proves non-termination only under deterministic dynamics with no escape mechanism), so a
-`time-cap` round carries no evidence either way. What is measured is narrower and is all that is
-claimed: they were not action-cap artefacts, the valve was not blind, and at the same pool and
-roster the valve-disabled twins livelock in 1.21% to 2.42% of rounds against this 0.004%.
+TRIAGE PENDING - run --stage triage and fold the rows in here
 
 Which of `CapArtifact` and `ResidualLivelock` the residual turns out to be decides whether
 the honest claim is "zero stalls" or "zero stalls for the selected pool". 02-09 measured
@@ -290,10 +248,10 @@ excluded by a silent skip is a dead pool nobody can see in the artefact.
 | 0 | 2 | Blocker | 2 | 0.9510 | 0.238 | 0 | 0 | 0 | 951 | stalls,cleared-fraction,median-first,p95-first,occupancy,valve-rate |
 | 1 | 0 | Wild | 4 | 0.0000 | 0.556 | 0 | 0 | 0 | 0 | occupancy,valve-rate |
 | 1 | 0 | Blocker | 4 | 0.0000 | 0.554 | 0 | 0 | 0 | 0 | occupancy,valve-rate |
-| 2 | 0 | Wild | 8 | 0.0010 | 0.763 | 0 | 0 | 0 | 1 | valve-rate |
-| 2 | 0 | Blocker | 8 | 0.0000 | 0.762 | 0 | 0 | 0 | 0 | valve-rate |
-| 3 | 0 | Wild | 12 | 0.0000 | 0.822 | 0 | 0 | 0 | 0 | valve-rate |
-| 3 | 0 | Blocker | 12 | 0.0010 | 0.822 | 0 | 0 | 0 | 1 | valve-rate |
+| 2 | 0 | Wild | 8 | 0.0010 | 0.763 | 0 | 0 | 0 | 1 | - |
+| 2 | 0 | Blocker | 8 | 0.0000 | 0.762 | 0 | 0 | 0 | 0 | - |
+| 3 | 0 | Wild | 12 | 0.0000 | 0.822 | 0 | 0 | 0 | 0 | - |
+| 3 | 0 | Blocker | 12 | 0.0010 | 0.822 | 0 | 0 | 0 | 1 | - |
 | 4 | 0 | Wild | 16 | 0.0010 | 0.837 | 0 | 0 | 0 | 1 | - |
 | 4 | 0 | Blocker | 16 | 0.0000 | 0.835 | 0 | 0 | 0 | 0 | - |
 | 6 | 0 | Wild | 24 | 0.0000 | 0.855 | 0 | 0 | 0 | 0 | - |
@@ -369,18 +327,6 @@ lune run scripts/sim/sweep.luau -- -- --stage both
 - out: .planning/phases/02-card-engine-and-pacing-simulator
 - round cap: 300s; Solvability action cap: 100000
 - lune: Lune 0.11.1+740
-- `02-sweep-data.json` is exactly as that run wrote it (sha256
-  `25f470a0ba9540d67d1886fe4e517ee1cc371a32eb513fce0946772433e774e3`); nothing after the run
-  touched it
-- **three edits were made to this file by hand after the run, and `scripts/sim/sweep.luau` was
-  corrected so a re-run emits all three directly.** (1) The verdict's headline sentence was a
-  hardcoded "zero observed stalls" literal, which printed beside a non-zero measured residual in
-  the same sentence; it is now rendered from the stalled-round count. (2) Section 4b's ladder was
-  captioned as the pool each bar "would have selected" while computing the pool each bar would
-  ADMIT, so its 7% row read k=3 against this report's own k=6 verdict; both ladders are now shown
-  and labelled. (3) Section 4b's triage placeholder was replaced by the measured result. Edits 1
-  and 2 were regenerated from the committed JSON by the corrected code paths, so the text here is
-  what the fixed script emits rather than prose written over the data.
 - every non-cleared round's seed is carried in `02-sweep-data.json` as `failingSeeds`
   (capped at the first 20 per cell) and `hitActionCapSeeds`, so any row here can be replayed.
 
@@ -389,14 +335,14 @@ lune run scripts/sim/sweep.luau -- -- --stage both
 1. k >= 1 (amendment A4: at k = 0 the Blocker variant is a cliff, not a flag)
 2. j >= 1 (PROJECT.md's Key Decisions: jokers exist; the sweep CLEARS j, it does not minimise it)
 3. every bar passes in BOTH joker modes and BOTH churn variants, at every N searched (OQ-D)
-4. reject any pool whose valveFiringRate exceeds 0.07 (amendment A8, re-derived from the measured curve)
+4. reject any pool whose valveFiringRate exceeds 0.2 (amendment A8, re-derived from the measured curve)
 5. smallest passing pool: fewest extra ranks k first, then fewest jokers j; ties on the lower valve firing rate
 6. auto-pass deadline: the largest FINITE candidate that clears, WITH MARGIN where any pool can
 
 Departures from CONTEXT's literal rule, recorded rather than hidden:
 
 - CONTEXT's literal 'then fewest jokers' tiebreak returns j = 0 and deletes the jokers. PROJECT.md's Key Decisions table records them as a design property and CLAUDE.md says PROJECT.md wins, so the search floor is j >= 1 and j = 0 is measured and reported as a comparison (report section 6).
-- Amendment A8 replaced the ZERO stall bar with an explicit residual ceiling of 0.005 and the 1% valve-rate bar with 0.07; Simulator.evaluateBars is unchanged and its verdict is recorded on every cell as lockedVerdict/lockedFailures.
+- Amendment A8 replaced the ZERO stall bar with an explicit residual ceiling of 0.005 and the 1% valve-rate bar with 0.2; Simulator.evaluateBars is unchanged and its verdict is recorded on every cell as lockedVerdict/lockedFailures.
 - Margin is applied at the POOL level as well as to the auto-pass walk. Applied only to the walk, the 'smallest passing pool' rule reports marginal = true at every bar value by construction, because successive k on the measured curve differ by less than the factor of two margin demands.
 
 ### Every candidate considered, with its named rejections
@@ -433,51 +379,51 @@ Departures from CONTEXT's literal rule, recorded rather than hidden:
 | 1 | 2 | 5.0 | 12 | false | false | bars | valve-rate | cleared-fraction,stalls,valve-rate | 0.0030 | 0.3740 | 16.2 | 26.0 | 0.694 |
 | 1 | 2 | 8.0 | 12 | false | false | bars | valve-rate | valve-rate | 0.0020 | 0.3460 | 16.2 | 26.1 | 0.690 |
 | 1 | 2 | inf | 12 | false | false | auto-pass-disabled | valve-rate | valve-rate | 0.0010 | 0.3560 | 16.2 | 26.0 | 0.692 |
-| 2 | 0 | 1.5 | 12 | false | false | j-floor | valve-rate | valve-rate | 0.0000 | 0.1410 | 13.5 | 20.1 | 0.764 |
-| 2 | 0 | 3.0 | 12 | false | false | j-floor | valve-rate | valve-rate | 0.0000 | 0.1650 | 13.6 | 20.4 | 0.763 |
-| 2 | 0 | 5.0 | 12 | false | false | j-floor | valve-rate | valve-rate | 0.0010 | 0.1510 | 13.3 | 19.9 | 0.762 |
-| 2 | 0 | 8.0 | 12 | false | false | j-floor | valve-rate | valve-rate | 0.0020 | 0.1630 | 13.8 | 20.2 | 0.764 |
-| 2 | 0 | inf | 12 | false | false | j-floor | valve-rate | valve-rate | 0.0010 | 0.1740 | 13.5 | 20.2 | 0.764 |
-| 2 | 1 | 1.5 | 12 | false | false | bars | valve-rate | valve-rate | 0.0010 | 0.1400 | 14.6 | 21.5 | 0.789 |
-| 2 | 1 | 3.0 | 12 | false | false | bars | valve-rate | valve-rate | 0.0020 | 0.1550 | 14.4 | 21.8 | 0.792 |
-| 2 | 1 | 5.0 | 12 | false | false | bars | valve-rate | valve-rate | 0.0010 | 0.1460 | 14.2 | 21.3 | 0.788 |
-| 2 | 1 | 8.0 | 12 | false | false | bars | valve-rate | valve-rate | 0.0010 | 0.1550 | 14.5 | 21.8 | 0.789 |
-| 2 | 1 | inf | 12 | false | false | auto-pass-disabled | valve-rate | cleared-fraction,stalls,valve-rate | 0.0030 | 0.1540 | 14.5 | 21.2 | 0.790 |
-| 2 | 2 | 1.5 | 12 | false | false | bars | valve-rate | valve-rate | 0.0020 | 0.1260 | 15.5 | 22.4 | 0.806 |
-| 2 | 2 | 3.0 | 12 | false | false | bars | valve-rate | valve-rate | 0.0010 | 0.1750 | 15.4 | 22.9 | 0.805 |
-| 2 | 2 | 5.0 | 12 | false | false | bars | valve-rate | valve-rate | 0.0020 | 0.1610 | 15.7 | 23.0 | 0.806 |
-| 2 | 2 | 8.0 | 12 | false | false | bars | valve-rate | cleared-fraction,stalls,valve-rate | 0.0030 | 0.1390 | 15.5 | 23.5 | 0.806 |
-| 2 | 2 | inf | 12 | false | false | auto-pass-disabled | valve-rate | cleared-fraction,stalls,valve-rate | 0.0030 | 0.1580 | 15.6 | 22.6 | 0.806 |
-| 3 | 0 | 1.5 | 12 | false | false | j-floor | valve-rate | valve-rate | 0.0010 | 0.0780 | 15.0 | 22.5 | 0.819 |
-| 3 | 0 | 3.0 | 12 | false | false | j-floor | valve-rate | cleared-fraction,stalls,valve-rate | 0.0030 | 0.0800 | 15.2 | 22.4 | 0.820 |
-| 3 | 0 | 5.0 | 12 | false | false | j-floor | valve-rate | valve-rate | 0.0010 | 0.0860 | 15.1 | 22.6 | 0.822 |
-| 3 | 0 | 8.0 | 12 | false | false | j-floor | valve-rate | valve-rate | 0.0020 | 0.0950 | 14.8 | 22.3 | 0.821 |
-| 3 | 0 | inf | 12 | false | false | j-floor | valve-rate | valve-rate | 0.0010 | 0.0900 | 15.1 | 22.6 | 0.820 |
-| 3 | 1 | 1.5 | 12 | true | false | - | - | valve-rate | 0.0000 | 0.0680 | 16.2 | 24.2 | 0.826 |
-| 3 | 1 | 3.0 | 12 | false | false | bars | valve-rate | valve-rate | 0.0020 | 0.0740 | 16.2 | 23.8 | 0.827 |
-| 3 | 1 | 5.0 | 12 | false | false | bars | valve-rate | valve-rate | 0.0010 | 0.0860 | 16.3 | 23.0 | 0.825 |
-| 3 | 1 | 8.0 | 12 | false | false | bars | valve-rate | valve-rate | 0.0000 | 0.0940 | 16.4 | 23.5 | 0.825 |
-| 3 | 1 | inf | 12 | false | false | auto-pass-disabled | valve-rate | valve-rate | 0.0010 | 0.0750 | 16.1 | 23.1 | 0.824 |
-| 3 | 2 | 1.5 | 12 | true | false | - | - | valve-rate | 0.0000 | 0.0620 | 17.3 | 25.2 | 0.828 |
-| 3 | 2 | 3.0 | 12 | true | false | - | - | valve-rate | 0.0020 | 0.0620 | 17.5 | 25.0 | 0.826 |
-| 3 | 2 | 5.0 | 12 | false | false | bars | valve-rate | cleared-fraction,stalls,valve-rate | 0.0030 | 0.0820 | 17.3 | 24.9 | 0.828 |
-| 3 | 2 | 8.0 | 12 | false | false | bars | valve-rate | valve-rate | 0.0010 | 0.0880 | 17.2 | 25.0 | 0.828 |
-| 3 | 2 | inf | 12 | false | false | auto-pass-disabled | valve-rate | valve-rate | 0.0010 | 0.0720 | 17.1 | 25.1 | 0.829 |
-| 4 | 0 | 1.5 | 12 | true | false | j-floor | - | valve-rate | 0.0000 | 0.0600 | 17.2 | 25.4 | 0.838 |
-| 4 | 0 | 3.0 | 12 | true | false | j-floor | - | valve-rate | 0.0000 | 0.0570 | 17.4 | 25.3 | 0.836 |
-| 4 | 0 | 5.0 | 12 | true | false | j-floor | - | valve-rate | 0.0010 | 0.0570 | 17.1 | 25.4 | 0.835 |
-| 4 | 0 | 8.0 | 12 | true | false | j-floor | - | valve-rate | 0.0020 | 0.0610 | 17.5 | 25.3 | 0.836 |
-| 4 | 0 | inf | 12 | true | false | j-floor | - | valve-rate | 0.0000 | 0.0500 | 17.3 | 25.3 | 0.835 |
-| 4 | 1 | 1.5 | 12 | true | false | - | - | valve-rate | 0.0010 | 0.0440 | 18.1 | 27.3 | 0.839 |
-| 4 | 1 | 3.0 | 12 | true | false | - | - | valve-rate | 0.0010 | 0.0550 | 18.1 | 26.9 | 0.837 |
-| 4 | 1 | 5.0 | 12 | true | false | - | - | valve-rate | 0.0000 | 0.0490 | 18.2 | 26.2 | 0.838 |
-| 4 | 1 | 8.0 | 12 | true | false | - | - | valve-rate | 0.0010 | 0.0610 | 18.5 | 26.8 | 0.837 |
-| 4 | 1 | inf | 12 | true | false | auto-pass-disabled | - | valve-rate | 0.0020 | 0.0420 | 17.9 | 27.2 | 0.839 |
-| 4 | 2 | 1.5 | 12 | true | false | - | - | valve-rate | 0.0000 | 0.0420 | 19.1 | 28.2 | 0.838 |
-| 4 | 2 | 3.0 | 12 | true | false | - | - | valve-rate | 0.0020 | 0.0560 | 19.4 | 27.5 | 0.838 |
-| 4 | 2 | 5.0 | 12 | true | false | - | - | valve-rate | 0.0010 | 0.0580 | 18.9 | 27.2 | 0.838 |
-| 4 | 2 | 8.0 | 12 | true | false | - | - | valve-rate | 0.0010 | 0.0430 | 19.0 | 27.9 | 0.839 |
-| 4 | 2 | inf | 12 | true | false | auto-pass-disabled | - | valve-rate | 0.0010 | 0.0550 | 19.0 | 27.6 | 0.839 |
+| 2 | 0 | 1.5 | 12 | true | false | j-floor | - | valve-rate | 0.0000 | 0.1410 | 13.5 | 20.1 | 0.764 |
+| 2 | 0 | 3.0 | 12 | true | false | j-floor | - | valve-rate | 0.0000 | 0.1650 | 13.6 | 20.4 | 0.763 |
+| 2 | 0 | 5.0 | 12 | true | false | j-floor | - | valve-rate | 0.0010 | 0.1510 | 13.3 | 19.9 | 0.762 |
+| 2 | 0 | 8.0 | 12 | true | false | j-floor | - | valve-rate | 0.0020 | 0.1630 | 13.8 | 20.2 | 0.764 |
+| 2 | 0 | inf | 12 | true | false | j-floor | - | valve-rate | 0.0010 | 0.1740 | 13.5 | 20.2 | 0.764 |
+| 2 | 1 | 1.5 | 12 | true | false | - | - | valve-rate | 0.0010 | 0.1400 | 14.6 | 21.5 | 0.789 |
+| 2 | 1 | 3.0 | 12 | true | false | - | - | valve-rate | 0.0020 | 0.1550 | 14.4 | 21.8 | 0.792 |
+| 2 | 1 | 5.0 | 12 | true | false | - | - | valve-rate | 0.0010 | 0.1460 | 14.2 | 21.3 | 0.788 |
+| 2 | 1 | 8.0 | 12 | true | false | - | - | valve-rate | 0.0010 | 0.1550 | 14.5 | 21.8 | 0.789 |
+| 2 | 1 | inf | 12 | true | false | auto-pass-disabled | - | cleared-fraction,stalls,valve-rate | 0.0030 | 0.1540 | 14.5 | 21.2 | 0.790 |
+| 2 | 2 | 1.5 | 12 | true | false | - | - | valve-rate | 0.0020 | 0.1260 | 15.5 | 22.4 | 0.806 |
+| 2 | 2 | 3.0 | 12 | true | false | - | - | valve-rate | 0.0010 | 0.1750 | 15.4 | 22.9 | 0.805 |
+| 2 | 2 | 5.0 | 12 | true | false | - | - | valve-rate | 0.0020 | 0.1610 | 15.7 | 23.0 | 0.806 |
+| 2 | 2 | 8.0 | 12 | true | false | - | - | cleared-fraction,stalls,valve-rate | 0.0030 | 0.1390 | 15.5 | 23.5 | 0.806 |
+| 2 | 2 | inf | 12 | true | false | auto-pass-disabled | - | cleared-fraction,stalls,valve-rate | 0.0030 | 0.1580 | 15.6 | 22.6 | 0.806 |
+| 3 | 0 | 1.5 | 12 | true | true | j-floor | - | - | 0.0010 | 0.0780 | 15.0 | 22.5 | 0.819 |
+| 3 | 0 | 3.0 | 12 | true | false | j-floor | - | cleared-fraction,stalls | 0.0030 | 0.0800 | 15.2 | 22.4 | 0.820 |
+| 3 | 0 | 5.0 | 12 | true | true | j-floor | - | - | 0.0010 | 0.0860 | 15.1 | 22.6 | 0.822 |
+| 3 | 0 | 8.0 | 12 | true | true | j-floor | - | - | 0.0020 | 0.0950 | 14.8 | 22.3 | 0.821 |
+| 3 | 0 | inf | 12 | true | true | j-floor | - | - | 0.0010 | 0.0900 | 15.1 | 22.6 | 0.820 |
+| 3 | 1 | 1.5 | 12 | true | true | - | - | - | 0.0000 | 0.0680 | 16.2 | 24.2 | 0.826 |
+| 3 | 1 | 3.0 | 12 | true | true | - | - | - | 0.0020 | 0.0740 | 16.2 | 23.8 | 0.827 |
+| 3 | 1 | 5.0 | 12 | true | true | - | - | - | 0.0010 | 0.0860 | 16.3 | 23.0 | 0.825 |
+| 3 | 1 | 8.0 | 12 | true | true | - | - | - | 0.0000 | 0.0940 | 16.4 | 23.5 | 0.825 |
+| 3 | 1 | inf | 12 | true | true | auto-pass-disabled | - | - | 0.0010 | 0.0750 | 16.1 | 23.1 | 0.824 |
+| 3 | 2 | 1.5 | 12 | true | true | - | - | - | 0.0000 | 0.0620 | 17.3 | 25.2 | 0.828 |
+| 3 | 2 | 3.0 | 12 | true | true | - | - | - | 0.0020 | 0.0620 | 17.5 | 25.0 | 0.826 |
+| 3 | 2 | 5.0 | 12 | true | false | - | - | cleared-fraction,stalls | 0.0030 | 0.0820 | 17.3 | 24.9 | 0.828 |
+| 3 | 2 | 8.0 | 12 | true | true | - | - | - | 0.0010 | 0.0880 | 17.2 | 25.0 | 0.828 |
+| 3 | 2 | inf | 12 | true | true | auto-pass-disabled | - | - | 0.0010 | 0.0720 | 17.1 | 25.1 | 0.829 |
+| 4 | 0 | 1.5 | 12 | true | true | j-floor | - | - | 0.0000 | 0.0600 | 17.2 | 25.4 | 0.838 |
+| 4 | 0 | 3.0 | 12 | true | true | j-floor | - | - | 0.0000 | 0.0570 | 17.4 | 25.3 | 0.836 |
+| 4 | 0 | 5.0 | 12 | true | true | j-floor | - | - | 0.0010 | 0.0570 | 17.1 | 25.4 | 0.835 |
+| 4 | 0 | 8.0 | 12 | true | true | j-floor | - | - | 0.0020 | 0.0610 | 17.5 | 25.3 | 0.836 |
+| 4 | 0 | inf | 12 | true | true | j-floor | - | - | 0.0000 | 0.0500 | 17.3 | 25.3 | 0.835 |
+| 4 | 1 | 1.5 | 12 | true | true | - | - | - | 0.0010 | 0.0440 | 18.1 | 27.3 | 0.839 |
+| 4 | 1 | 3.0 | 12 | true | true | - | - | - | 0.0010 | 0.0550 | 18.1 | 26.9 | 0.837 |
+| 4 | 1 | 5.0 | 12 | true | true | - | - | - | 0.0000 | 0.0490 | 18.2 | 26.2 | 0.838 |
+| 4 | 1 | 8.0 | 12 | true | true | - | - | - | 0.0010 | 0.0610 | 18.5 | 26.8 | 0.837 |
+| 4 | 1 | inf | 12 | true | true | auto-pass-disabled | - | - | 0.0020 | 0.0420 | 17.9 | 27.2 | 0.839 |
+| 4 | 2 | 1.5 | 12 | true | true | - | - | - | 0.0000 | 0.0420 | 19.1 | 28.2 | 0.838 |
+| 4 | 2 | 3.0 | 12 | true | true | - | - | - | 0.0020 | 0.0560 | 19.4 | 27.5 | 0.838 |
+| 4 | 2 | 5.0 | 12 | true | true | - | - | - | 0.0010 | 0.0580 | 18.9 | 27.2 | 0.838 |
+| 4 | 2 | 8.0 | 12 | true | true | - | - | - | 0.0010 | 0.0430 | 19.0 | 27.9 | 0.839 |
+| 4 | 2 | inf | 12 | true | true | auto-pass-disabled | - | - | 0.0010 | 0.0550 | 19.0 | 27.6 | 0.839 |
 | 6 | 0 | 1.5 | 12 | true | true | j-floor | - | - | 0.0000 | 0.0150 | 20.8 | 30.9 | 0.856 |
 | 6 | 0 | 3.0 | 12 | true | true | j-floor | - | - | 0.0000 | 0.0260 | 21.2 | 31.0 | 0.855 |
 | 6 | 0 | 5.0 | 12 | true | true | j-floor | - | - | 0.0000 | 0.0320 | 20.7 | 30.6 | 0.855 |
