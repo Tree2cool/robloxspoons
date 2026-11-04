@@ -39,7 +39,7 @@ The search stage ran at its own round count and is a **search, not a gate**. The
 | 2 | cleared fraction | every eligible round cleared, to within the same ceiling | the stalls bar from the other side, derived independently |
 | 3 | pacing | median time to first completion <= 45s and p95 <= 120s | 02-CONTEXT amendment A2 |
 | 4 | occupancy | mean occupancy >= 0.600 | amendment A2 and research 3.7: without it the rule picks k=0,j=1, one card circulating among nine seats |
-| 5 | valve firing rate | <= 20.000% of rounds | amendment A8 resolution 1, re-derived from the measured curve. See the bar-sensitivity ladder in section 4b |
+| 5 | valve firing rate | <= 20.000% of rounds | amendment A8 resolution 1. **A regression guard set at an OWNER-CHOSEN operating point, not a discovered threshold** - the firing-rate curve is smooth and monotone with no elbow, so this bar chooses the pool rather than finding it. G1 therefore passes on FOUR discovered bars plus this one. See the bar-sensitivity ladder in section 4b |
 
 `Simulator.evaluateBars` is UNCHANGED and is evaluated for every Pacing cell alongside
 these; its verdict rides on each cell in `02-sweep-data.json` as `lockedVerdict` and

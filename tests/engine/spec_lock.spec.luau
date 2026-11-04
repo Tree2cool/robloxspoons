@@ -383,9 +383,29 @@ return function(t: Test.Runner)
 			-- The mode is asserted against the whole section, because the report records it as a FLAG in the
 			-- prose beneath the selection line rather than as part of the selected pool. `string.find` with
 			-- a message rather than `t.contains`, so a failure prints the sentence and not the section.
+			-- NOT a drift check, and it must not be mistaken for one. The Verdict section says "Wild and
+			-- Blocker both clear every bar", so it contains BOTH literals and this find succeeds for
+			-- either value -- it only proves the report discusses the mode at all. Phase 2 verification
+			-- found that flipping the shipped mode to Blocker was caught solely by CARD-09's rejection
+			-- COUNT (Blocker yields fewer wild-completable hands), which is incidental: it would vanish
+			-- the moment that corpus changed. The deliberate pin is the assertion below it.
 			t.truthy(
 				string.find(verdict, CardPool.JOKER_MODE, 1, true) ~= nil,
 				`the report's Verdict never mentions the shipped joker mode {CardPool.JOKER_MODE}`
+			)
+
+			-- THE PIN. PROJECT.md's Key Decisions table records jokers-as-wilds as a design property and
+			-- CLAUDE.md forbids re-opening that row; Gate G1 then cleared BOTH modes at every roster size,
+			-- so Blocker survives as a live flag rather than a contingency. That is exactly why the mode
+			-- needs an explicit assertion: when both variants pass every bar, no measurement can tell you
+			-- which one is meant to ship. This is the one G1 value the data cannot defend, so the decision
+			-- defends it. Changing the shipped mode means changing PROJECT.md first, then this line.
+			t.equal(
+				CardPool.JOKER_MODE,
+				"Wild",
+				"the shipped joker mode must be Wild: PROJECT.md's Key Decisions table records "
+					.. "jokers-as-wilds, and G1 cleared both modes, so nothing in the measured data "
+					.. "distinguishes them. Flip PROJECT.md first if this is deliberate."
 			)
 			-- `marginal` is in the Verdict for a reason: plan 02-11 was instructed to HALT rather than choose
 			-- a value if the report flagged the selection marginal without a stated reason. Locking the flag

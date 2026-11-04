@@ -235,6 +235,36 @@ inherited explicitly so the next phase does not have to infer it):
 - Cold start below the 3-player minimum is an existential risk that code alone cannot fix; bot-fill decision is deferred to Phase 8 on telemetry.
 - First true 9 to 10 player human playtest needs a published place (human gate); Studio multi-client is capped.
 
+### Phase 2 verification findings carried into Phase 4 (do not rediscover)
+
+- **The valve has an unstated DETECTION LIMIT.** It fires only on an **exact** whole-table state
+  repeat. A stuck trajectory that never exactly repeats is invisible to it even when armed and not
+  blinded. Phase 2 verification replayed 15 of the 37 residual stalled seeds: all reproduced, every
+  one reached a first completion (6.8-24.4s) and then ran **2,431-4,429 actions without clearing**
+  against a healthy cell mean of ~380, with `valveSeenResets = 0` throughout — and **3 of the 15
+  had `valveArmed = true` and zero firings**. So a stuck round can present with **no
+  `ValveForcedPass` at all**: a "this round is going nowhere" affordance must NOT be keyed off valve
+  events. This narrows the valve's claim; it does not weaken the measured result.
+- **The triage question is formally open, and this sweep cannot close it.**
+  `capArtifactCandidates`/`hitActionCap` track the 100,000-**action** cap, while the gated cells are
+  Pacing cells ending on the 300-**second** clock at ~379 actions per round — so "no action-cap
+  rounds" was structurally guaranteed for those 1,113 cells rather than discovered. The conclusion
+  drawn from it is still correct and conservative (300s is the shipped round cap, so raising an
+  action cap was never an option), but **whether the residual rounds are cycling or merely slow is
+  unanswered**, because cycle detection is disabled for every valve-ON cell by design.
+- **The fuzz suite's `k` grid is {1,2} and never covers the shipped `k = 3`.** Its 194,567-action
+  conservation result is therefore not a claim about the shipped pool. Worth widening when Phase 4
+  touches it.
+- **CI regresses N = 3, 6, 10 only, while every observed residual stall was at N >= 7** (worst cell
+  N = 9). The CI subset cannot see the regime the residual lives in.
+- **A8's "firing rate equals valve-off stall rate to three decimals" does not hold to three
+  decimals** (Blocker/churn 4.77% vs 5.33%; Wild/no-churn 5.86% vs 6.21%), and "every firing is a
+  real rescue" is an inference from the correlation, not a per-firing measurement. The correlation
+  is strong and the conclusion stands; the precision claim was overstated.
+- **Phase 6 note on SeatOrder:** its 28-case corpus uses hand-built inputs, so the residual risk is
+  the **construction** of `SeatOrderInput` from live records — hider identity, filtering departed
+  finishers. Re-verify that when Phase 6 wires it, not the ranking itself.
+
 ## Deferred Items
 
 Items acknowledged and carried forward from previous milestone close:

@@ -298,3 +298,33 @@ convenient; `tests/maps/graybox.spec.luau` asserts it statically and `MapLoader`
 `Geometry`, but the live tree was not eyeballed.
 
 - [x] M-06 signed off: alejandrog_m 2026-11-03
+
+---
+
+## M-07 (CARD-11) Calibrate the simulator's human model against a real playtest
+
+**Why manual:** no simulation can answer it. Gate G1's **solvability** half is a theorem that does
+not depend on the bot model at all. Its **pacing** half measures the bot, and two assumptions behind
+that bot have never been checked against a person:
+
+- **V-35** — whether a lognormal reaction-time distribution over roughly 250-900ms represents real
+  players. Carried as Verification Debt since project init.
+- **A4** — whether humans deviate from perfectly greedy play often enough to matter. Surfaced by
+  Phase 2's research and never closed.
+
+Phase 2 removed these from the critical path rather than resolving them: the anti-livelock valve
+makes zero-stall a property of the engine instead of a bet on player behaviour, so a wrong human
+model no longer breaks the game. It still makes the **pacing numbers** (median 16.2s to first
+completion, p95 23.7s) claims about a simulated player rather than a real one.
+
+1. At the first playtest that reaches a full roster, record time-to-first-completion per round.
+2. Compare the distribution against the G1 report's confirm-stage figures for `k=3, j=1`.
+3. Record how often a player passes a card the greedy policy would have kept.
+
+**Expected:** the measured median sits inside the simulated p95. A large divergence means the
+pacing half of G1 should be re-run with a corrected reaction model; it does **not** threaten
+solvability.
+
+Observed: _
+
+- [ ] M-07 signed off: <name> <date>   (Phase 4/6 playtest; not blocking Phase 2)
