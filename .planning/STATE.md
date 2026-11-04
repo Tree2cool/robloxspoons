@@ -219,6 +219,23 @@ rows below (Phases 5, 6 and 7) are untouched and still open.
   non-discriminating. **The machinery is correct and tested, but it is not load-bearing at the
   configuration that ships** — so do not cite it as a reason the ramp connects. Carry into
   03-10's debt section.
+- **ACCEPTED DEPARTURE (orchestrator, wave 3): the two shelf corpus rows report `Unreachable`,
+  not `OutOfReach`.** The locked corpus said `OutOfReach`; plan 03-05 measured `Unreachable` and
+  asked for confirmation rather than adjusting the expectation. **Accepted, because the measured
+  VALUE is unchanged** — nearest spawn-connected cell 6.538 against research's 6.54 — and only the
+  label moved. The shelf top carries its own standable cells 2.12 away, inside `E = 5.5` but region
+  0, so `OutOfReach`'s condition ("a cell within `PICKUP_RANGE` but none within `E`") is false while
+  `Unreachable`'s ("a cell within `E` but none spawn-connected") is true. Research used "REACH" as a
+  **coarse bucket spanning both reasons**, because D-12's six-reason taxonomy was decided after
+  research ran (research gave five illustrative names and contradicted itself in the same
+  paragraph). Corroborated independently: the implementation also reproduces research's ladder at a
+  second operating point — at `PICKUP_RANGE 8.5` the shelf edge passes and the shelf centre is
+  `NoSight`. **Consequence: the shelf is never `OutOfReach` below `E = 6.54`.** A flat-room row at
+  (4, 8.7, 4) now produces `OutOfReach` for the coverage case.
+- **A baseline captured at planning time can go stale before the wave that asserts it runs.** Plan
+  03-05's "guarded roots = 20 before" was measured during planning; waves 1-2 added roots, so the
+  real transition was 22 -> 23. The +1 delta still evidences the new root. Later plans asserting a
+  repo-wide count should derive it at execution time, not quote a planning-time figure.
 - **"Corridor width 3 erodes to nothing" holds only when the faces sit on lattice centre lines**
   (plan 03-04). A width-3 gap otherwise spans three centres. The maze fixture aligns deliberately
   and documents it; the authoring rule `width >= 2 * capsuleRadius + gridSize` is **sufficient,
