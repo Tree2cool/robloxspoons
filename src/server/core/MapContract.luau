@@ -83,6 +83,7 @@ local MapContract = {
 	-- Every stable issue code the validator can emit. Tests assert by code and check this list is fully covered.
 	ISSUE_CODES = {
 		"MAP_BOUNDS_INVALID",
+		"MAP_BOUNDS_TOO_LARGE",
 		"MAP_META_INVALID",
 		"MAP_MISSING_FOLDER",
 		"MAP_MISSING_PART",
@@ -93,7 +94,14 @@ local MapContract = {
 		"MAP_SEAT_COUNT",
 		"MAP_SEAT_NAME",
 		"MAP_SPAWN_COUNT",
+		"MAP_SPAWN_DISCONNECTED",
+		"MAP_SPAWN_NO_FOOTING",
 		"MAP_SPOT_COUNT",
+		"MAP_SPOT_NO_FOOTING",
+		"MAP_SPOT_NO_SIGHT",
+		"MAP_SPOT_OUT_OF_REACH",
+		"MAP_SPOT_SOLID",
+		"MAP_SPOT_UNREACHABLE",
 		"MAP_TAG_OUTSIDE_FOLDER",
 	} :: { string },
 }

@@ -13,16 +13,19 @@
 --   * seat winding (seats 1..9 clockwise) and each seat's look vector pointing at the TableAnchor
 --   * Bounds roll: Node carries only a look vector, so a roll about it is invisible here (needs an up vector)
 local MapContract = require("./MapContract")
+local SpoonPlacement = require("./SpoonPlacement")
 
 type Node = MapContract.Node
 type Issue = MapContract.Issue
 type MapSpec = MapContract.MapSpec
 type Pose = MapContract.Pose
+type PlacementConfig = SpoonPlacement.PlacementConfig
 type Vec3 = MapContract.Vec3
 type Aabb = MapContract.Aabb
 type SizeClass = MapContract.SizeClass
 
 local BOUNDS_INVALID = "MAP_BOUNDS_INVALID"
+local BOUNDS_TOO_LARGE = "MAP_BOUNDS_TOO_LARGE"
 local META_INVALID = "MAP_META_INVALID"
 local MISSING_FOLDER = "MAP_MISSING_FOLDER"
 local MISSING_PART = "MAP_MISSING_PART"
@@ -33,7 +36,14 @@ local SCRIPT_FORBIDDEN = "MAP_SCRIPT_FORBIDDEN"
 local SEAT_COUNT = "MAP_SEAT_COUNT"
 local SEAT_NAME = "MAP_SEAT_NAME"
 local SPAWN_COUNT = "MAP_SPAWN_COUNT"
+local SPAWN_DISCONNECTED = "MAP_SPAWN_DISCONNECTED"
+local SPAWN_NO_FOOTING = "MAP_SPAWN_NO_FOOTING"
 local SPOT_COUNT = "MAP_SPOT_COUNT"
+local SPOT_NO_FOOTING = "MAP_SPOT_NO_FOOTING"
+local SPOT_NO_SIGHT = "MAP_SPOT_NO_SIGHT"
+local SPOT_OUT_OF_REACH = "MAP_SPOT_OUT_OF_REACH"
+local SPOT_SOLID = "MAP_SPOT_SOLID"
+local SPOT_UNREACHABLE = "MAP_SPOT_UNREACHABLE"
 local TAG_OUTSIDE_FOLDER = "MAP_TAG_OUTSIDE_FOLDER"
 
 local CODE_CLASSES: { [string]: boolean } = { Script = true, LocalScript = true, ModuleScript = true }
@@ -88,7 +98,36 @@ local function dotOf(a: Vec3, b: Vec3): number
 	return a.x * b.x + a.y * b.y + a.z * b.z
 end
 
-local function validate(root: Node): ({ Issue }, MapSpec?)
+-- SpoonPlacement.Reason -> stable issue code. The ORDER of the reasons is LOCKED and recorded in
+-- THREE places: SpoonPlacement.luau's `Reason` type union, the comment there, and this table plus
+-- tests/placement/corpus.spec.luau. Never reorder it to make an assertion pass.
+--
+--   1 OutOfBounds   in-bounds        -> MAP_OUT_OF_BOUNDS (the structural pass fires first, so this
+--                                      row never triggers inside validate; it exists so the mapping
+--                                      is TOTAL and a future caller cannot hit a nil code. The
+--                                      reason itself is live for the Phase 6 hider check, where the
+--                                      point comes from a client.)
+--   2 Solid         standable (a)    -> MAP_SPOT_SOLID
+--   3 NoFooting     standable (b)    -> MAP_SPOT_NO_FOOTING
+--   4 OutOfReach    reach (a)        -> MAP_SPOT_OUT_OF_REACH
+--   5 Unreachable   reach (b)        -> MAP_SPOT_UNREACHABLE
+--   6 NoSight       line-of-sight    -> MAP_SPOT_NO_SIGHT
+--
+-- A spot inside the solid Core must report Solid, NOT a downstream sightline failure. Reporting a
+-- fundamental failure as a downstream symptom is the most expensive way to be wrong, which is the
+-- same reasoning that put `circulation` before `unsatisfiable` in Invariants.check.
+local CODE_OF_REASON: { [string]: string } = {
+	OutOfBounds = OUT_OF_BOUNDS,
+	Solid = SPOT_SOLID,
+	NoFooting = SPOT_NO_FOOTING,
+	OutOfReach = SPOT_OUT_OF_REACH,
+	Unreachable = SPOT_UNREACHABLE,
+	NoSight = SPOT_NO_SIGHT,
+}
+
+local function validate(root: Node, placement: PlacementConfig): ({ Issue }, MapSpec?)
+	-- Loud on purpose (D-13, the SeatOrder precedent). A nil config here would mean a map validated against NOTHING and reported clean, which is the single worst failure mode this validator has.
+	SpoonPlacement.assertConfig(placement)
 	local issues: { Issue } = {}
 	local function report(code: string, path: string, message: string)
 		table.insert(issues, { code = code, path = path, message = message })
@@ -234,7 +273,9 @@ local function validate(root: Node): ({ Issue }, MapSpec?)
 	local hiderSpawn: Node? = nil
 	local tableAnchor: Node? = nil
 	local seekerSpawns: { Node } = {}
+	local seekerPaths: { string } = {} -- parallel to seekerSpawns, so a SpawnNoFooting fault can name its spawn
 	local defaultSpots: { Node } = {}
+	local defaultSpotPaths: { string } = {} -- parallel to defaultSpots
 	local decoyAnchors: { Node } = {}
 	local seats: { [number]: Node } = {}
 	-- Every anchor that must lie inside Bounds, with its path.
@@ -284,6 +325,7 @@ local function validate(root: Node): ({ Issue }, MapSpec?)
 			for _, child in seekerFolder.children do
 				if isPart(child) and hasTag(child, MapContract.TAG_SEEKER_SPAWN) then
 					table.insert(seekerSpawns, child)
+					table.insert(seekerPaths, `{seekerPath}/{child.name}`)
 					table.insert(anchors, { node = child, path = `{seekerPath}/{child.name}` })
 				end
 			end
@@ -297,6 +339,7 @@ local function validate(root: Node): ({ Issue }, MapSpec?)
 			for _, child in spotFolder.children do
 				if isPart(child) and hasTag(child, MapContract.TAG_DEFAULT_SPOT) then
 					table.insert(defaultSpots, child)
+					table.insert(defaultSpotPaths, `{spotPath}/{child.name}`)
 					table.insert(anchors, { node = child, path = `{spotPath}/{child.name}` })
 				end
 			end
@@ -372,6 +415,56 @@ local function validate(root: Node): ({ Issue }, MapSpec?)
 		end
 	end
 
+	-- PLACEMENT STAGE (MAP-02, D-17 STRICT). Runs ONLY when the structural pass is clean: research
+	-- Pitfall 11 -- placement over a map that already failed structure would dereference folders the
+	-- structural pass just reported missing. A spot outside Bounds is already MAP_OUT_OF_BOUNDS from
+	-- the structural pass, so the OutOfBounds reason never fires here; it is live for the Phase 6
+	-- hider check, where the point comes from a client.
+	if #issues == 0 and box ~= nil then
+		local boxes = SpoonPlacement.boxesOf(root, placement)
+		local spawnPoints: { Vec3 } = {}
+		for _, spawn in seekerSpawns do
+			local spawnPosition = spawn.position
+			if spawnPosition ~= nil then
+				table.insert(spawnPoints, spawnPosition)
+			end
+		end
+		local world, faults = SpoonPlacement.bake(boxes, box, spawnPoints, placement)
+		local dataFolderPath = `{rootPath}/Data`
+		for _, fault in faults do
+			-- one issue per fault, never "the first fault wins": a map with two bad spawns must
+			-- tell its author about both (the same discipline D-17 applies to spots).
+			if fault.kind == "BoundsTooLarge" then
+				report(BOUNDS_TOO_LARGE, `{dataFolderPath}/Bounds`, fault.detail)
+			elseif fault.kind == "SpawnNoFooting" then
+				local index = fault.spawnIndex
+				local spawnPath = if index ~= nil then seekerPaths[index] else nil
+				report(SPAWN_NO_FOOTING, spawnPath or `{dataFolderPath}/SeekerSpawns`, fault.detail)
+			else
+				report(SPAWN_DISCONNECTED, `{dataFolderPath}/SeekerSpawns`, fault.detail)
+			end
+		end
+		if world ~= nil then
+			local reachRange = placement.PICKUP_RANGE - placement.PICKUP_MARGIN
+			for index, spot in defaultSpots do
+				local spotPosition = spot.position
+				if spotPosition ~= nil then
+					local verdict = SpoonPlacement.check(world, spotPosition)
+					if not verdict.ok then
+						local reason: string = verdict.reason or "OutOfBounds"
+						report(
+							CODE_OF_REASON[reason],
+							defaultSpotPaths[index],
+							`placement rule {reason} failed: no seeker could find a spoon here (effective range {reachRange} studs)`
+						)
+					end
+				end
+			end
+		end
+	end
+
+	-- The merged structural + placement list must stay totally ordered so CLI output is byte-deterministic
+	-- across runs. This is the ONLY sort, and it runs after the placement stage has contributed.
 	table.sort(issues, function(a: Issue, b: Issue): boolean
 		if a.code ~= b.code then
 			return a.code < b.code
