@@ -127,7 +127,19 @@ Plans:
   2. The same placements produce the same verdict for avatars of different body scales
   3. The validator fails the build on a deliberately unfindable default spot, and passes the reference map with at least 16 default spots that each survive the real placement rules after exclusions
   4. **Gate G2:** the validator is green on the reference map and the full corpus, and the maze bake stress test (worst-case reachability) completes, so the five map builds may be authored
-**Plans**: TBD
+**Plans**: 11 plans in 8 waves
+Plans:
+- [ ] 03-01-PLAN.md — contract version 2: Node gains up, canCollide and shape, both snapshotters emit them identically, and the shape-parity gate (wave 1)
+- [ ] 03-02-PLAN.md — the ten shipped placement constants (D-18) with the coupling invariants, the clearance cliff and two new MANUAL-CHECKS rows (wave 1)
+- [ ] 03-03-PLAN.md — Obb: basis from look x up, point distance, segment-vs-OBB slab test and column span, with six degenerate cases and differential fuzz (wave 1)
+- [ ] 03-04-PLAN.md — WalkGrid: multi-layer span field, slope-allowance erosion, link-verified 4-neighbour BFS, plus the MicroWorld fixtures including D-19 over-a-void (wave 2)
+- [ ] 03-05-PLAN.md — SpoonPlacement: the locked six-reason order, bake and check, the placement corpus and the arity lock (wave 3)
+- [ ] 03-06-PLAN.md — the graybox regenerated under D-17 STRICT: 21 authored spots that all pass, with the margin table and the reference-map time cap (wave 4)
+- [ ] 03-07-PLAN.md — the adversarial maze generator and its oracle, with the 2.0 s bake cap and the corridor-3 vacuity control (wave 4)
+- [ ] 03-08-PLAN.md — the validator placement stage, eight new issue codes with exact-set fixtures, both call sites injected and the comment-stripped spec lock (wave 5)
+- [ ] 03-09-PLAN.md — seat winding and seat facing (D-20), and Phase 1 deferred-checks list closed out honestly (wave 6)
+- [ ] 03-10-PLAN.md — Gate G2 report, the nine-gate observation table, the validation sign-off and the Verification Debt update (wave 7)
+- [ ] 03-11-PLAN.md — owner sign-off on Gate G2 and M-08 in Studio, unblocking Phase 7a (wave 8, not autonomous)
 **Research**: YES. Walkable-grid flood-fill versus Pathfinding (spike on the maze), StreamingEnabled effect on client preview, Lune-based CI validation, avatar normalisation scope (Open Question 12: spawn-time versus canonical reference avatar). Re-check V-17 to V-20, V-4.
 
 ### Phase 4: Live Card Table
