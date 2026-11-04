@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 2 COMPLETE (14/14 plans, Gate G1 PASSED); ready to plan Phase 3
-last_updated: "2026-11-04T03:18:57.949Z"
+stopped_at: Phase 3 context gathered (03-CONTEXT.md committed); ready to plan Phase 3
+last_updated: "2026-11-04T05:02:35.909Z"
 last_activity: 2026-11-04
 progress:
   total_phases: 8
   completed_phases: 2
   total_plans: 26
   completed_plans: 26
-  percent: 25
+  percent: 100
 ---
 
 # Project State
@@ -107,11 +107,13 @@ phase that contradicts one fails the suite rather than a review.
   `.planning/phases/02-card-engine-and-pacing-simulator/02-G1-REPORT.md`. Measured residual 37 stalled rounds in 320,000 gated
   (0.012% aggregate, 0.070% worst cell) against a 0.500% ceiling; median first completion 16.2s (bar 45s),
   p95 23.7s (bar 120s), occupancy 0.825 (bar 0.600), worst valve firing rate 8.240% (bar 20.000%).
+
 - [02-11] The six shipped `src/shared/Config/CardPool.luau` values: `EXTRA_RANKS = 3`, `JOKERS = 1`,
   `JOKER_MODE = "Wild"`, `ANTI_LIVELOCK_VALVE = true`, `AUTO_PASS_MAX_SECONDS = 8.0`,
   `AUTO_PASS_SELECTION = "uniform-random-from-hand"`. `ranks = seatCount + 3` with `seatCount` = seated
   seekers = (players in round) − 1 (amendment A3; `Pool.poolConfig` is the only site that writes that
   subtraction). Circulation `= 4k + j = 13`.
+
 - [02-11, owner] **`k = 3` over the bar's own `k = 6` is a GAMEPLAY decision, not a measurement.** Every
   candidate `k = 2..6` clears all five bars and the firing-rate curve is smooth and monotone with no
   elbow, so the bar CHOOSES rather than discovers (7% selects k=6, 20% selects k=3, 40% selects k=2).
@@ -119,6 +121,7 @@ phase that contradicts one fails the suite rather than a review.
   starting-gun speed against k=2 while cutting forced passes by about a third, and avoids k=6's ~45%
   slower start (median first 20.9s against 16.2s). The sweep was then **re-run** at that operating point,
   so the shipped pool is also the confirmed one.
+
 - [02-13 / amendment A7] **The engine's anti-livelock valve, with its firing and choice rules locked.**
   Fires **immediately after a non-completing `Draw`, on the drawing seat**, when the whole-table state
   repeats with no completion since the previous repeat; it then forces one pass chosen **from naturals
@@ -128,6 +131,7 @@ phase that contradicts one fails the suite rather than a review.
   held constant so the reference numbers stay comparable — they are not restatements of A7's wording.
   The valve must stay ON in the shipped game: at the selected pool the valve-DISABLED twins stall at
   3.58–8.31%, matching the firing rate, so every firing is a real rescue.
+
 - [02-02] **The locked four-bucket seat order**, and `dealer == seatOrder[1]` always, because the hider is
   not seated so the highest-placed SEATED finisher IS the head of the order. Buckets: finishers by find
   order, then non-finishers by previous seat index, then the previous hider, then joiners by join order,
@@ -135,12 +139,14 @@ phase that contradicts one fails the suite rather than a review.
   empty); two or more empty-handed seekers is NOT a special case (bucket 2 is a list with a key, never an
   index into "the" non-finisher). Round 1 is the same function with every previous list empty and an
   INJECTED Rng — a missing rng is a loud error, never a fallback to the global generator.
+
 - [02-06] **The locked removal dump order and the terminal bucket.** A departing seat's cards go
   **hand ascending, then inbox in FIFO order**, appended to the successor's inbox tail (research OQ-G).
   The sole-seat case routes to `state.terminal` (`head = 0`, `liveCount = 0`) rather than down a nil path,
   which is what keeps Non-Negotiable Rule 8's "never destroyed" literally assertable by the partition
   identity. `removeSeat` decrements `rankInPlay`/`jokersInPlay`/`cnt` **only** in the no-successor branch:
   routing a card to an inbox does not take it out of play.
+
 - [02-07] **The locked reject precedence, event order and valve call rule.** Exactly seven reject codes,
   first match wins, with `UnknownCard` before `HandNotFive` and `HandNotFour` before `InboxEmpty` both
   mutation-proven in both directions. A rejection asserts four things — the code, an empty event list, an
@@ -149,11 +155,13 @@ phase that contradicts one fails the suite rather than a review.
   forget it: exactly one entry point per successful apply and none on a rejection. Locked event order
   includes the valve's three-event form `Drew -> ValveForcedPass -> Passed`. A `Remove` intent may NOT
   carry the `Completed` cause — that is a caller-bug error, not an eighth reject code.
+
 - [02-03 / amendment A6] **`coroutine` and `os.` are banned in the pure zones** by `check-guards` R3, which
   is what finally makes Non-Negotiable Rules 5 and 6 enforced rather than merely stated. `coroutine` is a
   whole-identifier ban; `os.` is a needle on the dotted namespace, so a pure-zone file may not contain the
   substring `os.` even inside a string literal. **No suppression mechanism was added** — a rule a developer
   can switch off in the file it governs is not a rule.
+
 - [02-01] **The locked violation ORDER of `Invariants.check`**, nine names: `hand-size`, `ring-links`,
   `liveness`, `circulation`, `partition-count`, `partition-identity`, `counters-rankInPlay`,
   `counters-histogram`, `unsatisfiable`. **Do not reorder it.** `circulation` (4) precedes `unsatisfiable`
@@ -167,13 +175,16 @@ phase that contradicts one fails the suite rather than a review.
 - **`src/server/engine/SeatOrder.luau` has no consumer inside Phase 2** beyond its own corpus, **by
   design**. Its first caller is **Phase 6's match lifecycle** (`nextSeatOrder` / `dealerOf`, with the
   locked four-bucket order above). It is not dead code and a later cleanup pass must not delete it.
+
 - **The simulator's clock is float seconds; the shipped clock is integer deciseconds** (Non-Negotiable
   Rule 5 — the server is the only clock, scoring granularity 100ms). Round at the boundary when Phase 4
   carries any simulator-derived timing across.
+
 - **`ValveForcedPass` fires in roughly 8% of rounds at the shipped pool** (3.59–8.24% per cell at N=10, up
   to 15.8% at tighter pools). A card leaves a player's hand that they did not choose, so **Phase 4 needs a
   real affordance for it**, not an edge-case path. The firing rate is a FEEL cost, not only a safety
   statistic — which is why it was traded against pacing rather than minimised.
+
 - **The start-up ramp is real:** ~8.3s at N=10 against a 4.6s median time-to-first-completion at N=3. Far
   seats need a "waiting for cards" affordance.
 
@@ -206,32 +217,44 @@ inherited explicitly so the next phase does not have to infer it):
 
 - **V-35 STANDS.** Whether a bot's reaction-time distribution represents real humans is unverifiable
   without real playtests; carried since project init. Calibrate in Phase 4/6 against live sessions.
+
 - **A4 STANDS.** Whether humans deviate from pure greed often enough is the same class as V-35 and was
   newly surfaced by this phase's research. Measure the deviation rate at the first real playtest.
+
 - **Scope note on what those two actually limit.** G1's **solvability** half is a theorem and needs no
   playtest — it does not depend on the bot model at all. Its **pacing** half measures the bot, not the
   game, until the two rows above close. Do not let a green pacing number read as a verified claim about
   real players.
+
 - **RETIRED by amendment A7: the deviation-rate assumption.** The zero-stall result no longer depends on
   how often humans deviate from pure greed, because the engine's valve deviates for them. What remains
   unverified is therefore the pacing model, not the solvability claim.
+
 - **RETIRED by plan 02-03: the engine's half of verification debt V-15.** The pure-zone R3 guard now bans
   `coroutine` and `os.`, so Non-Negotiable Rules 5 and 6 are enforced in the engine rather than stated.
   V-15's non-engine half is unaffected.
+
 - **The valve-on residual is NEITHER a `CapArtifact` NOR an unexplained `ResidualLivelock`, and it was
   measured rather than assumed.** `capArtifactCandidates` is empty in all 1,132 cells of the run across
   1,501,000 simulated rounds, and `hitActionCap` is false in every confirm row, so `02-triage.json` is
   absent by measurement rather than omission. Every stalled round this engine produces is a 300s
   `time-cap` round, which a raised ACTION cap cannot rescue. That is exactly why the recorded claim is
   scoped to the selected pool and the 37/320,000 residual is printed rather than rounded to zero.
+
 - **Accepted departure from a locked decision (owner, 2026-11-04):** 02-CONTEXT locked "Phase 1's CI is
   ~20s and that should stay true". The suite now runs ~25–26s (Phase 1 baseline 15.94s + plan 02-09's
   measured 8.0s simulator subset + 02-08's fuzz suite and the new engine specs). **The owner accepts the
   overshoot.** Nothing was trimmed to hide it: the 500-round statistical floor, every mutation case and
   every bar are intact. Recorded as a measured, approved departure rather than a silent one.
+
 - Verification debt: every Roblox platform claim in research is unverified (doc hosts DNS-blocked). Each phase's research step starts by re-checking SUMMARY.md Verification Debt rows for that phase. Add the blocked hosts to the environment's allowed domains.
 - Owner decisions CONFIRMED during initialization: hider-score denominator = fixed 300 s (OQ 7); mid-round leaver = finish the round then end on current totals, no win credit (OQ 8); free/earned cosmetic baseline = free defaults plus an achievement-unlocked set (OQ 11); player cap = 10 (OQ 17).
-- Owner decisions still open: match tiebreak (OQ 5, default: higher best-round then earlier four-of-a-kind placement), avatar normalisation scope (OQ 12, Phase 3), VIP route (OQ 14, Phase 7b), Game Pass versus Developer Product switch point (OQ 15, Phase 7b), rejoin policy confirmation (OQ 18, derived default in MATCH-08), cold-start and bot-fill decision (OQ 13, Phase 8 on telemetry).
+- Owner decisions still open: match tiebreak (OQ 5, default: higher best-round then earlier four-of-a-kind placement), VIP route (OQ 14, Phase 7b), Game Pass versus Developer Product switch point (OQ 15, Phase 7b), rejoin policy confirmation (OQ 18, derived default in MATCH-08), cold-start and bot-fill decision (OQ 13, Phase 8 on telemetry).
+- **OQ 12 RESOLVED (Phase 3 discuss, 2026-11-04):** avatar normalisation scope is a **canonical
+  reference avatar** — one fixed capsule for every validity test, biased toward rejecting (short reach,
+  tall headroom). The rule function takes no avatar argument, so HIDE-07's scale-invariance is true by
+  construction rather than sampled. Recorded as D-10/D-11 in
+  `.planning/phases/03-placement-rules-map-pipeline-and-validator/03-CONTEXT.md`.
 - Cold start below the 3-player minimum is an existential risk that code alone cannot fix; bot-fill decision is deferred to Phase 8 on telemetry.
 - First true 9 to 10 player human playtest needs a published place (human gate); Studio multi-client is capped.
 
@@ -245,6 +268,7 @@ inherited explicitly so the next phase does not have to infer it):
   had `valveArmed = true` and zero firings**. So a stuck round can present with **no
   `ValveForcedPass` at all**: a "this round is going nowhere" affordance must NOT be keyed off valve
   events. This narrows the valve's claim; it does not weaken the measured result.
+
 - **The triage question is formally open, and this sweep cannot close it.**
   `capArtifactCandidates`/`hitActionCap` track the 100,000-**action** cap, while the gated cells are
   Pacing cells ending on the 300-**second** clock at ~379 actions per round — so "no action-cap
@@ -252,15 +276,19 @@ inherited explicitly so the next phase does not have to infer it):
   drawn from it is still correct and conservative (300s is the shipped round cap, so raising an
   action cap was never an option), but **whether the residual rounds are cycling or merely slow is
   unanswered**, because cycle detection is disabled for every valve-ON cell by design.
+
 - **The fuzz suite's `k` grid is {1,2} and never covers the shipped `k = 3`.** Its 194,567-action
   conservation result is therefore not a claim about the shipped pool. Worth widening when Phase 4
   touches it.
+
 - **CI regresses N = 3, 6, 10 only, while every observed residual stall was at N >= 7** (worst cell
   N = 9). The CI subset cannot see the regime the residual lives in.
+
 - **A8's "firing rate equals valve-off stall rate to three decimals" does not hold to three
   decimals** (Blocker/churn 4.77% vs 5.33%; Wild/no-churn 5.86% vs 6.21%), and "every firing is a
   real rescue" is an inference from the correlation, not a per-firing measurement. The correlation
   is strong and the conclusion stands; the precision claim was overstated.
+
 - **Phase 6 note on SeatOrder:** its 28-case corpus uses hand-built inputs, so the residual risk is
   the **construction** of `SeatOrderInput` from live records — hider identity, filtering departed
   finishers. Re-verify that when Phase 6 wires it, not the ranking itself.
@@ -276,9 +304,16 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-11-04
-Stopped at: Session resumed from HANDOFF.json (status: phase_complete_between_phases, no blockers);
-owner chose discuss-before-plan for Phase 3, proceeding to /gsd-discuss-phase 3
-Resume file: .planning/HANDOFF.json (still present — delete once Phase 3 work actually starts)
+Stopped at: Phase 3 context gathered — 16 decisions across 4 gray areas, Open Question 12 resolved
+Resume file: .planning/phases/03-placement-rules-map-pipeline-and-validator/03-CONTEXT.md
 
-**Next:** plan Phase 3 (Placement Rules, Map Pipeline and Validator). Phase 3 depends only on Phase 1 and
-was always the parallel partner of Phase 2.
+**Next:** plan Phase 3 (`/gsd-plan-phase 3`). CONTEXT.md is written and committed; the research step
+must open by re-checking Verification Debt rows V-17..V-20 and V-4 in `.planning/research/SUMMARY.md`,
+then propose the placement numbers with their per-spot consequences on the graybox for owner
+confirmation (D-16).
+
+**Carried into planning as the phase's live risk:** the `Node` contract bump to v2 (adding `up` and
+`canCollide`) makes the two snapshotters' shape agreement the correctness foundation rather than
+hygiene — with one pure geometry model, `scripts/maps/snapshot.luau` and
+`src/server/services/MapLoader.luau` disagreeing means CI and the live game disagree about whether a
+spoon is findable.
