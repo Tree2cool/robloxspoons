@@ -9,6 +9,8 @@
 -- it fail. Later plans (03-05, 03-08) extend this file with the PlacementConfig type lock, the arity lock
 -- and the MapLoader source assertion; the cases are independent so they can be appended.
 local Placement = require("../../src/shared/Config/Placement")
+local fs = require("@lune/fs")
+local lex = require("../../scripts/ci/lex")
 local SpoonPlacement = require("../../src/server/core/SpoonPlacement")
 local Test = require("../harness/Test")
 
@@ -229,5 +231,36 @@ return function(t: Test.Runner)
 		local coarse: any = table.clone(Placement)
 		coarse.GRID_SIZE = 4
 		t.equal(SpoonPlacement.assertConfig(coarse), coarse)
+	end)
+
+	t.test("the runtime loader injects the shipped placement values (vacuous-pass gate 5)", function()
+		-- MapLoader needs the Roblox API, so it cannot be executed headlessly and this is a SOURCE
+		-- assertion. Comments are stripped first with the same lexer check-guards uses: a grep that
+		-- also matches a comment would pass on a commented-out require, which is the exact vacuity
+		-- this gate exists to prevent. Mutation: comment out the require and this case must fail.
+		local source = lex.stripComments(fs.readFile("src/server/services/MapLoader.luau"))
+		t.contains(source, "local Placement = require(ReplicatedStorage.Shared.Config.Placement)")
+		t.contains(source, "MapValidator.validate(MapLoader.snapshot(map), Placement)")
+	end)
+
+	t.test("the CI CLI injects the same shipped values", function()
+		local source = lex.stripComments(fs.readFile("scripts/maps/validate-map.luau"))
+		t.contains(source, 'require("../../src/shared/Config/Placement")')
+		t.contains(source, "MapValidator.validate(root, Placement)")
+	end)
+
+	t.test("no pure-zone file requires the config across the mount boundary", function()
+		for _, path in
+			{
+				"src/server/core/SpoonPlacement.luau",
+				"src/server/core/MapValidator.luau",
+				"src/server/core/WalkGrid.luau",
+				"src/server/core/Obb.luau",
+			}
+		do
+			local source = lex.stripComments(fs.readFile(path))
+			t.falsy(string.find(source, "Config/Placement", 1, true), `{path} names Config/Placement`)
+			t.falsy(string.find(source, "Config.Placement", 1, true), `{path} names Config.Placement`)
+		end
 	end)
 end

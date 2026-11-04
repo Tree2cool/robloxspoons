@@ -6,9 +6,13 @@
 -- Reads the .rbxm, snapshots it into plain data and runs the same pure validator the server uses at runtime.
 -- Prints one line per issue as `<CODE> <path> <message>` and exits 1 if there are any (or if the file cannot be
 -- read or does not hold exactly one root); otherwise prints `validate-map: ok (<n> spots, <n> seats)` and exits 0.
+--
+-- The shipped placement numbers are injected here, because the pure validator may not require across the Rojo
+-- mount boundary (R6); the runtime loader injects the same table through the DataModel path.
 local process = require("@lune/process")
 
 local MapValidator = require("../../src/server/core/MapValidator")
+local Placement = require("../../src/shared/Config/Placement")
 local Snapshot = require("./snapshot")
 
 local function main()
@@ -33,7 +37,7 @@ local function main()
 		return
 	end
 
-	local issues, spec = MapValidator.validate(root)
+	local issues, spec = MapValidator.validate(root, Placement)
 	if #issues > 0 or spec == nil then
 		for _, issue in issues do
 			print(`{issue.code} {issue.path} {issue.message}`)

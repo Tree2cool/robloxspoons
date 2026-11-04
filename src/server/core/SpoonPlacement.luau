@@ -43,7 +43,7 @@ type Vec3 = MapContract.Vec3
 type Aabb = MapContract.Aabb
 type Node = MapContract.Node
 
--- The injected config. Key names are UPPER_SNAKE so src/shared/Config/Placement.luau IS a PlacementConfig with
+-- The injected config. Key names are UPPER_SNAKE so the shipped shared placement config module IS a PlacementConfig with
 -- no adapter between them: an adapter would be a second place where CI and the live game could disagree about
 -- a number, which is exactly what D-01 exists to prevent.
 export type PlacementConfig = {

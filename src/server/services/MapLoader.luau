@@ -13,11 +13,17 @@
 -- Position and look are derived from CFrame only. On a deserialized Part the derived Position property errors
 -- (plan 01-07, assumption A5), so CFrame.Position and CFrame.LookVector are the one readable source.
 local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ServerStorage = game:GetService("ServerStorage")
 local Workspace = game:GetService("Workspace")
 
 local MapContract = require("../core/MapContract")
 local MapValidator = require("../core/MapValidator")
+-- The shipped placement numbers (D-13). This service is the ONLY file under src/ that requires
+-- them: guard rule R6 forbids a pure-zone cross-mount require, so MapValidator and SpoonPlacement
+-- receive the config as a parameter. The DataModel path is the precedent RoundDriver.luau and
+-- Persistence.luau set; default.project.json mounts src/shared at ReplicatedStorage.Shared.
+local Placement = require(ReplicatedStorage.Shared.Config.Placement)
 
 type Node = MapContract.Node
 type Vec3 = MapContract.Vec3
@@ -89,7 +95,7 @@ function MapLoader.load(mapId: string): (Instance, MapContract.MapSpec)
 		error(`map {mapId} not found under ServerStorage.Maps`)
 	end
 
-	local issues, spec = MapValidator.validate(MapLoader.snapshot(map))
+	local issues, spec = MapValidator.validate(MapLoader.snapshot(map), Placement)
 	if #issues > 0 or spec == nil then
 		error(formatIssues(mapId, issues))
 	end
