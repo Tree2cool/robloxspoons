@@ -4,14 +4,17 @@
 -- validate(root) returns (issues, spec). `spec` is non-nil ONLY when `issues` is empty. Issues are sorted by
 -- (code, path, message) so output is deterministic. Tests assert the CODE, never the prose.
 --
--- PHASE 3 DEFERRED (D-12). This phase checks STRUCTURE only. The rules below need real geometry and belong to
--- Phase 3; add them here as new checks that run after the structural pass, each with its own stable code:
---   * walkability and standable surfaces under or beside each spot
---   * per-spot PlacementRules (height band, clearance, wall-adjacency)
---   * reachability of every spot from the seeker spawns (nav / path existence)
---   * sightlines: line-of-sight from spawns, glint-range occlusion
---   * seat winding (seats 1..9 clockwise) and each seat's look vector pointing at the TableAnchor
---   * Bounds roll: Node carries only a look vector, so a roll about it is invisible here (needs an up vector)
+-- validate(root, placement) runs two stages. The structural pass (MAP-01) checks shape. The placement stage
+-- (MAP-02, D-17 STRICT) runs only when the structural pass is clean and sends every authored default spot through
+-- the same SpoonPlacement bake and check the hider will use, so walkable footing, the per-spot rules,
+-- reachability from the seeker spawns and sightlines are all covered by real geometry, one issue per failing spot.
+-- The placement numbers arrive as a parameter: this pure zone may not require across the Rojo mount boundary (R6).
+--
+-- STILL DEFERRED (D-12), after this plan:
+--   * seat winding (seats 1..9 clockwise) and each seat's look vector pointing at the TableAnchor -- plan 03-09
+--     closes this inside Phase 3; if it is ever descoped, re-home it here rather than dropping it.
+--   * CLOSED, not deferred: the Bounds roll item. Node v2 carries an up vector, so a roll about the look axis is
+--     visible and rejected as MAP_BOUNDS_INVALID.
 local MapContract = require("./MapContract")
 local SpoonPlacement = require("./SpoonPlacement")
 

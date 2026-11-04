@@ -4,6 +4,7 @@
 -- the wrong reason) cannot pass. A final case proves every code in MapContract.ISSUE_CODES has a case here.
 local MapContract = require("../../src/server/core/MapContract")
 local MapValidator = require("../../src/server/core/MapValidator")
+local PLACEMENT = require("../../src/shared/Config/Placement")
 local Test = require("../harness/Test")
 
 type Node = MapContract.Node
@@ -27,10 +28,15 @@ local function part(name: string, x: number, y: number, z: number, tag: string?)
 	return p
 end
 
+-- The placement stage runs whenever the structural pass is clean, so the baseline has to be a world the
+-- rules accept. A 1x1x1 floor with spots floating 11 studs up would make every case in this file report a
+-- placement issue and the exact-set assertions would all fail for the wrong reason. Note that only the handful
+-- of cases which PASS the structural pass pay the bake cost -- the roughly fifty rejection cases return early
+-- at the seam (Pitfall 11), so this adds about five bakes to the suite, not fifty.
 local function validSnapshot(): Node
 	local spots: { Node } = {}
 	for i = 1, 16 do
-		table.insert(spots, part(`Spot{i}`, (i - 8) * 5, 3 + (i % 3) * 4, 10, MapContract.TAG_DEFAULT_SPOT))
+		table.insert(spots, part(`Spot{i}`, (i - 8) * 5, 0.5, 10, MapContract.TAG_DEFAULT_SPOT))
 	end
 	local seats: { Node } = {}
 	for i = 1, 9 do
@@ -38,8 +44,10 @@ local function validSnapshot(): Node
 	end
 	local bounds = part("Bounds", 0, 14, 0)
 	bounds.size = { x = 124, y = 30, z = 124 }
+	local floor = part("Floor", 0, -0.5, 0)
+	floor.size = { x = 124, y = 1, z = 124 }
 	local root = node("TestMap", "Model", {
-		node("Geometry", "Folder", { part("Floor", 0, -0.5, 0) }),
+		node("Geometry", "Folder", { floor }),
 		node("Data", "Folder", {
 			bounds,
 			part("HiderSpawn", 0, 3, 40),
@@ -78,6 +86,17 @@ local function find(root: Node, path: string): Node
 		current = nextNode
 	end
 	return current
+end
+
+-- A collidable, anchored axis-aligned block, appended to Geometry by the placement fixtures below.
+local function block(name: string, x: number, y: number, z: number, sx: number, sy: number, sz: number): Node
+	local b = part(name, x, y, z)
+	b.size = { x = sx, y = sy, z = sz }
+	return b
+end
+
+local function geometryOf(root: Node): Node
+	return find(root, "Geometry")
 end
 
 local function removeChild(parent: Node, name: string)
@@ -459,6 +478,100 @@ local cases: { Case } = {
 		end,
 	},
 	{
+		-- Floor top is y = 0 and the slab spans y in [-1, 0]; -0.5 is inside it.
+		name = "a spot inside the floor slab",
+		code = "MAP_SPOT_SOLID",
+		pathContains = "Spot1",
+		mutate = function(r)
+			find(r, "Data/DefaultSpots/Spot1").position = { x = -35, y = -0.5, z = 10 }
+		end,
+	},
+	{
+		-- y = 20, not 30: Bounds spans y in [-1, 29], so 30 would report MAP_OUT_OF_BOUNDS instead. The nearest
+		-- standable root point is at y = 2.5, so 17.5 away against PICKUP_RANGE 7.0 (10.5 studs of slack).
+		name = "a spot 20 studs above the floor",
+		code = "MAP_SPOT_NO_FOOTING",
+		pathContains = "Spot1",
+		mutate = function(r)
+			find(r, "Data/DefaultSpots/Spot1").position = { x = -35, y = 20, z = 10 }
+		end,
+	},
+	{
+		-- The floor is NOT shrunk (that would strand other spots and both spawns). At (-35, 8.75, 10) the
+		-- nearest column centre is 0.707 away horizontally and its root point is at y = 2.5, so the 3D distance
+		-- is sqrt(0.5 + 6.25^2) = 6.29: inside PICKUP_RANGE 7.0 by 0.71, outside E = 5.5 by 0.79.
+		name = "a spot 8.75 studs above the floor, past E but inside PICKUP_RANGE",
+		code = "MAP_SPOT_OUT_OF_REACH",
+		pathContains = "Spot1",
+		mutate = function(r)
+			find(r, "Data/DefaultSpots/Spot1").position = { x = -35, y = 8.75, z = 10 }
+		end,
+	},
+	{
+		-- A 10-stud cavity (x, z in [35, 45]) under a roof whose underside is at y = 12, i.e. 12 studs of
+		-- headroom against CAPSULE_HEIGHT 7. A tighter box would report NoFooting (no cell survives erosion)
+		-- instead of Unreachable. The 12-high walls exceed STEP_UP so the cavity is never connected.
+		name = "a spot inside a sealed box",
+		code = "MAP_SPOT_UNREACHABLE",
+		pathContains = "Spot1",
+		mutate = function(r)
+			local geometry = geometryOf(r)
+			table.insert(geometry.children, block("CellNorth", 40, 6, 34, 14, 12, 2))
+			table.insert(geometry.children, block("CellSouth", 40, 6, 46, 14, 12, 2))
+			table.insert(geometry.children, block("CellWest", 34, 6, 40, 2, 12, 14))
+			table.insert(geometry.children, block("CellEast", 46, 6, 40, 2, 12, 14))
+			table.insert(geometry.children, block("CellRoof", 40, 13, 40, 14, 2, 14))
+			find(r, "Data/DefaultSpots/Spot1").position = { x = 40, y = 0.5, z = 40 }
+		end,
+	},
+	{
+		-- A 6 x 6 slab, underside y = 1.5, half-width w = 3 about the spot. w must satisfy w + 1.5 < 5.123 so a
+		-- ring of surviving cells (dh in [4.5, 5.123]) remains in reach, and the underside must satisfy
+		-- 0.5 + 10.5 / 5.123 >= 1.5 so every eye point in that ring is blocked.
+		name = "a spot tucked under an overhang",
+		code = "MAP_SPOT_NO_SIGHT",
+		pathContains = "Spot1",
+		mutate = function(r)
+			table.insert(geometryOf(r).children, block("Overhang", -35, 2.5, 10, 6, 2, 6))
+		end,
+	},
+	{
+		-- A bake fault returns a NIL world, so the placement stage emits no spot issue at all: that is why this
+		-- fixture is surgical without moving any spot. y = 20 is 20 below nothing: the floor is 20 under the
+		-- spawn and SPAWN_DROP_LIMIT is 8.
+		name = "a seeker spawn with no footing",
+		code = "MAP_SPAWN_NO_FOOTING",
+		pathContains = "S1",
+		mutate = function(r)
+			find(r, "Data/SeekerSpawns/S1").position = { x = 0, y = 20, z = 0 }
+		end,
+	},
+	{
+		-- A bake fault returns a NIL world, so no spot issue can be emitted. Two 50-wide slabs with a 20-stud
+		-- gap cannot be linked by STEP_UP 1.0 at any grid resolution.
+		name = "two spawns on disconnected slabs",
+		code = "MAP_SPAWN_DISCONNECTED",
+		pathContains = "SeekerSpawns",
+		mutate = function(r)
+			local geometry = geometryOf(r)
+			geometry.children = {
+				block("SlabA", -35, -0.5, 0, 50, 1, 124),
+				block("SlabB", 35, -0.5, 0, 50, 1, 124),
+			}
+		end,
+	},
+	{
+		-- A bake fault returns a NIL world, so no spot issue can be emitted. Every spot and spawn is still inside
+		-- the enlarged bounds, so no MAP_OUT_OF_BOUNDS appears. 4000 * 4000 = 16,000,000 columns against the
+		-- 250,000 ceiling, and the bake refuses before allocating, which is why this is fast.
+		name = "a Bounds larger than the bake ceiling",
+		code = "MAP_BOUNDS_TOO_LARGE",
+		pathContains = "Bounds",
+		mutate = function(r)
+			find(r, "Data/Bounds").size = { x = 4000, y = 30, z = 4000 }
+		end,
+	},
+	{
 		name = "root that is not a Model",
 		code = "MAP_ROOT_INVALID",
 		mutate = function(r)
@@ -469,7 +582,7 @@ local cases: { Case } = {
 
 return function(t: Test.Runner)
 	t.test("a valid snapshot returns zero issues and a typed MapSpec", function()
-		local issues, spec = MapValidator.validate(validSnapshot())
+		local issues, spec = MapValidator.validate(validSnapshot(), PLACEMENT)
 		t.deepEqual(issues, {})
 		assert(spec ~= nil, "valid snapshot must yield a MapSpec")
 		t.equal(#spec.defaultSpots, 16)
@@ -494,7 +607,7 @@ return function(t: Test.Runner)
 			table.insert(reversed, seats.children[i])
 		end
 		seats.children = reversed
-		local issues, spec = MapValidator.validate(root)
+		local issues, spec = MapValidator.validate(root, PLACEMENT)
 		t.deepEqual(issues, {})
 		assert(spec ~= nil, "expected a MapSpec")
 		t.deepEqual(spec.cardTable.seats[1].position, { x = -8, y = 3, z = -40 })
@@ -502,7 +615,7 @@ return function(t: Test.Runner)
 	end)
 
 	t.test("exactly 16 tagged spots passes (the boundary is inclusive)", function()
-		local issues, spec = MapValidator.validate(validSnapshot())
+		local issues, spec = MapValidator.validate(validSnapshot(), PLACEMENT)
 		t.equal(#issues, 0)
 		t.truthy(spec ~= nil)
 	end)
@@ -510,7 +623,7 @@ return function(t: Test.Runner)
 	t.test("a DecoyAnchors folder that is empty is valid", function()
 		local root = validSnapshot()
 		find(root, "Data/DecoyAnchors").children = {}
-		local issues, spec = MapValidator.validate(root)
+		local issues, spec = MapValidator.validate(root, PLACEMENT)
 		t.deepEqual(issues, {})
 		assert(spec ~= nil, "expected a MapSpec")
 		t.equal(#spec.decoyAnchors, 0)
@@ -520,7 +633,7 @@ return function(t: Test.Runner)
 		t.test(`rejects: {case.name} -> {case.code}`, function()
 			local root = validSnapshot()
 			case.mutate(root)
-			local issues, spec = MapValidator.validate(root)
+			local issues, spec = MapValidator.validate(root, PLACEMENT)
 			t.truthy(#issues > 0, "expected at least one issue")
 			-- Assert the REASON: the only code present is the expected one. A validator that rejected the
 			-- baseline for some other reason, or rejected everything, fails here.
@@ -539,6 +652,17 @@ return function(t: Test.Runner)
 		end)
 	end
 
+	t.test("validate with no config fails loudly rather than reporting a clean map", function()
+		-- A caller that forgot the argument must fail loudly. A validator that silently ran with no
+		-- config would report a clean map it never actually checked, which is the worst failure mode
+		-- this file has. The call is on its own line on purpose: see the plan's note on the
+		-- validate-call sweep. (Do NOT spell the call out in this comment -- the sweep counts lines
+		-- holding the call text without a config, so naming it here would make the sweep return 2.)
+		t.throws(function()
+			MapValidator.validate(validSnapshot(), nil :: any)
+		end, "PlacementConfig")
+	end)
+
 	t.test("every issue code in the contract is asserted by at least one case", function()
 		local covered: { [string]: boolean } = {}
 		for _, case in cases do
@@ -553,7 +677,7 @@ return function(t: Test.Runner)
 			coveredCount += 1
 		end
 		t.equal(coveredCount, #MapContract.ISSUE_CODES)
-		t.equal(#MapContract.ISSUE_CODES, 13)
+		t.equal(#MapContract.ISSUE_CODES, 21)
 	end)
 
 	t.test("issues are sorted by code then path and identical across runs", function()
@@ -565,8 +689,8 @@ return function(t: Test.Runner)
 			table.insert(find(root, "Geometry").children, node("Evil", "Script"))
 			return root
 		end
-		local first = MapValidator.validate(broken())
-		local second = MapValidator.validate(broken())
+		local first = MapValidator.validate(broken(), PLACEMENT)
+		local second = MapValidator.validate(broken(), PLACEMENT)
 		t.deepEqual(first, second)
 		t.deepEqual(codesOf(first), { "MAP_META_INVALID", "MAP_MISSING_PART", "MAP_SCRIPT_FORBIDDEN" })
 		for i = 2, #first do
@@ -580,7 +704,7 @@ return function(t: Test.Runner)
 		root.attributes.SizeClass = "Huge"
 		removeChild(find(root, "Data/CardTable/Seats"), "Seat9")
 		find(root, "Data/SeekerSpawns").children = {}
-		local issues, spec = MapValidator.validate(root)
+		local issues, spec = MapValidator.validate(root, PLACEMENT)
 		t.deepEqual(codesOf(issues), { "MAP_META_INVALID", "MAP_SEAT_COUNT", "MAP_SPAWN_COUNT" })
 		t.equal(spec, nil)
 	end)

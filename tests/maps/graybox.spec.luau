@@ -6,9 +6,11 @@
 local fs = require("@lune/fs")
 local process = require("@lune/process")
 local roblox = require("@lune/roblox")
+local serde = require("@lune/serde")
 
 local MapContract = require("../../src/server/core/MapContract")
 local MapValidator = require("../../src/server/core/MapValidator")
+local PLACEMENT = require("../../src/shared/Config/Placement")
 local Snapshot = require("../../scripts/maps/snapshot")
 local Lex = require("../../scripts/ci/lex")
 local Test = require("../harness/Test")
@@ -172,7 +174,7 @@ return function(t: Test.Runner)
 	end)
 
 	t.test("the snapshot yields the expected MapSpec through the shared validator", function()
-		local issues, spec = MapValidator.validate(loadGrayBox())
+		local issues, spec = MapValidator.validate(loadGrayBox(), PLACEMENT)
 		t.deepEqual(issues, {})
 		assert(spec ~= nil, "gray-box must produce a MapSpec")
 		t.equal(spec.metadata.contractVersion, 2)
@@ -250,7 +252,7 @@ return function(t: Test.Runner)
 	t.test("the authored spot count carries margin above the contract minimum", function()
 		-- D-15 requires the map to carry spare so a future rule change has somewhere to go that is not the
 		-- rules. 21 against 16 is five spare; the previous 18 left zero once the real rules ran.
-		local _, spec = MapValidator.validate(loadGrayBox())
+		local _, spec = MapValidator.validate(loadGrayBox(), PLACEMENT)
 		assert(spec ~= nil, "gray-box must produce a MapSpec")
 		t.truthy(
 			#spec.defaultSpots >= MapContract.MIN_DEFAULT_SPOTS + 4,
@@ -311,7 +313,7 @@ return function(t: Test.Runner)
 		local root = loadGrayBox()
 		local seats = child(child(child(root, "Data"), "CardTable"), "Seats")
 		table.remove(seats.children, #seats.children)
-		local issues, spec = MapValidator.validate(root)
+		local issues, spec = MapValidator.validate(root, PLACEMENT)
 		t.deepEqual(codesOf(issues), { "MAP_SEAT_COUNT" })
 		t.equal(spec, nil)
 	end)
@@ -328,6 +330,37 @@ return function(t: Test.Runner)
 		t.contains(r.stdout, "MAP_SEAT_COUNT")
 		t.contains(r.stdout, "GrayBox/Data/CardTable/Seats")
 		t.falsy(string.find(r.stdout, "validate-map: ok", 1, true) ~= nil, "a broken map must not print ok")
+	end)
+
+	t.test("the CLI exits 1 and names the reason for a deliberately unfindable default spot", function()
+		-- This is ROADMAP criterion 3's first half -- "the validator fails the build on a deliberately
+		-- unfindable default spot" -- at the CLI level, over a map generated to be unfindable rather than
+		-- hand-broken. The second half, "passes the reference map with at least 16 default spots that each
+		-- survive the real placement rules", is the 21-spot case above.
+		fs.writeDir(SCRATCH)
+		local path = `{SCRATCH}/unfindable-maze.rbxm`
+		local made = process.exec("lune", {
+			"run",
+			"scripts/maps/generate-maze.luau",
+			path,
+			"--footprint",
+			"48",
+			"--levels",
+			"1",
+			"--sealed",
+			"1",
+		})
+		t.equal(made.code, 0, `generate-maze failed: {made.stderr}`)
+		local oracle = serde.decode("json", fs.readFile(`{path}.oracle.json`))
+		local sealedNames = oracle.spotsInSealed
+		t.equal(#sealedNames, 1)
+		local r = runCli(path)
+		fs.removeFile(path)
+		fs.removeFile(`{path}.oracle.json`)
+		t.equal(r.code, 1, `expected exit 1, got {r.code}`)
+		t.contains(r.stdout, "MAP_SPOT_UNREACHABLE")
+		t.contains(r.stdout, `Maze/Data/DefaultSpots/{sealedNames[1]}`)
+		t.falsy(string.find(r.stdout, "validate-map: ok", 1, true) ~= nil, "an unfindable map must not print ok")
 	end)
 
 	t.test("the CLI exits 1 and prints MAP_SCRIPT_FORBIDDEN when a Script is smuggled into Geometry", function()
