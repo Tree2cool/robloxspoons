@@ -51,6 +51,8 @@ These were open questions in the research files. They are decided.
 | Spoon skins | Enforced template (fixed bounding box, scale, pickup hitbox, luminance floor). Glint is fixed and non-purchasable. | PITFALLS C10 |
 | No-pay-to-win structure | `Scoring`, `CardTable`, `SpoonPlacement` have no import path to cosmetics/shop; lint-enforced. | PITFALLS C10 |
 | Mobile card phase | Movement controls disabled, targets >=48px, `ScreenInsets` set explicitly. | PITFALLS C13 |
+| Avatar normalisation scope (OQ-12) | **Resolved Phase 3: a canonical reference avatar (D-10).** `SpoonPlacement.check` takes no avatar argument. Residual risk is `M-09`, not an open question | Phase 3 context |
+| Phase 3 Open Question 1 (spot validity under the real rules) | **Resolved STRICT (D-17):** every authored default spot must pass, no exclusions | Phase 3 context |
 | Other | Min 3 players. Rounds = starting roster. Timing from server arrival, integer deciseconds. >=16 default spots per map. Native `TextChatService`. Native friend-join. | various |
 
 Knock-on effects the roadmapper should carry into requirements:
@@ -373,7 +375,7 @@ Safely parallel: P2 with P3; P4 with P5; P7a with P4-P6; the floating persistenc
 
 ## Verification Debt
 
-The container blocked `create.roblox.com`, `devforum.roblox.com`, `robloxapi.github.io`, `madstudioroblox.github.io` and `jsdotlua.github.io`. **First action: add those hosts to the environment's allowed domains.** GitHub release and README pages were reachable. Nothing below has been upgraded from its source confidence.
+The container blocked `create.roblox.com`, `devforum.roblox.com`, `robloxapi.github.io`, `madstudioroblox.github.io` and `jsdotlua.github.io`. **First action: add those hosts to the environment's allowed domains.** GitHub release and README pages were reachable. Nothing below has been upgraded from its source confidence. **Phase 3 re-check note (2026-11-04):** `create.roblox.com` was reachable only via `curl` on `.md` URLs (`WebFetch` failed); `madstudioroblox.github.io`, `jsdotlua.github.io` and `lune-org.github.io` remained unreachable. No confidence level was raised that could not be re-sourced.
 
 **Tooling and workflow**
 
@@ -382,7 +384,7 @@ The container blocked `create.roblox.com`, `devforum.roblox.com`, `robloxapi.git
 | V-1 | Pinned versions (Rojo 7.7.1, Rokit 1.2.0, Wally 0.3.2, Lune 0.11.1, StyLua 2.6.0, Selene 0.32.0, luau-lsp 1.70.1 / Luau 0.740, pesde 0.7.4). Years for Rojo, Rokit and Lune were inferred. Only StyLua, Selene, luau-lsp and pesde carried explicit 2026 dates. | STACK, HIGH/MEDIUM | P1: let `rokit add` resolve and pin the result |
 | V-2 | Jest-Lua runner package version; `wally-package-types` version | STACK, unverified | P1, only if Jest is used |
 | V-3 | ProfileService is "not receiving updates" (no official deprecation notice found) | STACK, MEDIUM | P1 |
-| V-4 | Jest-Lua runs only inside Roblox; Lune runs engine code and reads Roblox model files; the CI map-validation workflow built on that | STACK vs ARCH, MEDIUM / unverified | P1 spike, P3 |
+| V-4 | Jest-Lua runs only inside Roblox; Lune runs engine code and reads Roblox model files; the CI map-validation workflow built on that | STACK vs ARCH, MEDIUM / unverified. **Phase 3 (2026-11-04): ANSWERED by a spike and independently re-verified by the orchestrator. HIGH for what was tested.** Under Lune 0.11.1 `CanCollide`, `CFrame.UpVector` and `CFrame.RightVector` all read correctly from a deserialized Part; only the derived `Position` fails (assumption A5). `Part.Shape` reads but a `Ball` Part still has className `"Part"`. The graybox Ramp reads `UpVector = (0.421, 0.907, 0)`, `acos(0.907) = 24.90 deg`, the true angle, and plan 03-01's graybox case asserts it every CI run. D-02 and D-03 needed no workaround. Not re-sourced from primary docs (`lune-org.github.io` unreachable); the evidence is behavioural | P1 spike, P3 (done) |
 | V-5 | Chrrxs MCP tool list and pin; official Studio MCP "cannot screenshot" may be stale after the Aug 2026 update | STACK, MEDIUM | P1 |
 | V-6 | Rojo `$ignoreUnknownInstances` behaviour on Workspace | STACK, MEDIUM, not re-verified | P1 |
 | V-7 | Open Cloud Luau Execution rate limits (docs conflicted, 5/min vs 45/min) | STACK, unverified | Only if CI test execution is adopted |
@@ -415,10 +417,10 @@ The container blocked `create.roblox.com`, `devforum.roblox.com`, `robloxapi.git
 
 | ID | Claim | Source and stated confidence | Re-check at |
 |----|-------|------------------------------|-------------|
-| V-17 | `PathfindingService:ComputeAsync` limitations (agent params, vertical placement, async) | ARCH, MEDIUM-HIGH | P3 |
-| V-18 | `FindPartOnRay` legacy; use `Workspace:Raycast` | ARCH, MEDIUM | P3 |
-| V-19 | Server-set character scale via `HumanoidDescription`; effect on reach and camera height | PITFALLS, training | P3 |
-| V-20 | `StreamingEnabled` interactions with client raycasts for placement preview | PITFALLS/ARCH, training | P3 |
+| V-17 | `PathfindingService:ComputeAsync` limitations (agent params, vertical placement, async) | ARCH, MEDIUM-HIGH. **Phase 3: RETIRED for this phase by D-05; no `PathfindingService` is used.** Its documented defaults (`AgentRadius` 2, `AgentHeight` 5) served only as a cross-check on the capsule sizing. Still relevant to Phase 5's hunt if it ever pathfinds | P3 (retired) |
+| V-18 | `FindPartOnRay` legacy; use `Workspace:Raycast` | ARCH, MEDIUM. **Phase 3: RETIRED for this phase by D-01 (the rules use no Roblox raycast). OPEN AGAINST PHASE 5, more sharply than before: `RaycastParams.RespectCanCollide` defaults to `false`, the OPPOSITE of D-03's model.** Phase 5's line-of-sight raycast must set it `true`, or CI and the live game will disagree about what blocks sight and a validated spot can hide a spoon in play. Confidence in the default: HIGH (read from `create.roblox.com` via `curl` on `.md` URLs) | P3 (retired), **P5 (OPEN)** |
+| V-19 | Server-set character scale via `HumanoidDescription`; effect on reach and camera height | PITFALLS, training. **Phase 3: PARTLY CONFIRMED, MEDIUM / LOW, unchanged and not upgraded.** The `HumanoidDescription` scale mapping, the HipHeight formula and classic proportions came from primary docs (MEDIUM). **Per-axis scale limits, the R15 default HipHeight and any camera-height formula were NOT found**; the 90-105% height / 70-100% width figures came from a web-search summary (LOW). D-10's canonical capsule makes placement validity scale-independent by construction (arity lock, gate 6), but whether the capsule bounds real avatars is unverified: D-11's bias toward rejecting is the mitigation, not a verification. Human gate: `M-09` (unsigned, not blocking Phase 3). No confidence raised because the primary source could not be re-fetched | P3 (partly), M-09 |
+| V-20 | `StreamingEnabled` interactions with client raycasts for placement preview | PITFALLS/ARCH, training. **Phase 3: deferral to Phase 6 confirmed sound; MEDIUM-HIGH.** This phase's rules run over a snapshot of `ServerStorage.Maps[mapId]`, never Workspace, so they have no streaming dependence. The client-preview question stays with Phase 6 | P3 (deferral confirmed), P6 |
 | V-21 | `PhysicsService` collision-group setup for player-player collisions off | PITFALLS, training | P5 |
 | V-22 | **Client-created `ProximityPrompt` or button works as the sole pickup affordance on a local-only visual** (STACK assumed a server `ProximityPrompt`, which PROJECT.md now forbids) | PITFALLS/STACK, unverified | P5 |
 | V-23 | Server-known `HumanoidRootPart` position lags client-owned characters; slack of a few studs suffices | ARCH, LOW | P5, P8 |
