@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 3 planned (11 plans, 8 waves, plan-check PASSED); ready to execute
+stopped_at: Phase 3 waves 1-7 EXECUTED (10/11 plans, Gate G2 PASSED with debt); wave 8 is the owner Studio checkpoint
 last_updated: "2026-11-04T05:02:35.909Z"
 last_activity: 2026-11-04
 progress:
@@ -369,13 +369,26 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-11-04
-Stopped at: Phase 3 PLANNED — 11 plans in 8 waves, plan-check PASSED on the third pass
+Stopped at: Phase 3 waves 1-7 executed — 10 of 11 plans complete, Gate G2 PASSED with named debt; wave 8 (03-11) awaits the owner in Studio
 Resume file: .planning/phases/03-placement-rules-map-pipeline-and-validator/03-CONTEXT.md
 
-**Next:** `/gsd-execute-phase 3` (autonomous `--only 3` is mid-run; discuss, research and plan are
-all complete). Planning artifacts: 03-CONTEXT, 03-RESEARCH, 03-VALIDATION, 03-PATTERNS and
-03-01..03-11-PLAN. Wave 8 (plan 03-11) is a **non-autonomous owner checkpoint** — Gate G2 sign-off
-plus MANUAL-CHECKS M-08 and the new M-10, both in one Studio session. 03-CONTEXT.md carries 20 owner decisions and 03-RESEARCH.md carries the
+**Next: TWO OWNER ACTIONS, both blocking Phase 3's close.** Everything automatable is done.
+
+1. **The Studio session (plan 03-11, non-autonomous).** Four manual checks now sit unsigned, and
+   three of them are Phase 3's: **M-08** (the place's `CharacterMaxSlopeAngle` is at least 30),
+   **M-09** (the reference capsule covers real avatars at the scale extremes — the human gate under
+   V-19, the phase's one genuinely soft claim), and **M-10** (the v2 21-spot graybox loads through
+   `MapLoader` and validates in Studio — the only check that closes gate 8's value-level parity gap,
+   which no CI arrangement can). M-07 is Phase 2's and is unaffected. All three can be done in one
+   session.
+2. **The CI suite timing decision.** 15.94s baseline -> ~25-26s at Phase 2 close (accepted) -> now
+   **29.9s**, with the whole `verify.luau` chain at **32.6s**. Deliberately NOT recorded as
+   accepted, and `03-VALIDATION.md`'s "Feedback latency < 30s" box is left unticked with the reason
+   beside it. The owner has not been asked. Accept or trim.
+
+**Measured state at wave 7:** 657 tests passed / 0 failed / 0 todo, `verify.luau` 14/14 (exit 0),
+23 issue codes, graybox 21 authored spots all passing under STRICT with five spare over the 16
+minimum. Evidence: `03-G2-REPORT.md`. 03-CONTEXT.md carries 20 owner decisions and 03-RESEARCH.md carries the
 measured number ladder. The Verification Debt re-check is DONE: V-17 and V-18 retired for this
 phase by D-05/D-01, V-20 deferred to Phase 6, V-4 answered by a Lune 0.11.1 spike and
 independently re-verified, V-19 only partly primary-sourced (per-axis avatar scale limits remain
