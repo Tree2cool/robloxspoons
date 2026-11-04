@@ -103,7 +103,11 @@ do
 		if value == nil then
 			fail(`generate-maze: --{key} needs a number\n{USAGE}`)
 		end
-		dials[key] = value
+		-- `fail` is typed `never`, but Luau does not narrow `key`/`value` through the call, so
+		-- restate the invariant the two checks above have already enforced. Caught by the
+		-- repo-wide standard-platform typecheck after merge: a worktree agent cannot run it,
+		-- because the `--ignore "**/fixtures/**"` glob is refused there.
+		dials[key :: string] = value :: number
 		i += 2
 	end
 end
