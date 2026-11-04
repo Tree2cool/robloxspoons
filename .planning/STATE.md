@@ -207,6 +207,31 @@ rows below (Phases 5, 6 and 7) are untouched and still open.
 | **Phase 7 (before authoring any cosmetics module)** | `FOUND-05` is a **filename deny-list** and the verifier confirmed it can be made vacuous by naming alone: `Scoring.luau` importing `Wardrobe.luau` leaves `check-guards` green. This is inside the guard's declared threat model (accident and drift), not outside it, but the no-pay-to-win rule is Non-Negotiable Rule 1. Require cosmetics/shop code under `cosmetics/` and `shop/` directories (path-segment matching already supports it), or invert R2 to an import allow-list. |
 | **Phase 7 (start, and before any real DataStore write)** | Re-run M-04 check 2. FOUND-07's enforcing control is a Creator Hub toggle **outside the repo**; Phase 1 proved empirically it can be wrong while all 14 gates are green, and nothing in the repo can detect it being flipped back. Also close M-04 check 3 before the first real write. |
 
+### Phase 3 execution findings (recorded as they are measured, not at phase close)
+
+- **At the shipped `GRID_SIZE = 1.0` the slope-allowance erosion is INERT for the graybox ramp**
+  (plan 03-04, measured). Research called slope-allowance erosion "the non-obvious part" of the
+  walkable-grid pattern, but the plan's own test for it **could not detect its removal**: the
+  mutation produced no FAIL line at all, because at g=1 with `CAPSULE_RADIUS 1.5` the erosion
+  window reaches only one cell, so the rise it sees is 0.466 and the allowance never binds. The
+  executor added a discriminating pair at `GRID_SIZE 0.5` (step 0.5 connects, step 0.2
+  disconnects) which DOES go red under the mutation, and kept the plan's original pair labelled
+  non-discriminating. **The machinery is correct and tested, but it is not load-bearing at the
+  configuration that ships** — so do not cite it as a reason the ramp connects. Carry into
+  03-10's debt section.
+- **"Corridor width 3 erodes to nothing" holds only when the faces sit on lattice centre lines**
+  (plan 03-04). A width-3 gap otherwise spans three centres. The maze fixture aligns deliberately
+  and documents it; the authoring rule `width >= 2 * capsuleRadius + gridSize` is **sufficient,
+  not exact**. Plan 03-07's maze oracle depends on this.
+- **CI suite timing, tracked per wave:** Phase 1 baseline 15.94s -> Phase 2 close ~25-26s
+  (owner-accepted departure) -> wave 1 **26.7s** -> wave 2 **29.6s**. Five waves remain and D-09's
+  bake cap is additional. This needs an explicit owner decision before phase close rather than a
+  silent second overshoot.
+- **Orchestrator error, recorded for honesty:** the wave-2 executor was handed a fabricated full
+  commit hash (short `51f76b8` was known; the remaining characters were invented). The agent
+  detected the mismatch, verified HEAD was the correct commit and proceeded safely. Later waves
+  use `git rev-parse HEAD` output verbatim.
+
 ### Blockers/Concerns
 
 - **RESOLVED (Phase 2):** the former card-engine blocking entry is gone. CARD-09 (deal-time four-of-a-kind)
