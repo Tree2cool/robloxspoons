@@ -79,9 +79,18 @@
 -- report prints a bar-sensitivity table so plan 02-11 can see which pool every candidate bar would
 -- have selected.
 --
--- WHAT IS AND IS NOT CLAIMED. The honest claim this file's report makes is "zero observed stalls
--- for the selected pool at the confirmed round count", with the measured residual printed rather
--- than rounded away. Nothing here claims the engine cannot stall.
+-- WHAT IS AND IS NOT CLAIMED. The honest claim this file's report makes is about the SELECTED
+-- pool at the confirmed round count, with the measured residual printed rather than rounded away.
+-- Nothing here claims the engine cannot stall.
+--
+-- The headline sentence is DATA-DRIVEN and must stay that way. It was once the hardcoded literal
+-- "zero observed stalls for the selected pool", which is true only while no gated round stalls.
+-- Plan 02-14's real run at 10,000 rounds per cell observed 14 stalled rounds in 320,000, so the
+-- literal printed "zero observed stalls" immediately before printing a non-zero measured residual
+-- in the same sentence - the report contradicting itself in the one sentence that most needs to be
+-- precise, and the one the threat register calls an overstated headline claim. The round count the
+-- rehearsal used could not reach the residual, which is exactly why a claim must be rendered from
+-- the count rather than asserted beside it.
 local fs = require("@lune/fs")
 local process = require("@lune/process")
 local serde = require("@lune/serde")
@@ -1137,10 +1146,22 @@ local function renderReport(
 			line(`| valve firing rate | {pct(valve)} | <= {pct(VALVE_RATE_MAX_SWEEP)} | <= {pct(MARGIN_VALVE_RATE)} |`)
 			line("")
 			local pass = gatedPass == true and mechanismPass == true
+			-- Rendered from the COUNT, never asserted beside it. See the header note.
+			local stalledRounds, gatedRounds = 0, 0
+			for _, r in gated do
+				stalledRounds += #r.failingSeeds
+				gatedRounds += r.rounds
+			end
+			local aggregate = if gatedRounds > 0 then stalledRounds / gatedRounds else 0
+			local observed = if stalledRounds == 0
+				then `**zero stalled rounds observed for the selected pool in {gatedRounds} gated rounds** `
+					.. `at {roundsPerCell.confirm or 0} rounds per cell`
+				else `**{stalledRounds} stalled round(s) observed for the selected pool in {gatedRounds} gated rounds** `
+					.. `at {roundsPerCell.confirm or 0} rounds per cell - {pct(aggregate)} aggregate, `
+					.. `worst cell {pct(stall)}`
 			line(
 				`**G1: {if pass then "PASSES" else "DOES NOT PASS"}** on this evidence - `
-					.. `**zero observed stalls for the selected pool at {roundsPerCell.confirm or 0} rounds per cell**, `
-					.. `measured residual {pct(stall)} against a {pct(STALL_RATE_MAX)} ceiling. `
+					.. `{observed}, against a {pct(STALL_RATE_MAX)} ceiling. `
 					.. "That is the claim, in its honest form: a measured property of a SELECTED configuration, "
 					.. "never an unconditional property of the engine. The measured residual is printed above "
 					.. "rather than rounded away, and section 4b says whether it was a cap artefact or a real one."
@@ -1286,13 +1307,90 @@ local function renderReport(
 	line("valve failed to break the cycle or never saw it.")
 	line("")
 	line("**Bar-sensitivity ladder.** The firing-rate bar is a judgement on a smooth monotone curve,")
-	line("so here is the pool every candidate bar would have selected, measured from this run's own")
-	line("search grid. The selected bar is marked.")
+	line("so here is what every candidate bar would have done, measured from this run's own search")
+	line("grid. The bar this run used is marked.")
+	line("")
+	line("TWO ladders, because they do not agree and the difference is the whole argument. The first")
+	line("applies the FULL selection rule at each candidate bar - including the pool-level margin")
+	line("correction, which demands a worst-case firing rate of at most HALF the bar - so it is the")
+	line("pool each bar would actually SELECT. The second is the pool each bar would merely ADMIT on")
+	line("a bare pass. At 7% they differ: the bar admits k=3 and selects k=6. A ladder showing only")
+	line("the second would contradict this report's own verdict one section above it.")
 	line("")
 	local candidates: { Candidate } = if selection ~= nil then selection.candidates else {}
 	if #candidates == 0 then
 		line("No search grid in this invocation, so no ladder.")
 	else
+		-- The full rule at an arbitrary bar. `failures` and `marginShortfalls` are recomputed only
+		-- for the valve-rate term, because that is the only bar being varied; every other bar keeps
+		-- the threshold it was evaluated at.
+		local function without(list: { string }, name: string): number
+			local n = 0
+			for _, v in list do
+				if v ~= name then
+					n += 1
+				end
+			end
+			return n
+		end
+		local function eligible(c: Candidate): boolean
+			return c.k >= K_FLOOR and c.j >= J_FLOOR and c.autoPassSeconds ~= nil
+		end
+		local function bestAt(bar: number, margin: boolean): Candidate?
+			local chosen: Candidate? = nil
+			for _, c in candidates do
+				if not eligible(c) then
+					continue
+				end
+				if without(c.failures, "valve-rate") > 0 or c.worstValveFiringRate > bar then
+					continue
+				end
+				if margin and (without(c.marginShortfalls, "valve-rate") > 0 or c.worstValveFiringRate > bar / 2) then
+					continue
+				end
+				local best = chosen
+				if
+					best == nil
+					or c.k < best.k
+					or (c.k == best.k and c.j < best.j)
+					or (
+						c.k == best.k
+						and c.j == best.j
+						and (c.autoPassSeconds :: number) > (best.autoPassSeconds :: number)
+					)
+				then
+					chosen = c
+				end
+			end
+			return chosen
+		end
+		line(
+			"| candidate bar | pool it SELECTS | marginal | worst firing rate | worst stall rate | min occupancy | worst median first | worst p95 first |"
+		)
+		line("|---|---|---|---|---|---|---|---|")
+		for _, bar in VALVE_RATE_LADDER do
+			local marker = if bar == VALVE_RATE_MAX_SWEEP then " **<- the bar this run used**" else ""
+			local c, marginal = bestAt(bar, true), false
+			if c == nil then
+				c, marginal = bestAt(bar, false), true
+			end
+			if c == nil then
+				line(`| {pct(bar)} | none in the searched grid | - | - | - | - | - | - |{marker}`)
+			else
+				line(
+					`| {pct(bar)} | k={c.k}, j={c.j}, {f1(c.autoPassSeconds)}s deadline | {tostring(marginal)} | `
+						.. `{pct(c.worstValveFiringRate)} | {pct(c.worstStallRate)} | {f3(c.worstOccupancy)} | `
+						.. `{f1(c.worstMedianFirst)}s | {f1(c.worstP95First)}s |{marker}`
+				)
+			end
+		end
+		line("")
+		line("The stall, occupancy and pacing columns above are the SEARCH grid's 1,000-round cells,")
+		line("so a single stalled round there reads as 0.100%; only the selected pool was confirmed at")
+		line("10,000 rounds. Read them as the shape of the trade, not as a residual measurement.")
+		line("")
+		line("And the same ladder on a bare pass, with no margin, for contrast:")
+		line("")
 		line("| candidate bar | smallest pool whose worst cell clears it | worst firing rate there |")
 		line("|---|---|---|")
 		for _, bar in VALVE_RATE_LADDER do
