@@ -3,8 +3,10 @@
 Phase 1 produced everything the automated chain can verify. These nine checks need Roblox Studio, the Creator
 Hub or a real playtest, which the build container does not have. Each check is owned by the phase that raised it:
 M-01 to M-06 belong to Phase 1 (**Phase 1 closes only when those boxes are ticked**), M-07 to Phase 2's pacing
-claim, and M-08 and M-09 to Phase 3's placement constants. Phase 3's closure depends on M-08 but not on M-09,
-which needs a full-roster playtest that does not exist yet. Silence is
+claim, and M-08, M-09 and M-10 to Phase 3. M-08 and M-09 check placement constants; M-10 is different in kind: it is
+the only check covering a gap CI cannot close (runtime versus CI snapshot values), not a check on an out-of-repo
+setting. Phase 3's closure depends on M-08 and M-10 but not on M-09, which needs a full-roster playtest that does not
+exist yet. Silence is
 not success: `lune run scripts/verify.luau` prints every unticked check after a green run.
 
 How to use this file:
@@ -382,3 +384,32 @@ the reach direction and `REACH_HEIGHT` must come down.
 Observed: _
 
 - [ ] M-09 signed off: <name> <date>   (Phase 4/6 full-roster playtest; not blocking Phase 3)
+
+---
+
+## M-10 (MAP-02 / D-02) The v2 reference map loads through MapLoader and validates in Studio
+
+**Why manual:** this is the only check that can observe **value-level** parity between the two snapshotters.
+`MapLoader` reads a live `ServerStorage.Maps.GrayBox` tree through Roblox APIs and cannot run under Lune, so CI can
+compare the two snapshotters' **key sets** (gate 8) but never the values they emit from the same input. The structural
+limit is real; this is the gate that covers it. It also re-runs M-06 against the ContractVersion 2, 21-spot map, since
+M-06 was signed against the version 1, 18-spot map.
+
+Steps: build and open the place (`mkdir -p build && rojo build default.project.json -o build/spoons.rbxl`), Play, and
+watch the Output window. Then, in the Explorer: confirm `ServerStorage.Maps.GrayBox` exists with `Geometry` and `Data`;
+confirm only `Geometry` was cloned into `Workspace` (`Data` and `GrayBox` must be **absent** there, the anti-ESP
+property M-06's note records as never having been eyeballed); and in View > Tag Editor confirm the `SpoonDefaultSpot`
+visualiser lists **21** tagged parts.
+
+**Expected:** `[Spoons] map loaded: GrayBox` with **no** error from `MapValidator`. `MapLoader` runs the same
+`MapValidator.validate` over its **own** snapshot of the live tree, against the same `Config.Placement` values, so a
+value-level disagreement between the two snapshotters large enough to change any verdict surfaces here as a validation
+failure naming an issue code, immediately and loudly, rather than as a map that is subtly different in play. A silent,
+clean load is the evidence.
+
+**Blocking: yes for Phase 3's close.** It is the same Studio session as M-08, so it costs nothing extra, and the thing
+it covers is the one named structural gap in the phase's evidence.
+
+Observed: _
+
+- [ ] M-10 signed off: <name> <date>   (Studio; blocking Phase 3)
