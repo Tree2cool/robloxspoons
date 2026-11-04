@@ -118,6 +118,45 @@
 -- anything fire: at 5s the auto-pass fires essentially never (measured 0 auto-passes in 6,000
 -- gated rounds), and that is correct now that the engine's valve carries the zero-stall job. Plan
 -- 02-10's sweep decides the shipped values and plan 02-11 updates these constants if they differ.
+--
+-- =============================================================================================
+-- WHAT PLAN 02-11 CHANGED: THE GATED CELLS NOW RUN THE SHIPPED CONFIGURATION
+-- =============================================================================================
+-- Gate G1 closed on `k = 3, j = 1`, an 8.0s auto-pass deadline and the valve ON
+-- (`.planning/phases/02-card-engine-and-pacing-simulator/02-G1-REPORT.md` section 1), so the GATED
+-- cells are built from `src/shared/Config/CardPool.luau` instead of from the provisional reference
+-- pool above. Everything in the analysis above was measured at the PROVISIONAL k=2, j=1 pool and is
+-- left standing, because it is the measurement that drove amendment A8 and it is still the reason
+-- two of the five bars are not CI-resolvable.
+--
+-- WHAT MOVED AND WHAT DID NOT. Only the gated cells read `CardPool`. The auto-pass probe, the
+-- `Livelock` fixture, the hand-built `CellResult` tables in the mutation cases and the sabotage,
+-- dead-pool, roster-shortfall and occupancy diagnostics all stay at the pool and deadline plan 02-09
+-- measured them at: they are mutation EVIDENCE, and pointing them at `CardPool` would make them
+-- follow the very thing they exist to falsify. Their sample sizes are calibrated against measured
+-- effect sizes at k=2, j=1 -- the 77%-of-churned-rounds sabotage rate, the 0.216 bad-pool firing rate,
+-- the k=0 j=1 occupancy floor -- and a silent re-pointing would invalidate that arithmetic while
+-- staying green. Hence `DIAGNOSTIC_K` / `DIAGNOSTIC_J` / `DIAGNOSTIC_AUTO_PASS_SECONDS` below, named
+-- for what they are.
+--
+-- BOTH JOKER MODES STAY IN THE GATED LOOP regardless of `CardPool.JOKER_MODE`. CARD-12's promise is
+-- that both variants are under test from the start, and research 3.5 showed a flag exercised in only
+-- one position is not a fallback but an untested rewrite.
+--
+-- MEASURED AT THE SHIPPED POOL (report section 3, 10,000 rounds per cell, N=10): the valve fires in
+-- 3.59%-8.24% of rounds, against 10.8%-15.1% at the provisional pool, so the N=10 firing-rate
+-- assertion in case 1 still holds with two orders of margin against `VALVE_RATE_MAX = 0.01` and the
+-- `CI_UNRESOLVABLE` exemption is still earned rather than assumed. The residual stall rate at the
+-- shipped pool is 0.012% aggregate and 0.070% in the worst confirm cell, comfortably inside
+-- `CI_RESIDUAL_STALL_MAX`. At 8.0s the auto-pass fired ZERO times in the sweep's 8.0s cells, so the
+-- gated cells are quieter than they were at 5.0s and the probe carries the mechanism proof alone.
+--
+-- MEASURED TIME AFTER THIS EDIT, beside plan 02-09's, because that delta is the only way to tell a
+-- slow machine from a regression -- see the SUMMARY of plan 02-11 for the arithmetic. No case added
+-- a single simulated round: the shipped-configuration case asserts EQUALITY against the cells case 1
+-- already ran, which is strictly stronger than a second run of them (a duplicate run only proves the
+-- shipped pool passes; the equality proves the pool the GATE ran is the shipped one).
+local CardPool = require("../../src/shared/Config/CardPool")
 local Engine = require("../../src/server/engine/Engine")
 local Invariants = require("../../src/server/engine/Invariants")
 local Livelock = require("../harness/Livelock")
@@ -126,11 +165,18 @@ local Simulator = require("../../scripts/sim/Simulator")
 local Test = require("../harness/Test")
 local Types = require("../../src/server/engine/Types")
 
--- The provisional reference pool and the rung.
-local REFERENCE_K = 2
-local REFERENCE_J = 1
+-- THE SHIPPED CONFIGURATION. Read from the module that records Gate G1's decision rather than
+-- restated here, so the gate cannot be green for a configuration that is not the one that ships.
+local SHIPPED_K = CardPool.EXTRA_RANKS
+local SHIPPED_J = CardPool.JOKERS
+local SHIPPED_AUTO_PASS_SECONDS = CardPool.AUTO_PASS_MAX_SECONDS
+
+-- THE DIAGNOSTIC POOL: the provisional k=2, j=1 at a 5.0s deadline, kept DELIBERATELY for the
+-- mutation and diagnostic cells only (see the header note). Never used by a gated cell.
+local DIAGNOSTIC_K = 2
+local DIAGNOSTIC_J = 1
 local roundsPerCell = 500
-local AUTO_PASS_SECONDS = 5.0
+local DIAGNOSTIC_AUTO_PASS_SECONDS = 5.0
 local RUNG = 2
 local RUNG_PLAYER_COUNTS = { 3, 6, 10 }
 local RUNG_GATED_CELLS = 12 -- 3 roster sizes x 2 joker modes x 2 churn settings, a full cross product
@@ -172,13 +218,23 @@ local function cellOpts(
 		config = config,
 		seed = seed,
 		mode = "Pacing",
-		autoPassSeconds = AUTO_PASS_SECONDS,
+		autoPassSeconds = DIAGNOSTIC_AUTO_PASS_SECONDS,
 		churn = churn,
 		churnLeavers = nil,
 		sabotage = "None",
 		identityCheck = IDENTITY_CHECK,
 		actionCap = nil,
 	}
+end
+
+-- A GATED cell's options: the shipped pool and the shipped deadline, both read from `CardPool`. The
+-- deadline is overridden on the way out rather than threaded through `cellOpts`, which is the same
+-- idiom the auto-pass probe uses for its 1.0s override -- and it keeps `cellOpts` a single place
+-- where a `SimOpts` is shaped.
+local function gatedOpts(n: number, mode: Types.JokerMode, churn: boolean, seed: number): Simulator.SimOpts
+	local opts = cellOpts(n, SHIPPED_K, SHIPPED_J, mode, churn, seed)
+	opts.autoPassSeconds = SHIPPED_AUTO_PASS_SECONDS
+	return opts
 end
 
 -- --------------------------------------------------------------------------------------------
@@ -298,10 +354,7 @@ local function gatedCells(): { Simulator.CellResult }
 				-- widened element no longer satisfies `JokerMode` (the same note sits in
 				-- tests/engine/apply.spec.luau).
 				local typed: Types.JokerMode = if mode == "Blocker" then "Blocker" else "Wild"
-				table.insert(
-					cells,
-					Simulator.runCell(cellOpts(n, REFERENCE_K, REFERENCE_J, typed, churn, seed), roundsPerCell, "gated")
-				)
+				table.insert(cells, Simulator.runCell(gatedOpts(n, typed, churn, seed), roundsPerCell, "gated"))
 				seed += 100000
 			end
 		end
@@ -322,7 +375,7 @@ local function probeCell(): Simulator.CellResult
 	if cached ~= nil then
 		return cached
 	end
-	local opts = cellOpts(10, REFERENCE_K, REFERENCE_J, "Wild", false, 31000)
+	local opts = cellOpts(10, DIAGNOSTIC_K, DIAGNOSTIC_J, "Wild", false, 31000)
 	opts.autoPassSeconds = 1.0
 	local built = Simulator.runCell(opts, 200, "autopass-probe")
 	cachedProbe = built
@@ -353,7 +406,7 @@ local function sabotageCell(): Simulator.CellResult
 	if cached ~= nil then
 		return cached
 	end
-	local opts = cellOpts(10, REFERENCE_K, REFERENCE_J, "Wild", true, 41000)
+	local opts = cellOpts(10, DIAGNOSTIC_K, DIAGNOSTIC_J, "Wild", true, 41000)
 	opts.sabotage = "DestroyRemovedCards"
 	local built = Simulator.runCell(opts, SABOTAGE_ROUNDS, "diagnostic")
 	cachedSabotage = built
@@ -372,7 +425,7 @@ end
 
 local function handCell(role: Simulator.CellRole, valve: boolean, mode: Types.JokerMode): Simulator.CellResult
 	local config: Types.EngineConfig =
-		{ ranks = 9 + REFERENCE_K, jokers = REFERENCE_J, jokerMode = mode, antiLivelockValve = valve }
+		{ ranks = 9 + DIAGNOSTIC_K, jokers = DIAGNOSTIC_J, jokerMode = mode, antiLivelockValve = valve }
 	return {
 		rounds = 500,
 		outcomes = {
@@ -408,10 +461,10 @@ local function handCell(role: Simulator.CellRole, valve: boolean, mode: Types.Jo
 		failingSeeds = {},
 		config = config,
 		n = 10,
-		k = REFERENCE_K,
-		j = REFERENCE_J,
+		k = DIAGNOSTIC_K,
+		j = DIAGNOSTIC_J,
 		jokerMode = mode,
-		autoPassSeconds = AUTO_PASS_SECONDS,
+		autoPassSeconds = DIAGNOSTIC_AUTO_PASS_SECONDS,
 		role = role,
 	}
 end
@@ -459,16 +512,17 @@ return function(t: Test.Runner)
 				`n={cell.n} {cell.jokerMode}: stallRate {cell.stallRate} exceeds the 500-round residual ceiling `
 					.. `{CI_RESIDUAL_STALL_MAX}; seeds {table.concat(cell.failingSeeds, ",")}`
 			)
-			-- THE FINDING, GATED. At N=10 the measured firing rate is 10.8-15.1% against a 1% bar,
-			-- so asserting it EXCEEDS the bar is what makes the `CI_UNRESOLVABLE` exemption above
-			-- earned rather than assumed. If a later engine or pool change ever brings the rate
-			-- under the bar, THIS assertion fails and whoever sees it deletes the exemption --
-			-- which is the only honest way to carry a known-unmet bar in a green suite.
+			-- THE FINDING, GATED. At N=10 the measured firing rate is 3.59-8.24% at the SHIPPED
+			-- pool (10.8-15.1% at the provisional one) against a 1% bar, so asserting it EXCEEDS
+			-- the bar is what makes the `CI_UNRESOLVABLE` exemption above earned rather than
+			-- assumed. If a later engine or pool change ever brings the rate under the bar, THIS
+			-- assertion fails and whoever sees it deletes the exemption -- the only honest way to
+			-- carry a known-unmet bar in a green suite.
 			if cell.n == 10 then
 				t.truthy(
 					cell.valveFiringRate > Simulator.VALVE_RATE_MAX,
 					`n=10 {cell.jokerMode}: valveFiringRate {cell.valveFiringRate} no longer exceeds VALVE_RATE_MAX `
-						.. `{Simulator.VALVE_RATE_MAX}; the reference pool may now clear the bar, so re-read the header`
+						.. `{Simulator.VALVE_RATE_MAX}; the shipped pool may now clear the bar, so re-read the header`
 				)
 			end
 			worstValveRate = math.max(worstValveRate, cell.valveFiringRate)
@@ -503,12 +557,12 @@ return function(t: Test.Runner)
 		for _, cell in cells do
 			t.equal(cell.rounds, roundsPerCell)
 			t.equal(cell.role, "gated")
-			t.equal(cell.k, REFERENCE_K)
-			t.equal(cell.j, REFERENCE_J)
-			-- Spelled out rather than only compared against the constant, so the gated deadline is
-			-- visible in the spec: `autoPassSeconds = 5.0` is a REALISTIC AFK pass deadline, chosen
-			-- because it is plausible and not because it makes anything fire.
-			t.equal(cell.autoPassSeconds, AUTO_PASS_SECONDS, "the gated cells run autoPassSeconds = 5.0")
+			t.equal(cell.k, SHIPPED_K)
+			t.equal(cell.j, SHIPPED_J)
+			-- The gated deadline is the SHIPPED one, which Gate G1 selected as a product value once the
+			-- valve took over the stall job: at 8.0s the auto-pass fires essentially never, and that is
+			-- correct rather than a defect -- the 1.0s probe cell carries its mechanism proof instead.
+			t.equal(cell.autoPassSeconds, SHIPPED_AUTO_PASS_SECONDS, "the gated cells run the shipped deadline")
 			t.truthy(cell.config.antiLivelockValve, "a gated cell runs the SHIPPED valve position")
 			total += cell.rounds
 		end
@@ -521,6 +575,88 @@ return function(t: Test.Runner)
 		local fx = fixture()
 		t.equal(fx.evidence.deterministicFiringProven, fx.firingAction ~= nil and fx.completedAction ~= nil)
 		t.equal(fx.evidence.deterministicTwinProven, fx.twinFirings == 0 and fx.twinCompletions == 0)
+	end)
+
+	-- 2b -------------------------------------------------------------------------------------
+	t.test("the shipped configuration IS the configuration the gate ran", function()
+		-- THE REGRESSION GATE ON GATE G1, and the reason the decision lives in a module rather than in
+		-- a markdown table. It asserts EQUALITY against the cells case 1 already ran and adds ZERO
+		-- simulated rounds: re-running the gated set under a second name would cost another 6,000
+		-- rounds at the shipped pool -- more than the whole gated set -- for no new information, and it
+		-- would blow plan 02-09's derived 8.0s budget by itself. It is also STRICTLY STRONGER than a
+		-- duplicate run: a duplicate only proves the shipped pool passes, while the equality proves the
+		-- pool the GATE ran is the shipped one.
+		--
+		-- WHAT EACH HALF OF THIS CASE CAN AND CANNOT CATCH, stated because the house standard is that a
+		-- check is not trusted until it has been made to fail. The gated cells are BUILT from
+		-- `CardPool`, so the k / j / deadline equalities below cannot fail on a change to `CardPool`
+		-- alone -- they follow it, and case 1's bars are then what judge the new pool. What they DO
+		-- catch is a construction path that stops reading the module: hardcoding `k = 2` and a 5.0s
+		-- deadline back into `gatedOpts` makes this case report
+		-- `n=3 Wild: gated k is not CardPool.EXTRA_RANKS (expected 3, got 2)`, which is the regression
+		-- that would otherwise leave a green gate measuring a pool nobody ships. The OTHER drift --
+		-- `CardPool` disagreeing with the committed evidence -- is not detectable from here at all, and
+		-- is owned by `tests/engine/spec_lock.spec.luau`'s CARD-12 case, which reads 02-G1-REPORT.md.
+		-- The valve and selection-rule assertions at the bottom DO fail on a `CardPool` mutation; both
+		-- were proven to (see 02-11-SUMMARY.md).
+		local cells = gatedCells()
+		t.truthy(gatedCells() == cells, "the gated cells are memoised, so this case simulated nothing")
+		t.equal(#cells, RUNG_GATED_CELLS, "and it is asserting over the whole gated set")
+
+		local modes: { [string]: true } = {}
+		for _, cell in cells do
+			t.equal(cell.k, CardPool.EXTRA_RANKS, `n={cell.n} {cell.jokerMode}: gated k is not CardPool.EXTRA_RANKS`)
+			t.equal(cell.j, CardPool.JOKERS, `n={cell.n} {cell.jokerMode}: gated j is not CardPool.JOKERS`)
+			t.equal(
+				cell.autoPassSeconds,
+				CardPool.AUTO_PASS_MAX_SECONDS,
+				`n={cell.n} {cell.jokerMode}: the gated deadline is not CardPool.AUTO_PASS_MAX_SECONDS`
+			)
+			-- `Pool.poolConfig` hardcodes the shipped valve position, so this equality is the one that
+			-- FAILS if `CardPool` ever ships the valve OFF -- which is the point: the measurement this
+			-- gate defends was taken with the valve on, so a config that turned it off is a config the
+			-- report says nothing about.
+			t.equal(
+				cell.config.antiLivelockValve,
+				CardPool.ANTI_LIVELOCK_VALVE,
+				`n={cell.n} {cell.jokerMode}: the gated valve position is not CardPool.ANTI_LIVELOCK_VALVE`
+			)
+			t.equal(cell.config.ranks, cell.n - 1 + CardPool.EXTRA_RANKS, "ranks = seatCount + k, seatCount = n - 1")
+			t.equal(cell.config.jokers, CardPool.JOKERS)
+			modes[cell.jokerMode] = true
+		end
+
+		-- BOTH variants, whichever one ships: CARD-12's promise is that both stay under test from the
+		-- start, and research 3.5 measured why -- a flag exercised in one position only is not a
+		-- fallback but an untested rewrite.
+		t.truthy(modes.Wild, "the gated set must contain Wild cells")
+		t.truthy(modes.Blocker, "the gated set must contain Blocker cells")
+		t.truthy(
+			CardPool.JOKER_MODE == "Wild" or CardPool.JOKER_MODE == "Blocker",
+			`CardPool.JOKER_MODE is {CardPool.JOKER_MODE}, which is neither variant the engine implements`
+		)
+
+		-- The two preconditions of the whole sweep, asserted where the gate can see them. Nothing else
+		-- in the suite would notice a config that turned the valve off or changed the auto-pass
+		-- selection rule, and either change invalidates every number the report carries.
+		t.equal(CardPool.ANTI_LIVELOCK_VALVE, true, "the shipped config must keep the anti-livelock valve on")
+		t.equal(
+			CardPool.AUTO_PASS_SELECTION,
+			"uniform-random-from-hand",
+			"an auto-pass that picks the player's own greedy card deviates by exactly zero, so the simulator's "
+				.. "auto-pass numbers would transfer nothing to the shipped game"
+		)
+		print(
+			string.format(
+				"    shipped: k=%d j=%d %s valve=%s autoPass=%.1fs selection=%s",
+				CardPool.EXTRA_RANKS,
+				CardPool.JOKERS,
+				CardPool.JOKER_MODE,
+				tostring(CardPool.ANTI_LIVELOCK_VALVE),
+				CardPool.AUTO_PASS_MAX_SECONDS,
+				CardPool.AUTO_PASS_SELECTION
+			)
+		)
 	end)
 
 	-- 3 --------------------------------------------------------------------------------------
@@ -618,10 +754,10 @@ return function(t: Test.Runner)
 			probe.autoPassRate > Simulator.AUTO_PASS_PROBE_MIN_RATE,
 			`the auto-pass fired at {probe.autoPassRate} of actions, below the {Simulator.AUTO_PASS_PROBE_MIN_RATE} probe bar`
 		)
-		-- And the gated cells, at the realistic 5.0s deadline, correctly see almost none. That is
-		-- the shipped behaviour, not a defect.
+		-- And the gated cells, at the shipped 8.0s deadline, correctly see almost none. That is the
+		-- shipped behaviour, not a defect: the sweep recorded ZERO auto-passes in its 8.0s cells.
 		for _, cell in gatedCells() do
-			t.truthy(cell.autoPassRate < Simulator.AUTO_PASS_PROBE_MIN_RATE, "a 5.0s deadline must be quiet")
+			t.truthy(cell.autoPassRate < Simulator.AUTO_PASS_PROBE_MIN_RATE, "the shipped deadline must be quiet")
 		end
 	end)
 
@@ -803,7 +939,7 @@ return function(t: Test.Runner)
 		-- live = seatCount - completions - churnRemovals and remaining = seatCount - 1 - completions,
 		-- so `live < remaining` reduces to `churnRemovals > 1` exactly. Hence three leavers here,
 		-- and hence the gated churn cells (one leaver) correctly see none.
-		local opts = cellOpts(10, REFERENCE_K, REFERENCE_J, "Wild", true, 61000)
+		local opts = cellOpts(10, DIAGNOSTIC_K, DIAGNOSTIC_J, "Wild", true, 61000)
 		opts.churnLeavers = 3
 		local cell = Simulator.runCell(opts, 100, "diagnostic")
 		t.truthy(cell.outcomes.RosterShortfall >= 1, "three leavers must drop the roster below the spoon count")
@@ -862,7 +998,7 @@ return function(t: Test.Runner)
 		t.truthy(#cell.failingSeeds >= 1, "the sabotage cell must produce failing seeds")
 		local replayed = 0
 		for _, seed in cell.failingSeeds do
-			local opts = cellOpts(10, REFERENCE_K, REFERENCE_J, "Wild", true, seed)
+			local opts = cellOpts(10, DIAGNOSTIC_K, DIAGNOSTIC_J, "Wild", true, seed)
 			opts.sabotage = "DestroyRemovedCards"
 			local first = Simulator.runRound(opts)
 			t.equal(first.seed, seed, "a RoundResult must carry the seed it ran")
@@ -879,7 +1015,7 @@ return function(t: Test.Runner)
 
 	-- 10 -------------------------------------------------------------------------------------
 	t.test("a round is a pure function of its SimOpts", function()
-		local opts = cellOpts(10, REFERENCE_K, REFERENCE_J, "Blocker", true, 91000)
+		local opts = cellOpts(10, DIAGNOSTIC_K, DIAGNOSTIC_J, "Blocker", true, 91000)
 		local a = Simulator.runRound(opts)
 		local b = Simulator.runRound(opts)
 		t.deepEqual(b, a, "two runs of identical SimOpts must agree in every field, metrics included")
@@ -902,7 +1038,7 @@ return function(t: Test.Runner)
 		-- `ResidualLivelock` without it, and that is the distinction the residual stall rate turns
 		-- on.
 		t.equal(summed, 0, "a healthy gated cell must not have cleared the valve's seen window")
-		local round = Simulator.runRound(cellOpts(10, REFERENCE_K, REFERENCE_J, "Wild", false, 95000))
+		local round = Simulator.runRound(cellOpts(10, DIAGNOSTIC_K, DIAGNOSTIC_J, "Wild", false, 95000))
 		t.truthy(type(round.valveSeenResets) == "number", "and it reaches RoundResult too")
 		t.equal(round.valveSeenResets, 0)
 	end)
