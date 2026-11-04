@@ -207,6 +207,36 @@ nobody's.
 
 </scope_note>
 
+<open_question_1>
+## Open Question 1 — what "after exclusions" means (OWNER DECISION, blocks planning)
+
+Surfaced by 03-RESEARCH and not resolvable from `.planning/` as written. Three sources
+disagree and the phrase "after exclusions" is defined nowhere:
+
+- **MAP-02** (REQUIREMENTS.md:107): the validator "fails the build on **any** that would be
+  unfindable."
+- **ROADMAP criterion 3**: "passes the reference map with **at least 16** default spots that
+  each survive the real placement rules **after exclusions**."
+- **Phase 1 (01-07-PLAN.md:323)**: authored **18** spots, "two above the 16 minimum **so one
+  can be culled by Phase 3's placement rules** without breaking the contract."
+
+The two coherent policies:
+
+- **STRICT** — every authored spot must pass; one issue per failing spot; the build fails on any
+  failure. Matches MAP-02's literal text and the phase goal ("no map can ship an unfindable
+  spoon"). Makes regenerating the graybox mandatory, because research measures exactly 16 of 18
+  surviving at the recommended values.
+- **TOLERANT** — spots may fail and be silently excluded; the build fails only when survivors
+  drop below `MIN_DEFAULT_SPOTS`. Matches Phase 1's comment and criterion 3's "after
+  exclusions". The recommended values then pass the graybox untouched, at exactly 16 with zero
+  spare.
+
+Research recommends STRICT. Until this is settled the planner cannot size the phase, because
+STRICT adds graybox regeneration (and updating the tests that assert exactly 18 spots) while
+TOLERANT does not.
+
+</open_question_1>
+
 <must_haves>
 ## Non-negotiable for this phase
 
@@ -303,12 +333,21 @@ nobody's.
 - **The graybox's geometry is already the placement corpus.** It was authored for this phase:
   `Core` (32x32 solid) for inside-a-wall, `ShelfSouthEastRoom` (top 8.5) for out-of-reach,
   `PillarWest`/`PillarEast` for occlusion in an open room, `CrateEastHall`/
-  `CrateSouthWestRoom` (top 4) for standable-beside, the `Ledge` + `Ramp` for step-up and
-  slope, and a floor that stops at ±60 inside bounds of ±62 — so "over a void" is reachable
-  without authoring anything new.
+  `CrateSouthWestRoom` (top 4) for standable-beside, and the `Ledge` + `Ramp` for step-up and
+  slope.
+  - **CORRECTED 2026-11-04 (03-RESEARCH, verified independently): the graybox has NO
+    over-a-void case.** This document previously claimed the ±60..62 band was in-bounds with no
+    floor. It is wrong: `WALL_HEIGHT = 20` and `WALL_THICKNESS = 2`, so each perimeter wall
+    (e.g. `WestWall` at x = -61) fills x ±60..62 solidly from y 0 to 20. Probing there yields
+    inside-a-wall, no-line-of-sight or out-of-reach depending on height — never "no footing".
+    A real no-footing case must be authored: research recommends a **synthetic micro-world
+    fixture** over adding a pit to the graybox. Criterion 1 names "over a void" explicitly, so
+    this is required work, not optional.
 - **18 spots against a 16 minimum**, deliberately, "so Phase 3's placement rules can cull some
-  without breaking the contract". The 2 shelf spots are the likely intended cull — but whether
-  they survive depends entirely on D-16's pickup-range value, so do not assume it.
+  without breaking the contract". Heights: **11 floor (y=0)**, 1 crate-top (4), 4 ledge (6.5),
+  2 shelf (8.5). The 2 shelf spots are indeed what research's recommended values cull — leaving
+  **exactly 16, with zero spare**, which triggers D-15 immediately.
+  - **This collides with MAP-02 and is now Open Question 1** — see `<open_question_1>` below.
 - **`tests/harness/Fuzz.luau`** — the stateful fuzz driver from Phase 1/2. The OBB raycast and
   the flood-fill are both good fuzz targets (e.g. a cell marked reachable must have a path, a
   ray must agree with a brute-force box test).
@@ -342,8 +381,9 @@ nobody's.
 - The ramp is **24.9 degrees** (rise 6.5 over run 14, from the generator's own math). Any
   max-walkable-slope value below that silently disconnects the ledge and takes 4 spots with it.
   This number should appear in a test comment, not be rediscovered.
-- `Bounds` is ±62 on x/z and -1..29 on y, while the `Floor` is 120x120 centred at origin —
-  so the band between ±60 and ±62 is in-bounds but has no floor. That is "over a void" for free.
+- `Bounds` is ±62 on x/z and -1..29 on y while the `Floor` is 120x120 (±60) — but the band
+  between ±60 and ±62 is **filled by the perimeter walls** (thickness 2, height 20, y 0..20),
+  so it is not a void. See the correction under Reusable assets.
 - Seat anchors are on a radius-6 ring at 40-degree spacing around `(0, 3, -40)`, oriented by
   `CFrame.lookAt` at the table anchor — the ground truth if seat winding is included per the
   scope note.
