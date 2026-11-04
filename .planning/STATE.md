@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 3 context + research complete, numbers confirmed; ready to plan Phase 3
+stopped_at: Phase 3 planned (11 plans, 8 waves, plan-check PASSED); ready to execute
 last_updated: "2026-11-04T05:02:35.909Z"
 last_activity: 2026-11-04
 progress:
@@ -311,11 +311,13 @@ Items acknowledged and carried forward from previous milestone close:
 ## Session Continuity
 
 Last session: 2026-11-04
-Stopped at: Phase 3 researched and numbers confirmed — 20 decisions, OQ-12 and OQ-1 resolved
+Stopped at: Phase 3 PLANNED — 11 plans in 8 waves, plan-check PASSED on the third pass
 Resume file: .planning/phases/03-placement-rules-map-pipeline-and-validator/03-CONTEXT.md
 
-**Next:** `/gsd-autonomous --only 3` (plan + execute; discuss and research both already done, so
-plan-phase skips them). 03-CONTEXT.md carries 20 owner decisions and 03-RESEARCH.md carries the
+**Next:** `/gsd-execute-phase 3` (autonomous `--only 3` is mid-run; discuss, research and plan are
+all complete). Planning artifacts: 03-CONTEXT, 03-RESEARCH, 03-VALIDATION, 03-PATTERNS and
+03-01..03-11-PLAN. Wave 8 (plan 03-11) is a **non-autonomous owner checkpoint** — Gate G2 sign-off
+plus MANUAL-CHECKS M-08 and the new M-10, both in one Studio session. 03-CONTEXT.md carries 20 owner decisions and 03-RESEARCH.md carries the
 measured number ladder. The Verification Debt re-check is DONE: V-17 and V-18 retired for this
 phase by D-05/D-01, V-20 deferred to Phase 6, V-4 answered by a Lune 0.11.1 spike and
 independently re-verified, V-19 only partly primary-sourced (per-axis avatar scale limits remain
