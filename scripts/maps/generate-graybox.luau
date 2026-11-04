@@ -11,7 +11,8 @@
 -- a lobby holding the visible card table, a raised ledge with a ramp, pillars, a shelf and crates, so spots exist
 -- at several heights and some sightlines are broken. The placement rules now exist in
 -- src/server/core/SpoonPlacement.luau and the authored spot table is validated against them by
--- tests/placement/graybox_spots.spec.luau (plan 03-06).
+-- tests/placement/graybox_spots.spec.luau (plan 03-06). The NE room also holds a 2-stud crate; the SE room holds
+-- a shelf that no spot is authored on (it is the "shelf out of reach" corpus fixture, see the spot table).
 --
 -- Layout (x east, z south, y up, studs; floor top is y = 0):
 --
@@ -179,6 +180,9 @@ local function buildGeometry(geometry: Inst)
 	block(geometry, "CrateEastHall", 48, 2, -12, 4, 4, 4)
 	block(geometry, "CrateSouthWestRoom", -33, 2, 33, 4, 4, 4)
 	block(geometry, "ShelfSouthEastRoom", 50, 8, 59, 8, 1, 2)
+	-- A 2-stud crate so the authored spots cover a fourth distinct height. Its top is NOT walkable at STEP_UP 1.0,
+	-- so like the other crates it is a "standable beside" case rather than terrain.
+	block(geometry, "CrateNorthEastRoom", 33, 1, -45, 4, 2, 4)
 
 	-- Lobby set dressing: the visible table and chairs. The anchors live under Data, not here.
 	-- Plan said 12 x 1 x 12; at that size the table would overlap the radius-6 seat ring, so it is 8 x 1 x 8.
@@ -204,28 +208,49 @@ local function buildData(data: Inst)
 	anchorAt(seekerSpawns, "Spawn3", -40, 3, 40, TAG_SEEKER_SPAWN)
 	anchorAt(seekerSpawns, "Spawn4", 40, 3, 40, TAG_SEEKER_SPAWN)
 
-	-- 18 spots: two above the 16 minimum so Phase 3's placement rules can cull some without breaking the contract.
-	-- Each is { x, surfaceY, z }; the anchor sits half a stud above its surface. Heights: floor (0), crates (4),
-	-- ledge (6.5) and shelf (8.5). Coverage: all four rooms, the lobby, the ring corridor, the ledge and the shelf.
+	-- 21 spots against the 16-spot MIN_DEFAULT_SPOTS, five spare (D-15). Each is { x, surfaceY, z };
+	-- the anchor sits half a stud above its surface, which is why SPOT_CLEARANCE must stay below 0.5
+	-- (at 0.5 a `<=` comparison culls every one of them -- measured).
+	--
+	-- D-17 is STRICT: every authored spot must pass the real placement rules and any failure fails
+	-- the build. tests/placement/graybox_spots.spec.luau proves it spot by spot WITH the margin, so
+	-- a spot added here without checking will fail CI rather than quietly become a 17th survivor.
+	--
+	-- TWO SPOTS WERE REMOVED IN PHASE 3 AND MUST NOT BE RE-AUTHORED:
+	--   the shelf centre (50, 8.5, 59) -- measured d*los = 12.36. Blocked by the shelf slab from
+	--     every floor position within 12 studs. Genuinely unfindable at any sane pickup range; this
+	--     was never a tuning problem.
+	--   the shelf east edge (54, 8.5, 59) -- measured d*conn = d*los = 6.54 against an effective
+	--     range of 5.5. PICKUP_RANGE 8.5 would admit it and was rejected: choosing a gameplay
+	--     constant to make map validation pass is D-15 running backwards.
+	-- Both report Unreachable (not OutOfReach) at the shipped config: the shelf top carries its own standable
+	-- cells that are inside E but not spawn-connected (plan 03-05).
+	-- The SHELF ITSELF STAYS. It is the "shelf out of reach" corpus fixture (03-05 corpus.spec
+	-- probes (50, 9.0, 59) and (54, 9.0, 59)), so deleting it would delete two corpus cases.
+	-- The four ledge spots connect because the Ramp's 24.9 degrees is under the 30 degree slope limit.
+	-- Heights: 14 floor (0), 1 at 2, 2 crate tops (4), 4 ledge (6.5) -- four distinct, four at y >= 6.
 	local spots: { { number } } = {
-		{ -55, 0, -55 }, -- NW room, far corner
-		{ -33, 0, -55 }, -- NW room
-		{ 55, 0, -55 }, -- NE room, far corner
-		{ 33, 0, -33 }, -- NE room, behind the doorway wall
-		{ -55, 0, 55 }, -- SW room, far corner
-		{ -33, 4, 33 }, -- SW room, on top of a crate
-		{ 33, 0, 55 }, -- SE room
-		{ 50, 8.5, 59 }, -- SE room, shelf
-		{ 54, 8.5, 59 }, -- SE room, shelf
-		{ -20, 0, -56 }, -- lobby, behind the table from the east door
-		{ 20, 0, -56 }, -- lobby
-		{ 0, 0, -22 }, -- ring corridor, north of the core
-		{ 22, 0, 0 }, -- ring corridor, east of the core
-		{ 0, 0, 22 }, -- ring corridor, south of the core
-		{ -56, 6.5, -4 }, -- ledge
-		{ -56, 6.5, 4 }, -- ledge
-		{ -44, 6.5, -4 }, -- ledge
-		{ -44, 6.5, 4 }, -- ledge
+		{ -55, 0, -55 }, -- 01 NW room, far corner
+		{ -33, 0, -55 }, -- 02 NW room
+		{ 55, 0, -55 }, -- 03 NE room, far corner
+		{ 33, 0, -33 }, -- 04 NE room, behind the doorway wall
+		{ -55, 0, 55 }, -- 05 SW room, far corner
+		{ -33, 4, 33 }, -- 06 SW room, on top of CrateSouthWestRoom
+		{ 33, 0, 55 }, -- 07 SE room
+		{ 50, 0, 50 }, -- 08 SE room floor, below the shelf's open side (was the shelf centre)
+		{ 55, 0, 40 }, -- 09 SE room floor, by the east wall (was the shelf east edge)
+		{ -20, 0, -56 }, -- 10 lobby, behind the table from the east door
+		{ 20, 0, -56 }, -- 11 lobby
+		{ 0, 0, -22 }, -- 12 ring corridor, north of the core
+		{ 22, 0, 0 }, -- 13 ring corridor, east of the core
+		{ 0, 0, 22 }, -- 14 ring corridor, south of the core
+		{ -22, 0, 0 }, -- 15 ring corridor, west of the core
+		{ 48, 4, -12 }, -- 16 east hall, on top of CrateEastHall
+		{ 33, 2, -45 }, -- 17 NE room, on top of CrateNorthEastRoom
+		{ -56, 6.5, -4 }, -- 18 ledge
+		{ -56, 6.5, 4 }, -- 19 ledge
+		{ -44, 6.5, -4 }, -- 20 ledge
+		{ -44, 6.5, 4 }, -- 21 ledge
 	}
 	local defaultSpots = make("Folder", "DefaultSpots", data)
 	for i, s in spots do
