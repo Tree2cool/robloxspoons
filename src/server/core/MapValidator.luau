@@ -10,11 +10,24 @@
 -- reachability from the seeker spawns and sightlines are all covered by real geometry, one issue per failing spot.
 -- The placement numbers arrive as a parameter: this pure zone may not require across the Rojo mount boundary (R6).
 --
--- STILL DEFERRED (D-12), after this plan:
---   * seat winding (seats 1..9 clockwise) and each seat's look vector pointing at the TableAnchor -- plan 03-09
---     closes this inside Phase 3; if it is ever descoped, re-home it here rather than dropping it.
---   * CLOSED, not deferred: the Bounds roll item. Node v2 carries an up vector, so a roll about the look axis is
---     visible and rejected as MAP_BOUNDS_INVALID.
+-- DEFERRED-CHECKS LIST (D-12), AFTER PLAN 03-09. Phase 1's list is resolved; what is where:
+--
+-- IMPLEMENTED IN PHASE 3:
+--   * walkability, clearance, reachability from ALL seeker spawns (D-06) and sightlines -> the placement stage,
+--     via SpoonPlacement.bake / check (plan 03-08)
+--   * seat winding and seat facing -> MAP_SEAT_ORDER and MAP_SEAT_FACING (D-20, plan 03-09)
+--   * Bounds roll -> closed by contract version 2's `up` vector (D-02); the fixture is validator.spec.luau's
+--     "Bounds rolled about the look axis", which expects exactly { MAP_BOUNDS_INVALID }
+--
+-- NOT HERE, AND OWNED ELSEWHERE:
+--   * glint-range occlusion during the hunt is PHASE 5. This file answers "can a seeker reach and see this spot
+--     at all", not "when does the glint become visible" (HUNT-02).
+--   * the live hider's per-tick check is PHASE 6. It calls the same SpoonPlacement.check with a client-supplied
+--     point, which is why `check` validates finiteness and bounds itself.
+--   * a union-of-volumes Bounds is a contract change, deferred until a multi-floor map needs it (Phase 1 D-19,
+--     re-confirmed by Phase 3's multi-layer grid). PHASE 7a decides.
+--   * separate collision and sight sets (glass, foliage) were rejected for v1 (D-03). PHASE 7a revisits if
+--     authoring hits it for real.
 local MapContract = require("./MapContract")
 local SpoonPlacement = require("./SpoonPlacement")
 
@@ -37,7 +50,9 @@ local OUT_OF_BOUNDS = "MAP_OUT_OF_BOUNDS"
 local ROOT_INVALID = "MAP_ROOT_INVALID"
 local SCRIPT_FORBIDDEN = "MAP_SCRIPT_FORBIDDEN"
 local SEAT_COUNT = "MAP_SEAT_COUNT"
+local SEAT_FACING = "MAP_SEAT_FACING"
 local SEAT_NAME = "MAP_SEAT_NAME"
+local SEAT_ORDER = "MAP_SEAT_ORDER"
 local SPAWN_COUNT = "MAP_SPAWN_COUNT"
 local SPAWN_DISCONNECTED = "MAP_SPAWN_DISCONNECTED"
 local SPAWN_NO_FOOTING = "MAP_SPAWN_NO_FOOTING"
@@ -53,6 +68,11 @@ local CODE_CLASSES: { [string]: boolean } = { Script = true, LocalScript = true,
 local DEFAULT_LOOK: Vec3 = { x = 0, y = 0, z = -1 }
 local DEFAULT_UP: Vec3 = { x = 0, y = 1, z = 0 }
 local LOOK_EPSILON = 1e-3
+local WINDING_EPSILON_DEGREES = 1.0
+-- 5 degrees, about 0.996 as a dot product. A generated seat (CFrame.lookAt, exact to float32) passes with
+-- nothing to spare; a hand-authored Studio seat is allowed human error. Tighter would make hand authoring in
+-- Studio miserable for no gameplay gain; looser would let a seat face the next seat rather than the table.
+local FACING_TOLERANCE_DEGREES = 5.0
 
 local function hasTag(node: Node, tag: string): boolean
 	return table.find(node.tags, tag) ~= nil
@@ -400,6 +420,96 @@ local function validate(root: Node, placement: PlacementConfig): ({ Issue }, Map
 						else
 							seats[number] = seat
 							table.insert(anchors, { node = seat, path = `{seatPath}/{seat.name}` })
+						end
+					end
+					-- This runs only when the ring is complete, so MAP_SEAT_COUNT and MAP_SEAT_ORDER never both
+					-- fire for the same fault.
+					local complete = anchor ~= nil
+					for number = 1, MapContract.SEAT_COUNT do
+						if seats[number] == nil then
+							complete = false
+						end
+					end
+					if complete and anchor ~= nil then
+						local anchorAt = poseOf(anchor).position
+						local bearings: { number? } = {}
+						-- Clockwise seen from above with x east and z south: the bearing atan2(x, -z) from north
+						-- increases. The graybox's nine seats are 40 degrees apart by construction, and
+						-- tests/maps/graybox.spec.luau asserts that stronger, map-specific form; this is the
+						-- general contract rule every Phase 7a map must satisfy.
+						local reported: { [number]: boolean } = {}
+						-- At most one MAP_SEAT_ORDER per seat: bounded, deterministic output, so a reversed ring
+						-- does not bury the real fault under nine near-identical issues.
+						local function reportOrder(number: number, message: string)
+							if reported[number] then
+								return
+							end
+							reported[number] = true
+							report(SEAT_ORDER, `{seatPath}/Seat{number}`, message)
+						end
+						for number = 1, MapContract.SEAT_COUNT do
+							local at = poseOf(seats[number]).position
+							local dx, dz = at.x - anchorAt.x, at.z - anchorAt.z
+							if math.sqrt(dx * dx + dz * dz) < LOOK_EPSILON then
+								-- No defined bearing and no defined facing: the ring is malformed. Skip the facing
+								-- test for this seat rather than dividing by a near-zero length.
+								reportOrder(number, "seat sits on the table anchor, so it has no bearing")
+							else
+								local bearing = math.deg(math.atan2(at.x - anchorAt.x, -(at.z - anchorAt.z)))
+								if bearing < 0 then
+									bearing += 360
+								end
+								bearings[number] = bearing
+								local look = seats[number].look or DEFAULT_LOOK
+								local hx, hz = look.x, look.z
+								-- look.y is ignored: a tilted seat still faces the table. The graybox's seats have
+								-- look.y == 0 and its spec asserts it, so tilt is a Phase 7a map-quality question.
+								local lookLength = math.sqrt(hx * hx + hz * hz)
+								local toAnchor: Vec3 = { x = -dx, y = 0, z = -dz }
+								local toLength = lengthOf(toAnchor)
+								local cosine = -2
+								if lookLength >= LOOK_EPSILON then
+									cosine = dotOf({ x = hx / lookLength, y = 0, z = hz / lookLength }, {
+										x = toAnchor.x / toLength,
+										y = 0,
+										z = toAnchor.z / toLength,
+									})
+								end
+								if cosine < math.cos(math.rad(FACING_TOLERANCE_DEGREES)) then
+									local measured = if cosine == -2
+										then 180
+										else math.deg(math.acos(math.min(1, cosine)))
+									report(
+										SEAT_FACING,
+										`{seatPath}/Seat{number}`,
+										`seat faces {string.format("%.1f", measured)} degrees away from the table anchor (tolerance {FACING_TOLERANCE_DEGREES})`
+									)
+								end
+							end
+						end
+						local total = 0
+						local allDefined = true
+						for number = 1, MapContract.SEAT_COUNT do
+							local previous = if number == 1 then MapContract.SEAT_COUNT else number - 1
+							local here, before = bearings[number], bearings[previous]
+							if here == nil or before == nil then
+								allDefined = false
+							else
+								local step = (here - before) % 360
+								total += step
+								if step <= 0 or step >= 180 then
+									reportOrder(
+										number,
+										`seat steps {string.format("%.1f", step)} degrees clockwise from Seat{previous}, needs a step strictly between 0 and 180`
+									)
+								end
+							end
+						end
+						if allDefined and math.abs(total - 360) > WINDING_EPSILON_DEGREES then
+							reportOrder(
+								1,
+								`the nine seat steps sum to {string.format("%.1f", total)} degrees, needs 360 (the ring winds round more than once)`
+							)
 						end
 					end
 				end
