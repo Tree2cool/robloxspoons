@@ -207,7 +207,18 @@ And the same ladder on a bare pass, with no margin, for contrast:
 
 ### Triage
 
-TRIAGE PENDING - run --stage triage and fold the rows in here
+**No round ended on the action cap; nothing to triage.**
+
+`capArtifactCandidates` is **empty in all 1,132 cells of this run**, across 1,501,000 simulated
+rounds, and `hitActionCap` is false in every confirm row. `02-triage.json` is therefore absent by
+measurement rather than by omission: `--stage triage` refuses an empty `--seeds` list, and a
+hand-written file of zero classified rows would assert something nothing measured.
+
+So the residual is **not** a cap artefact. Every stalled round this engine produces is a 300s
+`time-cap` round, which a raised ACTION cap cannot rescue — the distinction the triage stage exists
+to draw is already settled by the absence of candidates. The 37 stalled rounds in 320,000 gated are
+real rounds that ran out of wall-clock time, which is exactly why the claim below is scoped to the
+selected pool and the measured residual is printed rather than rounded away.
 
 Which of `CapArtifact` and `ResidualLivelock` the residual turns out to be decides whether
 the honest claim is "zero stalls" or "zero stalls for the selected pool". 02-09 measured

@@ -37,10 +37,10 @@ Requirements for initial release. Each maps to exactly one roadmap phase.
 - [ ] **CARD-06**: Seat order each round is finishers in find order, then the empty-handed seeker, then everyone else
 - [ ] **CARD-07**: Four of a kind is detected on draw and immediately removes that player from the table
 - [ ] **CARD-08**: A removed seat's remaining cards route to the successor's left pile and are never destroyed
-- [ ] **CARD-09**: No player is dealt an opening hand that is already complete or completable by a held wild
-- [ ] **CARD-10**: Jokers act as wilds, and natural cards are spent before jokers when a set completes
-- [ ] **CARD-11**: A headless pacing simulator proves the table stays solvable at every player count from 3 to 10, and selects the card pool and joker count
-- [ ] **CARD-12**: Jokers revert to blockers that can never complete a set if the simulator cannot prove solvability
+- [x] **CARD-09**: No player is dealt an opening hand that is already complete or completable by a held wild
+- [x] **CARD-10**: Jokers act as wilds, and natural cards are spent before jokers when a set completes
+- [x] **CARD-11**: A headless pacing simulator proves the table stays solvable at every player count from 3 to 10, and selects the card pool and joker count
+- [x] **CARD-12**: Jokers revert to blockers that can never complete a set if the simulator cannot prove solvability
 - [ ] **CARD-13**: Player can see their own hand and only the pile depths of others
 - [ ] **CARD-14**: Passing feels immediate on a normal connection, with server reconciliation correcting any mismatch
 - [ ] **CARD-15**: Player is protected from passing a card by accident
@@ -234,10 +234,10 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CARD-06 | Phase 2 | **Partial** (same ranking as CARD-05, bucket 2 is a list; unwired until Phase 6) |
 | CARD-07 | Phase 2 | Pending |
 | CARD-08 | Phase 2 | Pending |
-| CARD-09 | Phase 2 | Pending |
-| CARD-10 | Phase 2 | Pending |
-| CARD-11 | Phase 2 | Pending |
-| CARD-12 | Phase 2 | Pending |
+| CARD-09 | Phase 2 | Complete |
+| CARD-10 | Phase 2 | Complete |
+| CARD-11 | Phase 2 | Complete |
+| CARD-12 | Phase 2 | Complete |
 | CARD-13 | Phase 4 | Pending |
 | CARD-14 | Phase 4 | Pending |
 | CARD-15 | Phase 4 | Pending |
