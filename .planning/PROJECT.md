@@ -85,12 +85,25 @@ transition.
   deck-exhaustion edge case.
 - **Four of a kind is checked only on draw** — passing can only leave a subset of a
   hand that already had none.
-- **Jokers are wilds, gated on simulation.** A joker counts as any rank. This ships
-  **only if a headless bot simulator proves the table stays solvable at every player
-  count from 3 to 10**; completing a set with a joker strands the real fourth card of
-  that rank and removes a wild from circulation, which can deadlock a shrinking circle.
-  **Pre-agreed fallback if the simulator fails: jokers become blockers** that can never
-  complete a set.
+- **Jokers are wilds — DECIDED, Gate G1 PASSED in Phase 2.** A joker counts as any rank.
+  Completing a set with a joker strands the real fourth card of that rank and removes a
+  wild from circulation, which can deadlock a shrinking circle, so this was gated on a
+  headless bot simulator rather than assumed. **The gate passed**, selecting one joker
+  (`j = 1`) in Wild mode over a pool of `ranks = seatCount + 3` (`k = 3` extra ranks, four
+  cards per rank, `seatCount` = seated seekers = players − 1, so circulation = 13), with
+  the engine's anti-livelock valve enabled. Measured across 320,000 gated rounds at
+  10,000 rounds per (N, pool config) for every N from 3 to 10, in both joker modes and
+  both churn variants: **37 stalled rounds — 0.012% aggregate, 0.070% in the worst cell —
+  against the 0.500% residual ceiling**, with median time to first completion 16.2s
+  against a 45s bar and p95 23.7s against 120s. That is a measured property of the
+  *selected* configuration, not an unconditional property of the engine, and the residual
+  is recorded rather than rounded to zero. Evidence: `02-G1-REPORT.md` in
+  `.planning/phases/02-card-engine-and-pacing-simulator/`; the shipped values live in
+  `src/shared/Config/CardPool.luau`.
+  **The blocker variant (CARD-12) ships alongside it behind the `JOKER_MODE` flag** — it
+  is a live flag rather than a dead fallback, because Blocker clears every bar at every
+  player count on the same evidence. This is also why `k >= 1` is mandatory: at `k = 0` a
+  Blocker joker can complete nothing, so the flag would be a cliff and not a flag.
 
 **3. Hunt**
 
@@ -346,7 +359,7 @@ than to paying, so purchases are shown off as a reward for skill.
 | Rounds = starting player count | Makes the hider rotation exactly fair — everyone hides once | — Pending |
 | Separate four-of-a-kind bonus and find-time points | Rewards card skill and hunt skill independently | — Pending |
 | Hider scores 4000 × average spoon survival fraction | Matches the seeker ceiling so the hider turn is neutral in expectation | — Pending |
-| Jokers as wilds, gated on a solvability simulator | Keeps the swings he wanted, with a pre-agreed blocker fallback if unsafe | — Pending |
+| Jokers as wilds, gated on a solvability simulator | Keeps the swings he wanted, with a pre-agreed blocker fallback if unsafe | **Wilds — Gate G1 PASSED** (Phase 2, 2026-11-04): `k = 3` extra ranks, `j = 1` joker, `JOKER_MODE = "Wild"` by default with Blocker live behind the flag. 37 stalled rounds in 320,000 gated — 0.012% aggregate, 0.070% worst cell — against a 0.500% ceiling. Evidence: `.planning/phases/02-card-engine-and-pacing-simulator/02-G1-REPORT.md` |
 | Keep the 5:00 cap; end the round on the last claim | 5:00 is a cap, not a duration; avoids redesigning scoring around a rare tail | — Pending |
 | Joiners queue to the next round | Preserves the `N − 2` spoon math exactly instead of changing a round mid-flight | — Pending |
 | Departed hider → auto-fill, no hider points, round runs | Preserves rounds = starting count; nobody hides twice | — Pending |
@@ -365,6 +378,9 @@ than to paying, so purchases are shown off as a reward for skill.
 | No soft currency, no loot crates | Nothing to spend currency on; crates trigger odds-disclosure policy | — Pending |
 | 5 maps in v1 | Variety is what keeps a hunt game alive past the first session | — Pending |
 | Full PC/mobile parity | Splitting the Roblox audience is not worth the saved UI work | — Pending |
+| The engine carries an anti-livelock safety valve, enabled in the shipped game | A purely greedy table livelocks at a non-zero rate at every pool; the engine detects a repeated whole-table state with no completion since the previous repeat and forces one uniformly random pass, so zero stalls is a measured property of the engine plus the selected pool rather than an assumption about how people play. **The honest limit, in the same row:** it is demonstrated for the selected pool at the confirmed round count, never universally — the valve-on residual is 0.070% in the worst cell, and k=2,j=2 carries a residual too | `ANTI_LIVELOCK_VALVE = true` in `src/shared/Config/CardPool.luau` (02-CONTEXT amendments A7, A7-CORRECTION, A8). At the selected pool the valve-DISABLED twin cells stall at 3.58–8.31% while the valve fires at the matching rate, so every firing is a real rescue. It fires in roughly 8% of rounds at a full roster: `ValveForcedPass` is an ordinary visible event for Phase 4, not an edge case. Evidence: `.planning/phases/02-card-engine-and-pacing-simulator/02-G1-REPORT.md` sections 4 and 4b |
+| AFK auto-pass deadline ceiling (CARD-16, built in Phase 4) | A product value now that the valve carries the zero-stall job rather than a tuned one; CARD-16 benches a player after repeated strikes, so a short deadline would be striking ordinary players several times a round. The deadline's firing curve is in the report | `AUTO_PASS_MAX_SECONDS = 8.0` — Phase 4's deadline must not exceed it. Evidence: `.planning/phases/02-card-engine-and-pacing-simulator/02-G1-REPORT.md` section 5 (0 auto-passes at 8.0s, 2 at 5.0s, 58 at 3.0s, 38,516 at 1.5s) |
+| AFK auto-pass SELECTION rule is uniform-random-from-hand | Deviation comes from the auto-pass choosing a card the player would NOT have chosen. 'Auto-pass your worst card' is the player's own greedy choice: deviation would be exactly zero and the simulator's result would transfer nothing to the shipped game. This row exists because the rule is easy to 'improve' in Phase 4 without anyone noticing it invalidates G1 | `AUTO_PASS_SELECTION = "uniform-random-from-hand"` — a **constraint on Phase 4**, not a tuning knob. The rule modelled throughout the sweep is `Bots.randomPass`, a card drawn uniformly at random from the hand. Evidence: `.planning/phases/02-card-engine-and-pacing-simulator/02-G1-REPORT.md` |
 
 ## Evolution
 
@@ -384,4 +400,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-11-02 after initialization and post-research design resolution*
+*Last updated: 2026-11-04 — Phase 2 complete; Gate G1 decided and recorded (plan 02-12)*

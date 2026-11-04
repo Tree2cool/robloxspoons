@@ -601,17 +601,31 @@ Cycle detection is only sound where the dynamics are deterministic — hence str
 
 Whichever is chosen, it is a change to what G1 means and the owner should see it. It cannot be left for the executor to discover.
 
+> **RESOLVED (plan 02-12).** By none of the three options as written: amendment **A7** took a fourth route — the ENGINE got an anti-livelock valve, so the gate no longer rests on an assumption about how people play. Option 2's auto-pass survives as a secondary mitigation with a realistic deadline. Amendment **A8** then replaced the literal zero-stall bar with an explicit 0.500% residual ceiling, owner-approved, with the measured residual printed. Evidence: `02-G1-REPORT.md` section 4b (the valve) and plan 02-13's deterministic livelock fixture, which escapes on action 113 through the real `apply` and provably never escapes with the valve disabled.
+
 **OQ-B — `seatCount` in "ranks = seatCount + k" is ambiguous**, and it shifts the gate's answer by a whole notch. If `seatCount` = seats at the table (`N−1`), then circulation `= 4k + j` and `k=0,j=0` is a provable instant deadlock. If `seatCount` = players (`N`), then circulation `= 4(k+1) + j` and `k=0` is the viable floor. Recommended: **define it as live seats at round start**, state the pool in terms of circulation (`circulation = 4(R − m₀) + j ≥ 1`, and ≥ 8 for occupancy), and exclude the dead cell with an asserting test rather than a silent skip.
+
+> **RESOLVED (plan 02-12).** By 02-CONTEXT amendment **A3**: `seatCount` means SEATED SEEKERS, so `ranks = (players in round − 1) + k` and circulation `= 4k + j`. Implemented in exactly one place, `Pool.poolConfig`; nothing else may compute `n - 1` inline. The dead `k=0, j=0` cell is swept and REPORTED as a negative result (amendment A5), never silently skipped. This off-by-one was not cosmetic: measured, it moved the valve-off stall rate by a factor of 40 (amendment A8).
 
 **OQ-C — the selection rule, applied literally, deletes the jokers.** "Fewest extra ranks first, then fewest jokers" selects `j = 0` wherever `j = 0` passes, and it does (§3.5). That makes CARD-10's wild semantics dead code in the shipped game and removes the swings PROJECT.md's Key Decisions table says jokers exist to provide. Recommended framing: **the joker count is a design parameter (PROJECT wants swings → `j ≥ 1`), and the simulator's job is to *clear* the chosen `j` as safe, not to minimise it.** Owner decision — it conflicts with a locked rule, so I have not assumed it away.
 
+> **RESOLVED (plan 02-12).** By the **owner's answer at plan 02-10's pre-sweep checkpoint**, recorded verbatim in `02-10-SUMMARY.md`: the recommended framing was taken — `j` searches `{1,2}` with a floor of `j >= 1`, the sweep CLEARS the chosen `j` rather than minimising it, and `j = 0` is measured and reported as a comparison (`02-G1-REPORT.md` section 6). PROJECT.md's Key Decisions table wins over the literal tiebreak, per CLAUDE.md. The owner re-confirmed the floor at plan 02-12's sign-off.
+
 **OQ-D — must the chosen pool pass in BOTH joker modes?** `[VERIFIED: §3.5]` At `k=0` the flag is a cliff (0% vs 97.4%). If CARD-12 is a real fallback that can be flipped on a live game, the gate must test both positions at the selected pool and `k ≥ 1` is effectively mandatory. If it is only a test-time variant, say so and drop the "available behind a flag" language.
+
+> **RESOLVED (plan 02-12).** **Yes — both modes, and the flag is real.** Enforced by step 3 of the sweep's selection rule (every bar must pass in BOTH joker modes and BOTH churn variants at every N searched) and by the CI subset, whose gated cells run both modes at 500 rounds per cell. Wild and Blocker each clear every bar at the selected pool, so the "available behind a flag" language stands rather than being dropped, and `k >= 1` is confirmed mandatory (amendment A4).
 
 **OQ-E — occupancy floor.** Recommend ≥ 60% mean occupancy at every N as a third pacing bar (§3.7). Without it the gate can legally select a table that is idle 86% of the time at 10 players.
 
+> **RESOLVED (plan 02-12).** Adopted as recommended by 02-CONTEXT amendment **A2**: mean occupancy `>= 0.600` is the third bar, implemented in `Simulator.evaluateBars`. It is load-bearing, not decorative — without it the selection rule picks `k=0, j=1`, one card circulating among nine seats at ~0.17 occupancy (`02-G1-REPORT.md` section 7). The selected pool measures 0.825.
+
 **OQ-F — dealer when the previous round had zero finishers**, and the order among multiple empty-handed seekers (§8.2). Both are reachable in exactly the rounds the simulator is hunting, so they will show up during this phase.
 
+> **RESOLVED (plan 02-12).** By **plan 02-02's locked four-bucket total order** and its corpus. Neither case is a special case: zero finishers means bucket 1 is simply empty and the head falls through to bucket 2, and two or more empty-handed seekers is handled because bucket 2 is a LIST with a key, never an index into "the" non-finisher. `dealer == seatOrder[1]` always, because the hider is not seated.
+
 **OQ-G — order of a departing seat's hand vs inbox** when routed to the successor (§7.4). Affects replay determinism; must be locked by a test either way.
+
+> **RESOLVED (plan 02-12).** By **plan 02-06's locked order: departing hand ascending, then departing inbox in FIFO order**, appended to the successor's inbox tail — locked by a test, as required. The sole-seat case routes to the `terminal` bucket rather than a nil path, which keeps Non-Negotiable Rule 8's "never destroyed" literally assertable by the partition identity.
 
 ---
 

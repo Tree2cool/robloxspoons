@@ -29,14 +29,14 @@ Requirements for initial release. Each maps to exactly one roadmap phase.
 
 ### Card Engine
 
-- [ ] **CARD-01**: Player holds 4 cards and can draw from their left pile only when their hand size is exactly 4
+- [x] **CARD-01**: Player holds 4 cards and can draw from their left pile only when their hand size is exactly 4
 - [ ] **CARD-02**: Player selects a card with one tap and sends it to their right pile with a second tap
-- [ ] **CARD-03**: A passed card arrives in the next seat's left pile, with the server resolving which seat that is at execution time
-- [ ] **CARD-04**: The last seat's passes land beneath the dealer's deck, so the deck never runs dry
-- [ ] **CARD-05**: The dealer is the previous round's first finder; if that player is hiding, the deck goes to the highest-placed finisher actually seated; round 1's dealer is random
-- [ ] **CARD-06**: Seat order each round is finishers in find order, then the empty-handed seeker, then everyone else
-- [ ] **CARD-07**: Four of a kind is detected on draw and immediately removes that player from the table
-- [ ] **CARD-08**: A removed seat's remaining cards route to the successor's left pile and are never destroyed
+- [x] **CARD-03**: A passed card arrives in the next seat's left pile, with the server resolving which seat that is at execution time
+- [x] **CARD-04**: The last seat's passes land beneath the dealer's deck, so the deck never runs dry
+- [x] **CARD-05**: The dealer is the previous round's first finder; if that player is hiding, the deck goes to the highest-placed finisher actually seated; round 1's dealer is random
+- [x] **CARD-06**: Seat order each round is finishers in find order, then the empty-handed seeker, then everyone else
+- [x] **CARD-07**: Four of a kind is detected on draw and immediately removes that player from the table
+- [x] **CARD-08**: A removed seat's remaining cards route to the successor's left pile and are never destroyed
 - [x] **CARD-09**: No player is dealt an opening hand that is already complete or completable by a held wild
 - [x] **CARD-10**: Jokers act as wilds, and natural cards are spent before jokers when a set completes
 - [x] **CARD-11**: A headless pacing simulator proves the table stays solvable at every player count from 3 to 10, and selects the card pool and joker count
@@ -44,7 +44,7 @@ Requirements for initial release. Each maps to exactly one roadmap phase.
 - [ ] **CARD-13**: Player can see their own hand and only the pile depths of others
 - [ ] **CARD-14**: Passing feels immediate on a normal connection, with server reconciliation correcting any mismatch
 - [ ] **CARD-15**: Player is protected from passing a card by accident
-- [ ] **CARD-16**: An idle player is auto-passed so they cannot stall the circle, and is benched after repeated strikes
+- [ ] **CARD-16**: An idle player is auto-passed so they cannot stall the circle, and is benched after repeated strikes [**Phase 2 / Gate G1 constraint on this requirement, two axes:** the auto-pass deadline must not exceed `CardPool.AUTO_PASS_MAX_SECONDS` (8.0s), **and** the card it passes must be chosen by `CardPool.AUTO_PASS_SELECTION` = `uniform-random-from-hand`. A longer deadline weakens a secondary mitigation; a greedy "auto-pass your worst card" rule is the player's own greedy choice, which makes the deviation the simulator measured exactly zero and invalidates what G1 measured. Both values live in `src/shared/Config/CardPool.luau`; evidence `.planning/phases/02-card-engine-and-pacing-simulator/02-G1-REPORT.md`]
 - [ ] **CARD-17**: Completing four of a kind plays a distinct moment that reads as a starting gun
 - [ ] **CARD-18**: The card phase opens with a shuffle-and-deal animation showing the dealer's deck skin before passing unlocks
 - [ ] **CARD-19**: Card faces are legible and colour-blind-safe
@@ -226,18 +226,18 @@ Which phases cover which requirements. Updated during roadmap creation.
 | FOUND-06 | Phase 1 | Complete |
 | FOUND-07 | Phase 1 | Complete |
 | FOUND-08 | Phase 1 | **Partial** (cap done; 3-minimum unwired until Phase 6) |
-| CARD-01 | Phase 2 | Pending |
+| CARD-01 | Phase 2 | Complete |
 | CARD-02 | Phase 4 | Pending |
-| CARD-03 | Phase 2 | Pending |
-| CARD-04 | Phase 2 | **Partial** (circulation identity asserted at every pool cell; the ring that realises it lands in 02-06/02-07) |
-| CARD-05 | Phase 2 | **Partial** (one ranking in `SeatOrder`, locked by corpus; unwired until Phase 6) |
-| CARD-06 | Phase 2 | **Partial** (same ranking as CARD-05, bucket 2 is a list; unwired until Phase 6) |
-| CARD-07 | Phase 2 | Pending |
-| CARD-08 | Phase 2 | Pending |
+| CARD-03 | Phase 2 | Complete |
+| CARD-04 | Phase 2 | Complete (the ring that realises the circulation identity landed in 02-06/02-07; `circulation = 4k + j` is invariant under draw, pass and completion) |
+| CARD-05 | Phase 2 | Complete (one ranking in `SeatOrder`, locked by corpus; **its first consumer is Phase 6's match lifecycle** — the module has no Phase 2 caller by design, see STATE.md) |
+| CARD-06 | Phase 2 | Complete (same ranking as CARD-05, bucket 2 is a list; **first consumer is Phase 6's match lifecycle**, see STATE.md) |
+| CARD-07 | Phase 2 | Complete |
+| CARD-08 | Phase 2 | Complete |
 | CARD-09 | Phase 2 | Complete |
 | CARD-10 | Phase 2 | Complete |
-| CARD-11 | Phase 2 | Complete |
-| CARD-12 | Phase 2 | Complete |
+| CARD-11 | Phase 2 | Complete (**Gate G1 PASSED** — `k = 3`, `j = 1`, Wild, valve ON; 37 stalled rounds in 320,000 gated, 0.012% aggregate / 0.070% worst cell against a 0.500% ceiling. The solvability half is a theorem; the pacing half still rests on V-35 and A4, carried as debt. Evidence: `.planning/phases/02-card-engine-and-pacing-simulator/02-G1-REPORT.md`) |
+| CARD-12 | Phase 2 | Complete (Blocker is a **live flag**, not a contingency: it clears every bar at every N on the same evidence; `JOKER_MODE` in `src/shared/Config/CardPool.luau`) |
 | CARD-13 | Phase 4 | Pending |
 | CARD-14 | Phase 4 | Pending |
 | CARD-15 | Phase 4 | Pending |

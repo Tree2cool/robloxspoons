@@ -13,7 +13,7 @@ Every Roblox platform claim in the research is unverified against primary docs (
 ## Phases
 
 - [x] **Phase 1: Foundations, Contracts and Spec Lock** - Toolchain, CI, typed gateway, lint guards, FSM skeleton, map contract, persistence skeleton, and the two blocking card-engine specs
-- [ ] **Phase 2: Card Engine and Pacing Simulator** - Pure headless card ring, fuzz suite, and the simulator gate that decides jokers-as-wilds versus blockers
+- [x] **Phase 2: Card Engine and Pacing Simulator** - Pure headless card ring, fuzz suite, and the simulator gate that decides jokers-as-wilds versus blockers
 - [ ] **Phase 3: Placement Rules, Map Pipeline and Validator** - Shared placement rules and a validator that runs every default spot through them (parallel with Phase 2)
 - [ ] **Phase 4: Live Card Table** - Server card shell, prediction/reconcile, AFK auto-pass, and the PC and mobile card UI (parallel with Phase 5)
 - [ ] **Phase 5: Hunt, Anti-ESP, Claim and Scoring** - Server-only spoon data, per-client reveal, atomic claim, scoring ledger, round end (parallel with Phase 4; ends at the vertical-slice gate)
@@ -77,22 +77,44 @@ Plans:
   3. A four-of-a-kind on draw removes that seat immediately, the ring closes up, and the removed seat's remaining cards reach the successor's left pile and are never destroyed
   4. The dealer and seat order for the next round are computed correctly from the previous find order, including the case where the first finder is the hider (deck goes to the highest-placed finisher actually seated) and the random round-1 dealer
   5. **Gate G1:** the bot pacing simulator reports zero stalls at every player count from 3 to 10 and acceptable time-to-first-completion, selecting the card pool and joker count; jokers ship as wilds (CARD-10) only if it passes, otherwise they ship as blockers (CARD-12), with both variants available behind a flag from the start
+
+**Gate G1: PASSED** (2026-11-04). Criterion 5 is kept verbatim above so the gate's original wording stays
+auditable against what was actually recorded. The verdict, every rejected cell with its named bar failures and
+the pure-greedy worst case are in `.planning/phases/02-card-engine-and-pacing-simulator/02-G1-REPORT.md`.
+
+- **Selected configuration, shipped in `src/shared/Config/CardPool.luau`:** `EXTRA_RANKS = 3` (`k = 3`, so
+  `ranks = seatCount + 3` where `seatCount` = seated seekers = players − 1; circulation `4k + j = 13`),
+  `JOKERS = 1`, `JOKER_MODE = "Wild"` with Blocker live behind the flag, `ANTI_LIVELOCK_VALVE = true`,
+  `AUTO_PASS_MAX_SECONDS = 8.0`, `AUTO_PASS_SELECTION = "uniform-random-from-hand"`.
+- **Measured, not rounded.** 320,000 gated rounds at the locked 10,000 per (N, pool config), N = 3..10 × both
+  joker modes × both churn variants: **37 stalled rounds — 0.012% aggregate, 0.070% in the worst cell — against
+  the 0.500% residual ceiling** amendment A8 set. Median time to first completion 16.2s (bar 45s), p95 23.7s
+  (bar 120s), minimum occupancy 0.825 (bar 0.600), worst valve firing rate 8.240% (bar 20.000%), `marginal = false`.
+- **The recorded claim is narrow on purpose:** zero *observed* stalls was never reached and is not claimed. This
+  is a measured property of the selected configuration at the confirmed round count, not an unconditional
+  property of the engine. Criterion 5's literal "zero stalls" bar was not met by any pool this engine has; the
+  bar became an explicit residual ceiling (amendment A8, owner-approved) with the measured residual printed.
+- **Both variants really do ship behind a flag.** Wild and Blocker each clear every bar at every N, so CARD-12
+  is a live flag rather than a contingency — which is also why `k >= 1` is mandatory.
+- **Carried debt:** the solvability half of G1 is a theorem independent of the bot model; the **pacing** half
+  measures the bot until V-35 (does the reaction-time distribution represent humans?) and A4 (do humans deviate
+  from pure greed?) close at a real playtest. Carried in STATE.md.
 **Plans**: 14 plans in 10 waves
 Plans:
-- [ ] 02-03-PLAN.md — pure-zone R3 guard extension banning `coroutine` and `os.`, with two mutation fixtures (CLAUDE.md rules 5 and 6) (wave 1, before the engine exists)
-- [ ] 02-01-PLAN.md — shared type vocabulary plus the circulation, partition-identity and satisfiability invariants, each mutation-proven (wave 2)
-- [ ] 02-02-PLAN.md — SeatOrder: one total order for dealer and seat order, with a corpus covering the five unspecified cases (wave 2)
-- [ ] 02-04-PLAN.md — Pool: `poolConfig`, build, shuffle, and the CARD-09 deal with a rejection-fired assertion (wave 3)
-- [ ] 02-05-PLAN.md — Hand: completion detection, naturals-first retirement, and the Wild/Blocker divergence (wave 3)
-- [ ] 02-06-PLAN.md — Ring: pass/draw/wrap and the one generic seat removal with its terminal bucket (wave 3)
-- [ ] 02-13-PLAN.md — the engine's anti-livelock valve (amendment A7) plus the deterministic livelock fixture that proves it fires (wave 3)
-- [ ] 02-07-PLAN.md — Engine.apply: validation, all seven reject codes, the locked event order, the valve wiring, and newRound (wave 4)
-- [ ] 02-08-PLAN.md — the 100k-action fuzz suite with action-count and per-kind coverage assertions (wave 5)
-- [ ] 02-09-PLAN.md — the bot simulator, the six-outcome taxonomy, the five G1 bars, the mechanism checks, and the CI regression subset (wave 6)
-- [ ] 02-10-PLAN.md — owner decision on the joker floor and the AFK deadline, then the sweep CLI and its smoke test (wave 7, not autonomous)
-- [ ] 02-14-PLAN.md — run the search, mechanism, confirm and triage stages; commit the G1 report and the sweep data (wave 8)
-- [ ] 02-11-PLAN.md — the G1 decision in `Config/CardPool`, the three spec-lock todos become real tests (todo count 0), and 02-VALIDATION.md signed off (wave 9)
-- [ ] 02-12-PLAN.md — owner sign-off, then record the verdict in the planning documents and hand Phase 4 the two auto-pass constraints (wave 10, not autonomous)
+- [x] 02-03-PLAN.md — pure-zone R3 guard extension banning `coroutine` and `os.`, with two mutation fixtures (CLAUDE.md rules 5 and 6) (wave 1, before the engine exists)
+- [x] 02-01-PLAN.md — shared type vocabulary plus the circulation, partition-identity and satisfiability invariants, each mutation-proven (wave 2)
+- [x] 02-02-PLAN.md — SeatOrder: one total order for dealer and seat order, with a corpus covering the five unspecified cases (wave 2)
+- [x] 02-04-PLAN.md — Pool: `poolConfig`, build, shuffle, and the CARD-09 deal with a rejection-fired assertion (wave 3)
+- [x] 02-05-PLAN.md — Hand: completion detection, naturals-first retirement, and the Wild/Blocker divergence (wave 3)
+- [x] 02-06-PLAN.md — Ring: pass/draw/wrap and the one generic seat removal with its terminal bucket (wave 3)
+- [x] 02-13-PLAN.md — the engine's anti-livelock valve (amendment A7) plus the deterministic livelock fixture that proves it fires (wave 3)
+- [x] 02-07-PLAN.md — Engine.apply: validation, all seven reject codes, the locked event order, the valve wiring, and newRound (wave 4)
+- [x] 02-08-PLAN.md — the 100k-action fuzz suite with action-count and per-kind coverage assertions (wave 5)
+- [x] 02-09-PLAN.md — the bot simulator, the six-outcome taxonomy, the five G1 bars, the mechanism checks, and the CI regression subset (wave 6)
+- [x] 02-10-PLAN.md — owner decision on the joker floor and the AFK deadline, then the sweep CLI and its smoke test (wave 7, not autonomous)
+- [x] 02-14-PLAN.md — run the search, mechanism, confirm and triage stages; commit the G1 report and the sweep data (wave 8)
+- [x] 02-11-PLAN.md — the G1 decision in `Config/CardPool`, the three spec-lock todos become real tests (todo count 0), and 02-VALIDATION.md signed off (wave 9)
+- [x] 02-12-PLAN.md — owner sign-off, then record the verdict in the planning documents and hand Phase 4 the two auto-pass constraints (wave 10, not autonomous)
 **Research**: YES. Simulator design (stall definition, pacing targets, bot reaction-time model, snowball and start-up latency measurement). Domain design, not API research. Open Questions 3 and 6 are resolved here. Re-check V-15 and V-35.
 **Note on CARD-10 and CARD-12**: both are mapped here and both are built, but exactly one is active in the shipped game, selected by Gate G1.
 
@@ -121,6 +143,25 @@ Plans:
 **Plans**: TBD
 **UI hint**: yes
 **Research**: Light. Re-check V-12, V-13, V-24, V-25, V-26, V-27 (remote ordering, control disable, ScreenInsets). Open Question 4 (AFK thresholds) tuned here and in Phase 6. Test on a real phone early. The basic deal hook is built here; the deck-skin flourish content lands in Phase 7 (CARD-18).
+
+**Note on CARD-16 — two constraints inherited from Phase 2's Gate G1, both enforced by
+`src/shared/Config/CardPool.luau`:**
+1. The auto-pass deadline **must not exceed `AUTO_PASS_MAX_SECONDS` (8.0s)**. A longer deadline weakens a
+   secondary mitigation (the engine's anti-livelock valve carries the stall job, amendment A7), and CARD-16
+   benches a player after repeated strikes, so a *shorter* deadline would strike ordinary players several
+   times a round. Open Question 4's tuning happens inside that ceiling, not above it.
+2. The card the auto-pass sends **must be chosen by `AUTO_PASS_SELECTION` = `uniform-random-from-hand`**. This
+   is the half that looks like a free implementation choice and is not. Deviation comes from the auto-pass
+   choosing a card the player would NOT have chosen; the helpful-looking "auto-pass your worst card" is the
+   player's own greedy choice, which makes the deviation exactly zero and means the simulator's result
+   transfers nothing to the shipped game.
+
+Also inherited: **`ValveForcedPass` fires in roughly 8% of rounds at a full roster** (up to 15.8% at tighter
+pools) — a card leaves a player's hand that they did not choose, so it needs a real affordance, not an
+edge-case path. The simulator's clock is float seconds while the shipped clock is integer deciseconds
+(Non-Negotiable Rule 5), so round at the boundary. And the start-up ramp is real: ~8.3s at N=10 against a 4.6s
+median time-to-first-completion at N=3, so far seats need a "waiting for cards" affordance. Evidence for all of
+these: `.planning/phases/02-card-engine-and-pacing-simulator/02-G1-REPORT.md`.
 
 ### Phase 5: Hunt, Anti-ESP, Claim and Scoring
 **Goal**: A seeker who completes four of a kind can hunt server-hidden spoons that cheat clients cannot read, claim one without races, and be scored correctly, closing the loop into a playable vertical slice
@@ -201,8 +242,8 @@ Phases execute in numeric order, with parallel pairs: 2 and 3, then 4 and 5, wit
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundations, Contracts and Spec Lock | 8/12 | In progress | - | - |
-| 2. Card Engine and Pacing Simulator | 0/TBD | Not started | - |
+| 1. Foundations, Contracts and Spec Lock | 12/12 | Complete | 2026-11-03 |
+| 2. Card Engine and Pacing Simulator | 14/14 | Complete (Gate G1 PASSED) | 2026-11-04 |
 | 3. Placement Rules, Map Pipeline and Validator | 0/TBD | Not started | - |
 | 4. Live Card Table | 0/TBD | Not started | - |
 | 5. Hunt, Anti-ESP, Claim and Scoring | 0/TBD | Not started | - |
