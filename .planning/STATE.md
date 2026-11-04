@@ -232,6 +232,22 @@ rows below (Phases 5, 6 and 7) are untouched and still open.
   second operating point — at `PICKUP_RANGE 8.5` the shelf edge passes and the shelf centre is
   `NoSight`. **Consequence: the shelf is never `OutOfReach` below `E = 6.54`.** A flat-room row at
   (4, 8.7, 4) now produces `OutOfReach` for the coverage case.
+- **"A comment that names the thing a grep forbids" has now bitten FOUR times in this phase**, and
+  it is worth treating as a known failure mode rather than four coincidences: (1) the plan snippet
+  whose comment spelled `MapValidator.validate(` and so broke its own call-site sweep; (2) plan
+  03-02's `grep -c 'require'` floor contradicted by the header prose the same task mandated; (3)
+  plan 03-05's own criterion forbade spelling `Config/Placement` in a comment, and 03-05 then did
+  exactly that at `SpoonPlacement.luau:46`, which 03-08 found when the raw-source sweep failed on
+  correct code; (4) 03-08's own sweep needed comment-stripping to be meaningful at all. **Rule for
+  later phases: a grep-based gate over raw source is only sound if nothing in the file is allowed
+  to describe what the gate searches for. Prefer `lex.stripComments` for any such gate.**
+- **Line numbers quoted in a plan go stale exactly like counts do.** The plan (and the plan-checker)
+  named two `validate(` call sites in `tests/maps/graybox.spec.luau` at lines 110 and 229; by wave 5
+  there were **three**, at 175, 253 and 314, because waves 1-4 had edited the file. All three were
+  injected. Later plans should locate call sites by pattern at execution time, never by line number.
+- **`MAP_NO_SIGHT`'s overhang half-width flips to `OutOfReach` at about 3.45, where the plan's
+  derivation said 3.62** (plan 03-08, measured). The fixture is unaffected at `w = 3` with ~0.45
+  slack, but the derivation is slightly optimistic and should not be re-used as an exact figure.
 - **A baseline captured at planning time can go stale before the wave that asserts it runs.** Plan
   03-05's "guarded roots = 20 before" was measured during planning; waves 1-2 added roots, so the
   real transition was 22 -> 23. The +1 delta still evidences the new root. Later plans asserting a
