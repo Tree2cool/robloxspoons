@@ -300,6 +300,36 @@ took the recommended option.
   D-29 replacement is proven. See the V-26 entry in `.planning/STATE.md` for why this exists at
   all: `GetControls()` is undocumented, unsupported and slated for removal mid-2027.
 
+### Added 2026-11-05 after pattern mapping (verified against the guard source)
+
+Pattern mapping found two conflicts between the artefacts and the lint guards as they actually
+behave. Both verified by reading `scripts/ci/zones.luau` and `scripts/ci/check-guards.luau`
+directly, and both are binding on the planner.
+
+- **D-37: copy assignment is SERVER-SIDE. The identifier `rankOf` must never appear anywhere in
+  `src/shared/` or `src/client/` — comments included.**
+  `04-RESEARCH.md` proposes `assignCopies(rankOf, ...)` in `src/shared/Card/Faces.luau`, while
+  `04-VALIDATION.md`'s rule-3 gate adds `rankOf` to `zones.secretNames`. **These cannot both
+  hold.** Guard R5 is a *raw plain-text substring scan* over the whole file
+  (`check-guards.luau`: `string.find(sf.text, name, from, true)`), so it matches inside comments
+  and string literals, not just code. Adding `rankOf` to `secretNames` while a shared module names
+  it — even in a comment explaining the rule — fails the build.
+  **Resolution:** the `copy` (1..4 → suit) assignment lives server-side, in `CardTable` or
+  `CardRouting`. `src/shared/Card/` may receive an already-assigned `copy` but must never see or
+  name `rankOf`. There are currently **zero** hits in either tree, so the rule starts clean —
+  do not be the first.
+
+- **D-38: `guardedNamePrefixes` must be extended, or most of the card shell gets NO FOUND-05
+  check.** `zones.luau` has `guardedNamePrefixes = { "Scoring", "CardTable", "SpoonPlacement" }`
+  and matches on the **file basename prefix**, so naming the core `CardTable.luau` covers exactly
+  that one file. `CardRouting`, `CardService`, `IdleClock`, `StallDetector`, `Flourish` and the
+  HUD modules would have **no import-path check to cosmetics or shop code at all**.
+  This is Non-Negotiable Rule 1 — "what makes no-pay-to-win true rather than promised" — so a
+  silent coverage hole here is the exact failure the rule exists to prevent. **The planner must add
+  the new prefixes to `zones.luau` in the same wave that creates the files**, and a test must prove
+  the new prefixes are actually covered (a fixture file under a new prefix with a forbidden import
+  must fail the guard). Adding a prefix is a one-line change; discovering the gap in Phase 7 is not.
+
 ### Claude's Discretion
 
 - The exact `Draw` / `Pass` intent payload shapes and their `Validate` schemas (within rule 7:
