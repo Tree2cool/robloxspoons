@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 3 COMPLETE (11/11 plans, Gate G2 PASSED by owner); ready to plan Phase 4 or 5
-last_updated: "2026-11-04T05:02:35.909Z"
-last_activity: 2026-11-04
+stopped_at: Phase 4 context gathered (04-CONTEXT.md); ready to plan Phase 4 or 5
+last_updated: "2026-11-05T00:52:19.294Z"
+last_activity: 2026-11-05
 progress:
   total_phases: 8
   completed_phases: 3
@@ -21,16 +21,19 @@ progress:
 See: .planning/PROJECT.md (updated 2026-11-02)
 
 **Core value:** The two-stage race has to feel great: the frantic card scramble must flow into the spoon hunt so that getting four of a kind feels like a starting gun, not a menu transition.
-**Current focus:** Phase 3 — Placement Rules, Map Pipeline and Validator (Phases 1 and 2 complete)
+**Current focus:** Phase 4 — Live Card Table (Phases 1, 2 and 3 complete; context gathered, not yet planned)
 
 ## Current Position
 
-Phase: 2 (Card Engine and Pacing Simulator) — **COMPLETE, Gate G1 PASSED**
-Plan: 14 of 14 complete
-Status: Ready to plan Phase 3
-Last activity: 2026-11-04
+Phase: 4 (Live Card Table) — **context gathered, 0 plans**
+Plan: 0 of TBD
+Status: Ready to plan Phase 4 (or Phase 5 — the roadmap pairs them)
+Last activity: 2026-11-05
 
-Progress: [██████████] 100% of Phase 2
+Progress: [░░░░░░░░░░] 0% of Phase 4 — Phases 1, 2 and 3 complete (37/37 plans, Gates G1 and G2 passed)
+
+**Phase 4 context:** `.planning/phases/04-live-card-table/04-CONTEXT.md` (33 decisions, all eight
+gray areas discussed). Full Q&A audit trail in `04-DISCUSSION-LOG.md`.
 
 **Gate G1: PASSED** on the evidence in `.planning/phases/02-card-engine-and-pacing-simulator/02-G1-REPORT.md`.
 Selected and shipped in `src/shared/Config/CardPool.luau`: `k = 3` extra ranks, `j = 1` joker,
@@ -368,17 +371,27 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-11-04
-Stopped at: **Phase 3 COMPLETE.** 11/11 plans, Gate G2 PASSED by the owner in Studio.
-Resume file: `.planning/phases/03-placement-rules-map-pipeline-and-validator/03-G2-REPORT.md`
+Last session: 2026-11-05
+Stopped at: **Phase 4 context gathered.** All eight gray areas discussed; 33 decisions recorded.
+Phase 3 remains complete (11/11 plans, Gate G2 PASSED by the owner in Studio).
+Resume file: `.planning/phases/04-live-card-table/04-CONTEXT.md`
 
 **Final measured state:** 657 tests passed / 0 failed / 0 todo; `verify.luau` 14/14 exit 0;
 `validate-map` ok (21 spots, 9 seats); `ISSUE_CODES` 23; MANUAL-CHECKS 8 signed, 2 unsigned.
 
-**Next:** Phase 4 (Live Card Table) or Phase 5 (Hunt, Anti-ESP, Claim and Scoring). The roadmap
-pairs them and they merge at Gate G3, the vertical slice. Phase 5 depends on Phase 3 and is now
-unblocked; Phase 4 depends on Phase 2. Phase 7a is also unblocked by Gate G2 but waits on Gate G3
-per the roadmap.
+**Next:** `/gsd-plan-phase 4`. Phase 5 (Hunt, Anti-ESP, Claim and Scoring) is equally available —
+the roadmap pairs 4 and 5 and they merge at Gate G3, the vertical slice. Phase 5 depends on Phase 3
+and is now unblocked; Phase 4 depends on Phase 2. Phase 7a is also unblocked by Gate G2 but waits
+on Gate G3 per the roadmap.
+
+**New human gate raised by Phase 4's context (D-28):** landscape must be locked as the supported
+orientation in the place settings, which is a Creator Dashboard step. It is recorded in
+`04-CONTEXT.md` and belongs in `MANUAL-CHECKS.md` / `NEEDS_HUMAN.md` when Phase 4 is planned.
+
+**Two items Phase 4's context carries as planner-level rather than owner-level:** D-22 of
+`01-CONTEXT.md` (the gateway's phase-gate-before-token-bucket order, flagged in Phase 1 for revisit
+in Phase 4 or Phase 8) and the rate limits for the new `Draw` / `Pass` intents (the current default
+burst 4 / refill 4 per second predates any card traffic; V-34 marks the numbers LOW confidence).
 
 **Carried into Phase 4/5/6 — do not rediscover:**
 - **`RaycastParams.RespectCanCollide` defaults to `false`**, the opposite of D-03. Phase 5's
