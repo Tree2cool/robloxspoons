@@ -330,6 +330,56 @@ directly, and both are binding on the planner.
   the new prefixes are actually covered (a fixture file under a new prefix with a forbidden import
   must fail the guard). Adding a prefix is a one-line change; discovering the gap in Phase 7 is not.
 
+### CORRECTIONS 2026-11-05 — D-37 and D-38 were both wrong (orchestrator error, found by the plan-checker)
+
+The plan-checker probed the guards empirically instead of reasoning about them, and both decisions
+I added after pattern mapping were wrong. I verified its findings myself before accepting them.
+**The corrected text below governs; the original D-37/D-38 wording above is superseded.**
+
+- **D-37 CORRECTED: the identifier `rankOf` must not appear in `src/shared/` or `src/client/` CODE
+  OR STRING LITERALS. The "comments included" half was FALSE and is withdrawn.**
+  I claimed R5 scans raw file text and therefore matches comments. It does not.
+  `check-guards.luau` sets `sf.text = stripComments(raw)` (line 324) and R5 scans `sf.text`, so a
+  `rankOf` appearing **only in a comment is invisible to R5**. I had read `string.find(..., true)`
+  and taken `plain = true` to mean "raw file text"; it means "no pattern matching". Two different
+  things.
+  **Verified empirically:** `lex.stripComments` applied to a file whose only `rankOf` is in a
+  comment leaves no `rankOf` behind — the probe printed `comment-only rankOf survives strip: false`.
+  **What is still true and still enforced:** `sf.text` **keeps string literals**, so `rankOf` in
+  code or in a string is caught. That is the leak that matters; a comment naming the identifier
+  leaks nothing. **Do not add a raw-text comment-inclusive scan** to rescue the original claim —
+  it would buy no safety and would make every file that documents the rule fail the build.
+  **Consequence for plan 04-02:** its fixture C puts `rankOf` in a comment only and asserts the
+  guard goes red. It cannot. Put `rankOf` in code or a string literal.
+
+- **D-38 WITHDRAWN: do NOT extend `guardedNamePrefixes`. FOUND-05 already covers the gameplay
+  cores, and extending it to the renderer layer would break Phase 7 by design.**
+  Two independent errors in the original:
+  1. **The extension is mostly redundant.** `check-guards.luau:341` is explicit: *"Roots for R2/R3:
+     guarded-name files under src/, then **every file in a pure zone**."* So `CardTable`,
+     `CardRouting`, `IdleClock`, `StallDetector` and `RejectThrottle` in `src/server/core` are
+     **already** FOUND-05 roots by location, whatever they are named — and `Faces`, `Hints`,
+     `Layout`, `Prediction`, `Flourish`, `Controls` become roots the moment `src/shared/Card` is
+     registered as a pure zone (plan 04-04). Nine of the ten proposed prefixes add nothing.
+  2. **The one prefix that would add something — `Card` — is actively harmful**, for two separate
+     reasons. First, guarded roots get **R3** as well as R2, and R3 bans the substring `os.` in
+     comment-stripped text *including string literals*. R3's own source comment says that
+     over-strictness is deliberate "in a zone whose whole point is having no clock". `CardService`
+     legitimately needs a clock, and — verified empirically — the needle also matches ordinary
+     identifiers: the probe printed `pos.X trips the os. needle: true`, so `pos.X` or
+     `anchorPos.Y` in any `Card*` client file would fail the build. Second, and more
+     fundamentally: **Phase 7 requires the card UI to import cosmetic data.** The dealer's deck
+     skin and the deal animation play to the whole table (PROJECT.md, CARD-18); the renderer is
+     precisely the layer that must touch cosmetics. Forbidding it would make Phase 7 impossible as
+     designed.
+  **What Rule 1 actually protects:** the modules that decide *outcomes* — `Scoring`, `CardTable`,
+  `SpoonPlacement` — not the layer that draws them. The existing prefix list is correctly scoped.
+  **What the planner must do instead:** add no prefixes, and **prove the coverage that already
+  exists** — a fixture under `src/server/core` with a forbidden cosmetics import must fail R2 with
+  the unmodified `zones.luau`. That is a real proof of a real guard, unlike the original plan's
+  fixture A, which the checker observed goes red with or without the prefixes and therefore proved
+  nothing.
+
 ### Claude's Discretion
 
 - The exact `Draw` / `Pass` intent payload shapes and their `Validate` schemas (within rule 7:
