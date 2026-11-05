@@ -28,7 +28,7 @@ created: 2026-11-05
 | Preset | not applicable |
 | Component library | none. **D-34 (hard constraint): vanilla Roblox UI only** — `ScreenGui`, `Frame`, `ImageLabel`, `TextLabel`, `TextButton`/`ImageButton` (hit areas), `UIListLayout`, `UIScale`, `UICorner`, `UIStroke`, `UIGradient` plus plain Luau. No Fusion, no React-lua, no `wally`, no `rokit install`. If the planner believes a library is required, that is a BLOCKER to raise with the owner. |
 | Icon library | none. Every shape is built from `Frame` + `UICorner`/`UIStroke`/rotation, or is an owner-uploaded image asset (see Card Face Anatomy → suit pips). No emoji, no web icon fonts. |
-| Font | Roblox built-in only. `Font.new("rbxasset://fonts/families/BuilderSans.json", Enum.FontWeight.Regular)` and `.Bold` (`Enum.Font.BuilderSans*` is the enum equivalent). **Verify in Studio** that Builder Sans is present and that Regular/Bold are the weights it ships; if not, fall back to `Enum.Font.Gotham` (Regular) / `Enum.Font.GothamBold` (Bold) — never `GothamMedium`, which would add a third weight. No web fonts. |
+| Font | Roblox built-in only. `Font.new("rbxasset://fonts/families/BuilderSans.json", Enum.FontWeight.Regular)` and `.Bold` (`Enum.Font.BuilderSans*` is the enum equivalent). **Builder Sans only — there is no Gotham fallback.** Phase research (04-RESEARCH.md) found `Enum.Font.Gotham*` has been **removed from the platform and now maps to Montserrat**, so the fallback this row previously named would silently change the typeface and invalidate every glyph-width figure in this document. If Builder Sans is somehow unavailable, that is a BLOCKER to raise, not a substitution to make. No web fonts. |
 
 ---
 
@@ -361,7 +361,13 @@ The UI checker returned **VERIFIED / APPROVED** with nine non-blocking FLAGs. Di
 
 **Handed to the planner as work, not resolved here:**
 
-- **F4 / strip width.** The 450 design px limit assumes ~11 px per character at 20 bold; bold
+- **F4 / strip width — now worse than the checker measured.** Phase research found
+  `GuiService.PreferredTextSize` scales text even with `TextScaled = false`, so a player on the
+  **Largest** accessibility setting gets strings wider than any figure below. The strip budget must
+  be validated at that setting, not only at the default, and `UITextSizeConstraint` is one of the
+  open questions the planner must settle (constrain to guarantee one line, or accept truncation).
+  The checker's original measurement, which still applies at default text size: the 450 design px
+  limit assumes ~11 px per character at 20 bold; bold
   glyphs can average ~12, which puts the two 38-character strings at ~456. The strip ends at y 28
   and the piles start at y 40, so it *can* span the full safe width (~634). **Planner: widen the
   strip to the safe width, or cap strings at ~34 characters — and the `GetTextSize` test must say
@@ -387,7 +393,8 @@ The UI checker returned **VERIFIED / APPROVED** with nine non-blocking FLAGs. Di
 | V-25 mobile min target size | UNVERIFIED | 48 is the project's own floor; do not cite 44 as platform fact |
 | V-26 disable default controls | UNVERIFIED | Confirm `PlayerModule:GetControls():Disable()` hides the thumbstick/jump and `Enable()` restores it |
 | V-27 `ContextActionService` / gamepad `SelectedObject` | UNVERIFIED | Confirm, or drop the gamepad column |
-| Font availability (BuilderSans Regular/Bold) | UNVERIFIED | Check in Studio; fall back to `Enum.Font.Gotham` (Regular) / `Enum.Font.GothamBold` (Bold) so the two-weight rule holds |
+| Font availability (BuilderSans Regular/Bold) | UNVERIFIED | Check in Studio. **No fallback exists** — `Enum.Font.Gotham*` was removed and maps to Montserrat (04-RESEARCH.md), so unavailability is a blocker, not a substitution |
+| `GuiService.PreferredTextSize` at "Largest" | **NEW, from 04-RESEARCH.md** | The accessibility setting scales text even when `TextScaled = false`, so it can overflow the single-line status strip. Every strip string must be measured at the **Largest** setting, not just the default — this compounds F4 below |
 | Suit pip rendering (glyph vs sprite) | OPEN | Test glyphs on a phone; else owner-uploaded sprite (human gate) |
 | Landscape lock | HUMAN GATE | Creator Dashboard setting; `MANUAL-CHECKS.md` + `NEEDS_HUMAN.md` |
 | Audio asset ids (sting, draw, pass) | HUMAN GATE | Owner-supplied; missing = silent |

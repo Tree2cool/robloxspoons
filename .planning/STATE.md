@@ -394,6 +394,45 @@ in Phase 4 or Phase 8) and the rate limits for the new `Draw` / `Pass` intents (
 burst 4 / refill 4 per second predates any card traffic; V-34 marks the numbers LOW confidence).
 
 **Carried into Phase 4/5/6 — do not rediscover:**
+- **`PlayerModule` / `GetControls()` IS NOT DOCUMENTED AND IS BEING REMOVED** (Phase 4 research,
+  2026-11-05, primary docs + staff release post). The idiom the research recorded as V-26 —
+  `require(PlayerScripts.PlayerModule):GetControls():Disable()` — appears in **no official Roblox
+  doc and never has**. A staff release post (2026-06-11) says the legacy `GetControls()` endpoints
+  "may no longer exist"; the player scripts are migrating to the **Input Action System**, with the
+  default flipping early 2027 and the legacy scripts removed mid-2027. DevForum reports from
+  Aug and Oct 2026 say it is already missing on opted-in places. **Any phase that hides or
+  restores default controls (UX-02 here, and anything similar in Phases 6 and 8) must go through a
+  `Controls.hide/restore` seam** layered as: server holds the avatar (the only security-relevant
+  part) plus server-only `DevComputerMovementMode`/`DevTouchMovementMode = Scriptable`; client sets
+  `GuiService.TouchControlsEnabled = false` and sinks keys via `BindActionAtPriority`. Nothing in
+  the default scripts is mutated, so there is nothing to restore if a layer fails. The IAS flag
+  `Workspace.PlayerScriptsUseInputActionSystem` must be pinned explicitly — a human gate. **None of
+  the replacements is proven under IAS**, and community reports describe stuck-touch and held-key
+  bugs on re-enable, which bear directly on D-15/D-30 (a finisher stands up and runs).
+
+- **V-12 IS REVERSED, in our favour** (Phase 4 research, primary docs `last_updated 2026-11-04`).
+  The carried caution was "same-remote ordering guaranteed, cross-remote NOT guaranteed". Current
+  docs state RemoteEvents are ordered **per connection per direction, including across different
+  RemoteEvent instances**. Ordering is of handler **start**, not completion, and RemoteFunction vs
+  RemoteEvent is still not ordered. Do not design around the old cross-remote caution.
+
+- **`Enum.Font.Gotham*` has been REMOVED from the platform and maps to Montserrat.** Any phase
+  specifying a Gotham fallback is specifying a silent typeface change. Builder Sans is the font;
+  unavailability is a blocker, not a substitution.
+
+- **`GuiService.PreferredTextSize` scales text even when `TextScaled = false`.** Any single-line
+  text budget must be validated at the **Largest** accessibility setting, not only the default.
+  Phases 6, 7 and 8 all add UI text and inherit this.
+
+- **Lint guard R4 confines `FireClient` and `FireAllClients` to `src/server/services/NetServer.luau`**
+  (`scripts/ci/zones.luau:44-45`, verified). No other module may publish to clients, so every
+  service needing per-player delivery takes an **injected publisher**. This is already enforced;
+  it is not a convention to remember.
+
+- **No avatar seating or stand-up code exists anywhere in the tree.** D-15/D-30/D-31 (a finisher
+  stands up from the chair and runs, rather than teleporting) need new server code, and the seat
+  hold must be server-enforced. Phase 6 inherits the same seam.
+
 - **`RaycastParams.RespectCanCollide` defaults to `false`**, the opposite of D-03. Phase 5's
   line-of-sight raycast must set it `true` or CI and the live game will disagree about what blocks
   sight. This is the highest-value single fact this phase produced for a later one.
