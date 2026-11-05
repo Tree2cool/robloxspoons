@@ -245,6 +245,17 @@ Explicitly NOT in scope (other phases own these):
 - **`ValveForcedPass` may cross the network, and carries no hash by design** (`Types.luau`
   comment). Do not add state hashes to anything client-bound.
 
+- **D-34: NO new third-party dependency, and no UI framework. Vanilla Roblox UI only.** This is
+  forced by the container, not a style preference. There is no `wally.toml` and no `Packages/` in
+  the tree, `rokit.toml` holds only rojo/stylua/selene/luau-lsp/lune, and **`rokit install` cannot
+  work here at all** — `api.github.com/repos/.../releases/tags/...` returns 403, which is exactly
+  what `01-CONTEXT.md` D-16's correction records (the toolchain was installed by downloading
+  release archives directly). So adding Fusion, React-lua or any other UI library would mean
+  inventing a second bespoke vendoring path for a dependency nobody has decided to take on.
+  Build the card UI from `ScreenGui` / `Frame` / `ImageLabel` / `TextLabel` and plain Luau.
+  If a planner or executor believes a library is genuinely required, that is a BLOCKER to raise
+  with the owner, never something to install.
+
 ### Claude's Discretion
 
 - The exact `Draw` / `Pass` intent payload shapes and their `Validate` schemas (within rule 7:
