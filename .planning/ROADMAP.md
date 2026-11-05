@@ -152,7 +152,28 @@ Plans:
   3. On a phone in landscape the hand and both piles are fully playable with touch targets of at least 48px, the default movement controls are hidden during the card phase, nothing sits under device safe areas, and on-screen hints match mouse, touch or keyboard
   4. An idle seat is auto-passed within the timeout so the circle keeps moving, and is benched after repeated strikes through the same seat-removal path as a disconnect
   5. Completing four of a kind plays a distinct starting-gun moment, and card faces (including jokers) remain legible for a colour-blind player
-**Plans**: TBD
+**Plans**: 20 plans in 10 waves
+Plans:
+- [ ] 04-01-PLAN.md — the RecordingPublisher fake, Config/Card, and the Gate G1 / D-32 spec-lock (wave 1)
+- [ ] 04-02-PLAN.md — zones.luau extended for D-37 and D-38, three fixtures proving the new coverage fires, and MANUAL-CHECKS M-11..M-17 written before execution (wave 1)
+- [ ] 04-03-PLAN.md — Draw and Pass in the Manifest with their buckets, and the rule-7 forbidden-key gate (wave 1)
+- [ ] 04-04-PLAN.md — src/shared/Card registered as a pure zone; Faces: the rank ladder, the drawn-asset table, and the 50-face greyscale gate (wave 2)
+- [ ] 04-05-PLAN.md — CardRouting: the audience as frozen data, the private-kind guard, ValveForcedPass stripping, and copy assignment (wave 2)
+- [ ] 04-06-PLAN.md — IdleClock: the D-15 legal-action gating, 80 deci, three strikes, the uniform auto-pass, and D-35's no-auto-draw (wave 2)
+- [ ] 04-07-PLAN.md — StallDetector independent of the valve (D-20), and RejectThrottle closing the D-22 revisit (wave 2)
+- [ ] 04-08-PLAN.md — Layout: the whole UI-SPEC geometry as pure arithmetic, four viewports, the 48 px floor, and the F4 strip resolution (wave 3)
+- [ ] 04-09-PLAN.md — Prediction: the auth + pending reducer, CARD-15's one-tap rule, cumulative ack and the rollback watchdog (wave 3)
+- [ ] 04-10-PLAN.md — Flourish: the fixed-duration driver, the CARD-18 seam, and the F8 periodic scan (wave 3)
+- [ ] 04-12-PLAN.md — CardTable: the pure server core, the CARD-13 privacy gate, and state-hash equivalence against the real engine (wave 3)
+- [ ] 04-11-PLAN.md — Hints: the complete (state x input) copy table with the four F4 rewrites; Controls: the pure hide/restore seam and the src-wide GetControls scan (wave 4)
+- [ ] 04-13-PLAN.md — the Card remote, the Publisher implementation and ClientNet.onCard (wave 4)
+- [ ] 04-14-PLAN.md — CardService: the one deci conversion, the two clocks, the 10 Hz sweep, the RoundStub, and the throttled reject sink (wave 5)
+- [ ] 04-15-PLAN.md — CardSeatHold: the server-enforced avatar hold and the instant release on completion (wave 6)
+- [ ] 04-16-PLAN.md — CardTheme, CardHud and CardStrip: the ScreenGui with CoreUISafeInsets, the UITextSizeConstraint, and the no-magic-number gate (wave 6)
+- [ ] 04-17-PLAN.md — CardFace, CardHand and CardPiles: the fan, the hit strips and both pile panels (wave 7)
+- [ ] 04-18-PLAN.md — CardControls, CardInput and CardClient: the control effects, the input layer and the one wiring file (wave 8)
+- [ ] 04-19-PLAN.md — CardTableView, CardCallout, CardFlourish and CardAudio: travelling cards, the who-went banner, the flourish surface and the sting (wave 9)
+- [ ] 04-20-PLAN.md — the phase gate: the runtime budget decision, the mutation ledger, the honest requirement split, and the device matrix checkpoint (wave 10, not autonomous)
 **UI hint**: yes
 **Research**: Light. Re-check V-12, V-13, V-24, V-25, V-26, V-27 (remote ordering, control disable, ScreenInsets). Open Question 4 (AFK thresholds) tuned here and in Phase 6. Test on a real phone early. The basic deal hook is built here; the deck-skin flourish content lands in Phase 7 (CARD-18).
 
