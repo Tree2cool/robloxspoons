@@ -74,13 +74,12 @@ created: 2026-11-05
 ### Scale
 One root `Frame` sized `S / scale` carries one `UIScale`:
 `scale = clamp(min(S.width / 760, S.height / 350), 0.85, 1.5)`.
-All numbers in this document are design units. The 0.85 floor is chosen so the smallest touch strip
 All numbers in this document are design units. The 0.85 floor is chosen so the smallest touch strip (60 design px) stays >= 48 physical px (60 x 0.85 = 51). The derivation is `step >= 48/0.85 = 56.5`; 60 is the next 4-grid value. **Do not lower the floor without re-checking UX-01.**
 
 ### Vertical budget (D-27, stated explicitly)
 | Zone | Height | Contents | Rule |
 |------|--------|----------|------|
-| **TableRegion** (top) | `H - 144*scale` (physical px). Fraction = `1 - 144*scale/H`. **Bound:** while `scale <= H/350` (always true unless the 0.85 floor raises it) the HandZone is at most `144/350 = 41.1%` of H, so **TableRegion >= 58.9%**; with the floor active (`scale = 0.85`, HandZone = 122.4 px) TableRegion >= 59.2% for H >= 300. Worked examples: S = 750 x 369 -> scale 0.987, HandZone 142 px, TableRegion 61.5%; S = 1920 x 1080 -> scale clamped to 1.5, HandZone 216 px, TableRegion 80%. | the 3D table, 9 seat stacks, travelling cards, avatars standing/running; who-went callout banners at its top centre | **The hand overlay never covers it.** Camera frames the table's full bounding box inside this rect with >= 8 design px margin. The camera is locked to the table (Phase 1 D-14); the planner chooses the mechanism (pitch / CFrame offset) — the *contract* is the projected-bounds assertion. |
+| **TableRegion** (top) | `H - 144*scale` (physical px). Fraction = `1 - 144*scale/H`. **Bound:** while `scale <= H/350` (always true unless the 0.85 floor raises it) the HandZone is at most `144/350 = 41.1%` of H, so **TableRegion >= 58.8%** (exactly 58.857%; stated down, never up); with the floor active (`scale = 0.85`, HandZone = 122.4 px) TableRegion >= 59.2% for H >= 300. Worked examples: S = 750 x 369 -> scale 0.987, HandZone 142 px, TableRegion 61.5%; S = 1920 x 1080 -> scale clamped to 1.5, HandZone 216 px, TableRegion 80%. | the 3D table, 9 seat stacks, travelling cards, avatars standing/running; who-went callout banners at its top centre | **The hand overlay never covers it.** Camera frames the table's full bounding box inside this rect with >= 8 design px margin. The camera is locked to the table (Phase 1 D-14); the planner chooses the mechanism (pitch / CFrame offset) — the *contract* is the projected-bounds assertion. |
 | **HandZone** (bottom) | **144** (design units) | status strip 28 (24 single-line text area + 4 drain-bar row) + fan area 112 (4 margin + 92 card + 16 lift; the lifted card's top is 4 px below the strip, 28 + 112 = 140 <= 144) + both pile panels | Opaque-ish plate; contains every interactive element of the phase. |
 
 Horizontal budget inside HandZone (W = S.width / scale; W >= 650 design units at every supported viewport: width-limited gives exactly 760, the 0.85 floor needs S.width >= 553 physical):
@@ -130,7 +129,7 @@ Declared values (multiples of 4), design units:
 | xl | 32 | Callout banner height |
 | 2xl | 48 | Touch-target floor (physical px), not a layout size |
 
-Exceptions: **none.** The card model is on the 4-grid too: **72 x 92 card, 60 step, 12 overlap, 16 lift, 12 left / 4 top index inset, 144 HandZone, 28 strip, 84 x 96 pile panel, 52 x 68 pile art**. The 48 hit-slot minimum is a physical floor, not a token: the 0.85 UIScale floor requires `step >= 48 / 0.85 = 56.5`, and 60 satisfies it (60 x 0.85 = 51). Stroke widths (2, 3) and pulse ranges are line weights, not spacing.
+Exceptions: **none.** The card model is on the 4-grid too: **72 x 92 card, 60 step, 12 overlap, 16 lift, 16 left / 4 top index inset, 144 HandZone, 28 strip, 84 x 96 pile panel, 52 x 68 pile art**, and the in-card art coordinates (rank glyph y 4..24, pip y 28..44, joker band y 60..88). The 48 hit-slot minimum is a physical floor, not a token: the 0.85 UIScale floor requires `step >= 48 / 0.85 = 56.5`, and 60 satisfies it (60 x 0.85 = 51). Stroke widths (2, 3) and pulse ranges are line weights, not spacing.
 
 ---
 
@@ -138,9 +137,9 @@ Exceptions: **none.** The card model is on the 4-grid too: **72 x 92 card, 60 st
 
 ### Data contract the UI needs (flag to planner)
 The engine has **no suits** (`Types.luau`): a card is `cardId` with `rankOf[cardId]` an integer in `1..ranks`, or `JOKER_RANK = 0`. `cardId` is a re-shuffled deck position, so `cardId mod 4` does NOT give four distinct suits per rank. The server shell must therefore send the holder, privately, a face record `{ cardId, rank, copy }` where `copy` in `1..4` is assigned by the **adapter** (e.g. sort the four ids of a rank ascending at deal time, copy = index). The engine is not changed. This record goes **only to the holder**; no client ever receives another seat's face data (derived constraint, CLAUDE.md rule 3). Public events (`Passed`, `Drew`) carry `cardId` only; a card passing in the open is shown **face-down**.
-The engine has **no suits** (`Types.luau`): a card is `cardId` with `rankOf[cardId]` an integer in `1..ranks`, or `JOKER_RANK = 0`. `cardId` is a re-shuffled deck position, so `cardId mod 4` does NOT give four distinct suits per rank. The server shell must therefore send the holder, privately, a face record `{ cardId, rank, copy }` where `copy` in `1..4` is assigned by the **adapter** (e.g. sort the four ids of a rank ascending at deal time, copy = index). The engine is not changed. This record goes **only to the holder**; no client ever receives another seat's face data (derived constraint, CLAUDE.md rule 3). Public events (`Passed`, `Drew`) carry `cardId` only; a card passing in the open is shown **face-down**.
 
 **Privacy test (named check):** with a recording fake of the Roblox send layer, assert that (a) the private face record and (b) `ValveForcedPass` are each sent via a **per-player** send (`FireClient(player)`) to exactly the owning/affected player and never via a broadcast (`FireAllClients`, a shared remote fired without a target); with 3 players, only the owner's recorder sees the face record, only the affected seat's player sees `ValveForcedPass`, while all see the ordinary `Passed`. Add a lint/grep rule that the card publish module does not reference `FireAllClients` for those two event kinds. Mutation-test: switch either send to a broadcast and the test must fail.
+
 ### Rank glyph mapping (D-21, D-22)
 A fixed constant table (stable for the whole round and across rounds):
 `RANK_LADDER = { "A","K","Q","J","10","7","4","2","5","3","9","8" }` — engine rank `r` in `1..12` maps to `RANK_LADDER[r]`; `r = 0` is the joker; **"6" is never used** (the 13th rank is unreachable since max ranks = 12). Order is by *visual distinctness*, so small tables (3 players = 5 ranks: A K Q J 10) use the five most dissimilar glyphs, and the confusable 6/8/9 trio enter last. Mapping is `r -> glyph` independent of round size, so a given integer never changes glyph mid-round. Copy-to-suit: `copy 1 = spade, 2 = heart, 3 = club, 4 = diamond`.
@@ -149,10 +148,10 @@ A fixed constant table (stable for the whole round and across rounds):
 
 | Part | **Fan size** (72 x 92, resting) | **Lifted** (same 72 x 92, raised 16, top z-order, full face) |
 |------|----------------------------------|----------------------------------------------------------------|
-| Corner index (top-left, inset **12 from left, 4 from top**) | Rank glyph 20 bold (y 4..24) + suit pip 16 below it (y 26..42). **This is all that is visible of a card under its right neighbour** (visible strip 60 wide; index spans x 12..~36). Must be fully legible in the 60-wide strip. | Same index, unchanged |
+| Corner index (top-left, inset **16 from left, 4 from top**) | Rank glyph 20 bold (y 4..24) + suit pip 16 below it (y 28..44). **This is all that is visible of a card under its right neighbour** (visible strip 60 wide; index spans x 16..~40). Must be fully legible in the 60-wide strip. | Same index, unchanged |
 | Centre | hidden by neighbour | Suit pip 28, centred |
 | Opposite corner (bottom-right, rotated 180) | hidden | Index repeated, rotated 180 (not on jokers) |
-| Joker face | Corner: star shape 24 + `JK` at 16 bold (below the star). Double border (two nested strokes) | Star 28 centred high, **rule band** across the lower third (y 62..88) with `WILD`/`BLOCK` 16 bold (<= 5 chars, ~50 px of the 72) |
+| Joker face | Corner: star shape 24 + `JK` at 16 bold (below the star). Double border (two nested strokes) | Star 28 centred high, **rule band** across the lower third (y 60..88) with `WILD`/`BLOCK` 16 bold (<= 5 chars, ~50 px of the 72) |
 
 Card face colour `Color3.fromRGB(244,240,230)`; 2 px outer stroke `fromRGB(24,24,30)` (4 px double stroke on jokers). `UICorner` radius 8.
 
@@ -173,8 +172,8 @@ Pips MUST be four **shape-distinct** silhouettes (spade, heart, club, diamond). 
 
 | State | Visual | Motion / duration | Input |
 |-------|--------|-------------------|-------|
-| **Idle** (in fan) | Corner index visible; at rest slot position | — | tappable slot |
-| **Selected** (lifted) | Raised 20 up, top z-order, full face, **3 px accent outline** + the lift itself. Not colour-only: position (lift) and stroke thickness (3 vs 2) carry it | Lift **0.08 s** Quad Out; begins on the same frame as the input | second tap on the same slot = send |
+| **Idle** (in fan) | Corner index visible; at rest slot position | — | **Tappable only at hand = 5.** At hand 4 the slots are inert no-op sinks (`Active = true`, so a tap does not reach the backdrop and cannot clear anything): the player owes a *draw*, not a pass, and the engine would reject a Pass with `HandNotFive`. Committing one anyway would fly a card out and back on a *guaranteed* rejection, which D-12 says a legitimate player must never experience. The client knows its own hand size, so this is decidable client-side with no round trip. Resolves checker FLAG F6 |
+| **Selected** (lifted) | Raised **16** up, top z-order, full face, **3 px accent outline** + the lift itself. Not colour-only: position (lift) and stroke thickness (3 vs 2) carry it | Lift **0.08 s** Quad Out; begins on the same frame as the input | second tap on the same slot = send |
 | **Arriving** (just drawn, predicted) | **Face-down** card back appears in the next free slot | Flies from left pile to slot **0.15 s** Quad Out; on face arrival flips (width 1->0->1) **0.12 s** | **not tappable until the server's answer carries its `cardId` and face.** This is information-limited, not a gate: the client does not know the id of the card it just drew (draw intents carry no card), so there is nothing it could name in a Pass intent (CLAUDE.md rule 7). It is not a timer and adds no delay beyond the round trip |
 | **In flight** (committed, predicted) | Card leaves the fan toward the right pile, shrinking to 60 % | **0.18 s** Quad In; others close the gap **0.12 s (visual only)** | none (gone). Neighbour hit strips **jump to their final slot positions at the instant of commit**; only the drawn cards tween, so a tap during the 0.12 s closing lands on the final layout. A stray second tap on the old slot lands on a neighbour or backdrop, never a double-send |
 | **Returning** (server correction, D-11) | Card flies back from the right pile (or, for a rejected draw, face-down back to the left pile) to its original slot | **0.25 s** Quad Out with slight overshoot (`Back`). Deliberately slower and bouncier than the 0.18 s send so it reads as a *return*. Pile counts revert as it moves. | **tappable immediately** — the hit strip is at the card's slot for the whole flight and a tap selects/sends it normally. The flight is cosmetic and gates nothing (D-02: no arming delay) |
@@ -194,7 +193,7 @@ Selection is tracked by `cardId`. If the selected card leaves the hand for any r
 ## Hand, Fan and Piles
 
 ### Fan geometry (D-25)
-Cards **72 x 92**, step **60**, so **12 px overlap** (card width − step); later cards (right) sit above earlier ones. Five slots span `72 + 4*60 = 312`. At 4 cards the fan is 252 wide; slots re-centre on hand changes (visual tween 0.12 s; hit strips jump to the final layout at once, see Hit Model). **Vertical budget of the 144 HandZone:** status strip 0..28 (24 text area + 4 drain-bar row); resting card top at 144 − 4 − 92 = **48**; lifted (16 up) card top at **32**, so a lifted card is **4 px clear** of the strip. Acceptance: at every viewport in the layout test, a lifted card's rect and the strip's rect do not intersect. The 12 px left index inset equals the overlap, so the lifted card never covers a neighbour's index.
+Cards **72 x 92**, step **60**, so **12 px overlap** (card width − step); later cards (right) sit above earlier ones. Five slots span `72 + 4*60 = 312`. At 4 cards the fan is 252 wide; slots re-centre on hand changes (visual tween 0.12 s; hit strips jump to the final layout at once, see Hit Model). **Vertical budget of the 144 HandZone:** status strip 0..28 (24 text area + 4 drain-bar row); resting card top at 144 − 4 − 92 = **48**; lifted (16 up) card top at **32**, so a lifted card is **4 px clear** of the strip. Acceptance: at every viewport in the layout test, a lifted card's rect and the strip's rect do not intersect. The **16 px** left index inset exceeds the 12 px overlap, so a lifted card's right edge — and its 3 px accent outline — stays **4 px clear** of the neighbour's index glyph. (At 12 the inset merely equalled the overlap, leaving zero clearance and letting the outline spill onto the neighbour's glyph.)
 
 ### Piles (D-26, D-06, CARD-13)
 Both panels 84 x 96, `fromRGB(38,45,66)` with `UICorner` 8, at the two bottom corners flanking the fan, 8 from the safe-rect edge. Contents: label at top (16 regular), card-back art 52 x 68 (up to 3 offset layers = `min(count,3)`), and the **exact count numeral** (28 bold) centred over the art, white with a dark stroke.
@@ -329,6 +328,54 @@ PROJECT.md requires every deal animation to have the same fixed duration so that
 | **Select / deselect** | lift/drop 0.08 s | n/a (selection is local only; nothing is sent until commit) | n/a |
 
 Selection never goes to the server. Only the committing intent does, carrying stable card IDs only (CLAUDE.md rule 7). Verify at **150-300 ms simulated lag** that the card is visibly gone within one frame and any return is a smooth motion with no teleport. A correction and a hard rejection are visually identical (D-12).
+
+---
+
+## Checker FLAGs: disposition (revision 1 audit, 2026-11-05)
+
+The UI checker returned **VERIFIED / APPROVED** with nine non-blocking FLAGs. Disposition:
+
+**Fixed in this file** (all were contradictions or real gaps, not polish):
+
+| FLAG | Was | Now |
+|------|-----|-----|
+| F1 | Selected state said "Raised 20 up" while the lift is 16 everywhere else | 16. At 20 the lifted top would sit at 28 — touching the strip — and the hit rect would be 112, not 108. A live contradiction, not a typo |
+| F2 | 12 px left index inset *equalled* the 12 px overlap, so a lifted card's 3 px outline spilled onto the neighbour's glyph | 16 px inset, giving 4 px clear. Index spans x 16..40, still inside the 60-wide visible strip |
+| F3 | Pip y 26..44 and joker band y 62..88 were off-grid while the spec claimed "Exceptions: none" | Pip y 28..44, band y 60..88. The "none" claim is now true |
+| F6 | Spec never said whether cards are selectable at hand 4 | Inert no-op sinks at hand 4. See the Idle row — a commit there would be a *guaranteed* `HandNotFive` rejection, which D-12 forbids a legitimate player from ever seeing |
+| F9 | Editing artefacts: a truncated duplicate line, a verbatim duplicated paragraph, a heading glued to the prior section | Removed |
+| — | Vertical-budget bound stated as ">= 58.9%" | ">= 58.8%". The true bound is 58.857%; the checker caught the over-round. **Rule: state this bound down, never up** |
+
+**Accepted as stated — named here so they are decisions, not oversights:**
+
+- **F5 / callout coverage.** A 2-stack is 68 design px: ~24% of TableRegion at 640x360, ~33% at
+  844x390 and 932x430, inside the spec's ~40% ceiling. It does sit over the far seats at the top
+  of the table for its 2.5 s. Accepted: the callout is the D-31 "someone is already out there"
+  pressure, and the far seats carry no information a seeker must act on within that window.
+- **F7 / hit-strip jump.** Hit strips snap to the final layout at commit while the visuals tween
+  0.12 s, so the two disagree by up to 30 px for that window. Accepted deliberately: the
+  alternative is a tap during the tween landing on a slot that is about to move, and D-02 forbids
+  adding any delay to resolve it.
+- **4 px drain-bar row** is 3.4 physical px at the 0.85 floor. Thin, but the countdown text
+  carries the same meaning redundantly, so no information depends on the bar alone.
+
+**Handed to the planner as work, not resolved here:**
+
+- **F4 / strip width.** The 450 design px limit assumes ~11 px per character at 20 bold; bold
+  glyphs can average ~12, which puts the two 38-character strings at ~456. The strip ends at y 28
+  and the piles start at y 40, so it *can* span the full safe width (~634). **Planner: widen the
+  strip to the safe width, or cap strings at ~34 characters — and the `GetTextSize` test must say
+  what it does on failure rather than only measuring.**
+- **F8 / flourish input sinking.** The post-play scan runs only when `play` returns and at the
+  cutoff, so an `Active` full-screen GuiObject created mid-flight could sink input for part of the
+  1.5 s — which would silently break D-30's "control returns instantly". **Planner: add a periodic
+  scan during the flourish, constrain the Deal kind's parent to a ScreenGui (`ctx.root` is a
+  `Folder` and no parent is specified for the UI vs 3D kinds), and set an explicit `DisplayOrder`
+  below the hand.** Note also that "every parent the flourish could reach" cannot be enumerated,
+  so the guarantee is a scan, not a proof.
+- **Minor:** the AFK hand-4 cue pulses the left-pile ring, which already pulses at 1.5 Hz for the
+  Drawable state — the text and drain bar already carry that cue, so the double meaning on one
+  ring should be resolved during implementation.
 
 ---
 
