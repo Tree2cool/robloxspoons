@@ -28,8 +28,8 @@ lives at `~/.rokit/bin/lune` and is **not on `PATH`**. Use `--root`, never `--fi
 | **Reusable fakes** | `tests/harness/FakeClock.luau` (seconds), `FakeScheduler.luau`, `Fuzz.luau`. **Wave 0 adds** `tests/harness/RecordingPublisher.luau` |
 | **Quick run command** | `lune run tests/run.luau -- --root tests/card` |
 | **Full suite command** | `lune run tests/run.luau` |
-| **Baseline runtime** | **657 passing in 23.07 s** before this phase |
-| **Phase budget** | **+3 s maximum.** All new specs in-process and pure. **No new subprocess gates** (each costs ~0.4 s) |
+| **Baseline runtime** | **657 passing in ~20.5 s** before this phase. Measured three times: 23.07 s (research), 20.53 s (planner), **20.15 s (orchestrator, `lune run tests/run.luau`)**. The 23.07 s reading was taken under load and is NOT the baseline — using it would have handed this phase ~2.5 s of slack that does not exist |
+| **Phase budget** | **+3 s maximum, so the ceiling is 23.5 s.** All new specs in-process and pure. No new subprocess gates beyond the three guard fixtures plan 04-02 justifies (~0.15 s) and the new pure zone's selene run (~0.4 s) |
 
 ### Why the budget is a hard number
 
@@ -167,7 +167,7 @@ stated in the phase gate rather than discovered there.
 - [ ] No watch-mode flags
 - [ ] Feedback latency < 3 s per task
 - [ ] Every gate in the mutation table has a clean control **and** a non-vacuity assertion
-- [ ] Suite runtime within the +3 s budget, or an explicit owner decision recorded
+- [ ] Suite runtime **<= 23.5 s** (baseline ~20.5 s + 3 s), measured three times, or an explicit owner decision recorded
 - [ ] Device rows written to `MANUAL-CHECKS.md` before execution, not after
 - [ ] `nyquist_compliant: true` set in frontmatter
 
