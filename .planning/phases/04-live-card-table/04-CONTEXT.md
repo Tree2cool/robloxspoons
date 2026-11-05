@@ -256,6 +256,50 @@ Explicitly NOT in scope (other phases own these):
   If a planner or executor believes a library is genuinely required, that is a BLOCKER to raise
   with the owner, never something to install.
 
+### Added 2026-11-05 after phase research (owner-decided)
+
+Phase research surfaced two questions nothing had decided. Both were put to the owner and both
+took the recommended option.
+
+- **D-35: when the AFK clock expires at hand 4 (owing a DRAW), the player takes a STRIKE and
+  NOTHING is drawn.** No auto-draw, ever.
+  **Why this is not symmetry for its own sake:** four of a kind is checked **only on draw**
+  (CLAUDE.md, Core Mechanic Reference). An auto-draw could therefore hand an absent player a
+  completion — and with it the four-of-a-kind bonus and the kept placement bonus. The game would
+  be paying someone for being away, which is the sharpest possible version of the fairness line
+  PROJECT.md draws everywhere else.
+  **Why starvation is not a counter-argument:** a seat that never draws hoards cards in its inbox,
+  starving the ring. That self-corrects — at three strikes (D-17) the bench fires through the
+  generic seat-removal path, which routes the whole hoarded inbox to the successor, so those cards
+  rejoin circulation within roughly 24 seconds at the 8.0 s deadline (D-13). The engine's
+  anti-livelock valve carries the table-level stall job independently (amendment A7).
+  **Note for the planner:** the Gate G1 sweep modelled the auto-pass at hand 5 ONLY, so no
+  simulator result speaks to hand-4 behaviour at all. Do not cite the sweep as evidence for this.
+  The rejected alternative "auto-draw only when it cannot complete" would also have put
+  hand-inspection logic in the shell, outside the pure engine, and modelled nothing the sweep ran.
+
+- **D-36: the status strip stays exactly one line, enforced by a `UITextSizeConstraint`.**
+  Phase research found `GuiService.PreferredTextSize` scales text even when `TextScaled = false`,
+  so a player on the **Largest** accessibility setting would otherwise overflow the single-line
+  strip that carries the AFK countdown and the strike warnings.
+  **The accepted cost, stated plainly:** a player who chose Largest text gets smaller text here
+  than they asked for. That is an accessibility compromise in the exact place strike warnings
+  appear, and it was chosen over the alternatives because wrapping to two lines forces a third
+  re-derivation of the HandZone budget (the strip height is what keeps the lifted card 4 px clear),
+  and truncation would cut the clause that says what is about to happen — "Strike 2 of 3. One more
+  benches you." truncated is worse than no message.
+  **Planner:** every strip string must be measured at the **Largest** setting, not only the
+  default. This is additional to checker FLAG F4, which found the strip ~6 px short of its own
+  longest strings at default size.
+
+- **Not decided here — carried as a human gate.** The IAS flag
+  `Workspace.PlayerScriptsUseInputActionSystem` must be **pinned explicitly** rather than left to
+  the platform default (which flips in early 2027), but the value belongs with whoever does the
+  Studio pass and can observe the control-hiding layers actually working. Record it in
+  `MANUAL-CHECKS.md` / `NEEDS_HUMAN.md` with the default of keeping legacy behaviour until the
+  D-29 replacement is proven. See the V-26 entry in `.planning/STATE.md` for why this exists at
+  all: `GetControls()` is undocumented, unsupported and slated for removal mid-2027.
+
 ### Claude's Discretion
 
 - The exact `Draw` / `Pass` intent payload shapes and their `Validate` schemas (within rule 7:
