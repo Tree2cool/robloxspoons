@@ -42,14 +42,31 @@ created: 2026-11-05
   Locking orientation is a **Creator Dashboard setting = human gate**: add a row to `MANUAL-CHECKS.md`
   and `NEEDS_HUMAN.md` beside the existing place-settings rows.
 
-### Safe area (UX-03) — flagged unverified
-- The card `ScreenGui` sets `ScreenInsets` **explicitly** (never relies on the default). Intended value: the most
-  conservative inset available, i.e. device safe area **plus** Roblox core-UI (top bar / menu button).
-  Research names candidate enum members `None`, `DeviceSafeInsets`, `CoreUISafeInsets`, `TopbarSafeInsets`.
-  **V-24 is UNVERIFIED against primary docs** (MEDIUM-HIGH from snippets only). The planner MUST confirm in
-  Studio, with device emulation including a notched phone, (a) the exact enum member names, (b) what each one
-  insets, (c) that `ScreenInsets` alone is sufficient and no manual `GuiService:GetGuiInset()` math is needed.
-  Do not assert any of this in code comments until confirmed; record what was confirmed in the plan.
+### Safe area (UX-03) — V-24 VERIFIED against primary docs 2026-11-05
+- The card `ScreenGui` sets `ScreenInsets` **explicitly** (never relies on the default), to
+  **`Enum.ScreenInsets.CoreUISafeInsets`**.
+- **V-24 is now VERIFIED**, not inferred. Source:
+  `https://create.roblox.com/docs/reference/engine/enums/ScreenInsets.md` (`last_updated:
+  2026-11-04T22:23:21Z`), fetched during this phase's debt re-check — see
+  `04-DEBT-RECHECK.md`, which also records that the previously DNS-blocked documentation hosts
+  are reachable again. The confirmed members and their meanings:
+
+  | Member | Value | Insets |
+  |--------|-------|--------|
+  | `None` | 0 | Nothing. Docs say use it **only** for a `ScreenGui` of non-interactive content such as background images. |
+  | `DeviceSafeInsets` | 1 | Device cutouts (camera notch) only — **NOT** Roblox core UI such as the top bar. |
+  | `CoreUISafeInsets` | 2 | `DeviceSafeInsets` **plus** Roblox core UI. Docs explicitly recommend this "for any `ScreenGui` that contains interactive and/or important UI elements such as buttons and status messages". |
+  | `TopbarSafeInsets` | 3 | `DeviceSafeInsets` plus core UI, but **dynamic** and confined to the top-bar strip outside `CoreUISafeInsets`. Pairs with `GuiService.TopbarInset`. |
+
+  Insets are relative to the **fullscreen area** (the rect covering all visible pixels).
+- **Why `CoreUISafeInsets` and not `DeviceSafeInsets`:** the hand, the tappable left pile, the AFK
+  countdown and every status cue are interactive/important UI, which is the exact case the
+  documentation names. `DeviceSafeInsets` would clear the notch but leave UI under the Roblox top
+  bar. This is now a documented recommendation rather than a judgement call, so it may be asserted
+  in code comments with the source cited.
+- **Still open (narrower than before):** whether `ScreenInsets` alone suffices or any manual
+  `GuiService:GetGuiInset()` math is still needed in practice, and the real behaviour on a notched
+  device. That is a Studio/real-phone observation, not a docs question.
 - **Rule:** every interactive element lies inside the inset rect ("safe rect", S). Non-interactive decoration
   (the hand-zone plate) may bleed to the screen edge only if the planner proves it does not matter; default is to keep it inside S.
 - Below, "W x H" means the safe rect S in *design units* after `UIScale`.
@@ -319,7 +336,7 @@ Selection never goes to the server. Only the committing intent does, carrying st
 
 | Item | Status | Action |
 |------|--------|--------|
-| V-24 `ScreenInsets` enum values/behaviour | UNVERIFIED | Confirm in Studio with notched-device emulation; record result |
+| V-24 `ScreenInsets` enum values/behaviour | **VERIFIED 2026-11-05** (primary docs; see `04-DEBT-RECHECK.md`) | Use `CoreUISafeInsets`. No docs work left. Remaining: observe on a real notched device, and confirm no manual `GetGuiInset()` math is needed |
 | V-25 mobile min target size | UNVERIFIED | 48 is the project's own floor; do not cite 44 as platform fact |
 | V-26 disable default controls | UNVERIFIED | Confirm `PlayerModule:GetControls():Disable()` hides the thumbstick/jump and `Enable()` restores it |
 | V-27 `ContextActionService` / gamepad `SelectedObject` | UNVERIFIED | Confirm, or drop the gamepad column |
