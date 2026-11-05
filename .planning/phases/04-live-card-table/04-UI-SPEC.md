@@ -28,7 +28,7 @@ created: 2026-11-05
 | Preset | not applicable |
 | Component library | none. **D-34 (hard constraint): vanilla Roblox UI only** — `ScreenGui`, `Frame`, `ImageLabel`, `TextLabel`, `TextButton`/`ImageButton` (hit areas), `UIListLayout`, `UIScale`, `UICorner`, `UIStroke`, `UIGradient` plus plain Luau. No Fusion, no React-lua, no `wally`, no `rokit install`. If the planner believes a library is required, that is a BLOCKER to raise with the owner. |
 | Icon library | none. Every shape is built from `Frame` + `UICorner`/`UIStroke`/rotation, or is an owner-uploaded image asset (see Card Face Anatomy → suit pips). No emoji, no web icon fonts. |
-| Font | Roblox built-in only. `Font.new("rbxasset://fonts/families/BuilderSans.json", Enum.FontWeight.Regular)` and `.Bold` (`Enum.Font.BuilderSans*` is the enum equivalent). **Verify in Studio** that Builder Sans is present and that Regular/Bold are the weights it ships; if not, fall back to `Enum.Font.GothamMedium` / `GothamBold`. No web fonts. |
+| Font | Roblox built-in only. `Font.new("rbxasset://fonts/families/BuilderSans.json", Enum.FontWeight.Regular)` and `.Bold` (`Enum.Font.BuilderSans*` is the enum equivalent). **Verify in Studio** that Builder Sans is present and that Regular/Bold are the weights it ships; if not, fall back to `Enum.Font.Gotham` (Regular) / `Enum.Font.GothamBold` (Bold) — never `GothamMedium`, which would add a third weight. No web fonts. |
 
 ---
 
@@ -75,20 +75,20 @@ created: 2026-11-05
 One root `Frame` sized `S / scale` carries one `UIScale`:
 `scale = clamp(min(S.width / 760, S.height / 350), 0.85, 1.5)`.
 All numbers in this document are design units. The 0.85 floor is chosen so the smallest touch strip
-(58 design px) stays >= 48 physical px (58 x 0.85 = 49.3). **Do not lower the floor without re-checking UX-01.**
+All numbers in this document are design units. The 0.85 floor is chosen so the smallest touch strip (60 design px) stays >= 48 physical px (60 x 0.85 = 51). The derivation is `step >= 48/0.85 = 56.5`; 60 is the next 4-grid value. **Do not lower the floor without re-checking UX-01.**
 
 ### Vertical budget (D-27, stated explicitly)
 | Zone | Height | Contents | Rule |
 |------|--------|----------|------|
-| **TableRegion** (top) | `H - 150*scale` (= **>= 58% of H** at every supported viewport; ~59% on 844x390; ~79% on 1080p) | the 3D table, 9 seat stacks, travelling cards, avatars standing/running; who-went callout banner at its top centre | **The hand overlay never covers it.** Camera frames the table's full bounding box inside this rect with >= 8 design px margin. The camera is locked to the table (Phase 1 D-14); the planner chooses the mechanism (pitch / CFrame offset) — the *contract* is the projected-bounds assertion. |
-| **HandZone** (bottom) | 150 (design units) | status strip (24) + fan area (126: 4 margin + 100 card + 20 lift + 2 gap) + both pile panels | Opaque-ish plate; contains every interactive element of the phase. |
+| **TableRegion** (top) | `H - 144*scale` (physical px). Fraction = `1 - 144*scale/H`. **Bound:** while `scale <= H/350` (always true unless the 0.85 floor raises it) the HandZone is at most `144/350 = 41.1%` of H, so **TableRegion >= 58.9%**; with the floor active (`scale = 0.85`, HandZone = 122.4 px) TableRegion >= 59.2% for H >= 300. Worked examples: S = 750 x 369 -> scale 0.987, HandZone 142 px, TableRegion 61.5%; S = 1920 x 1080 -> scale clamped to 1.5, HandZone 216 px, TableRegion 80%. | the 3D table, 9 seat stacks, travelling cards, avatars standing/running; who-went callout banners at its top centre | **The hand overlay never covers it.** Camera frames the table's full bounding box inside this rect with >= 8 design px margin. The camera is locked to the table (Phase 1 D-14); the planner chooses the mechanism (pitch / CFrame offset) — the *contract* is the projected-bounds assertion. |
+| **HandZone** (bottom) | **144** (design units) | status strip 28 (24 single-line text area + 4 drain-bar row) + fan area 112 (4 margin + 92 card + 16 lift; the lifted card's top is 4 px below the strip, 28 + 112 = 140 <= 144) + both pile panels | Opaque-ish plate; contains every interactive element of the phase. |
 
-Horizontal budget inside HandZone (S width W >= 650 design units on the smallest viewport after scale):
-left pile panel (84) at the left edge + 8 margin | gap | fan (300 wide, centred on S) | gap | right pile panel (84) at the right edge + 8 margin.
-Minimum clear gap between the fan and either pile: 24. (At 650 wide: 8+84 = 92 | 92..175 clear | fan 175..475 | 475..558 clear | 558..642 right pile. Passes.)
+Horizontal budget inside HandZone (W = S.width / scale; W >= 650 design units at every supported viewport: width-limited gives exactly 760, the 0.85 floor needs S.width >= 553 physical):
+left pile panel (84) at the left edge + 8 margin | gap | fan (312 wide, centred on S) | gap | right pile panel (84) at the right edge + 8 margin.
+Minimum clear gap between the fan and either pile: 24. (At W = 650: left pile 8..92 | clear 92..169 (77) | fan 169..481 | clear 481..558 (77) | right pile 558..642. Passes. The status strip is limited to the clear span between the two piles: 450 design px at W = 650.)
 
 ### Acceptance tests for layout (falsifiable)
-1. For each of {844x390 notched, 640x360, 932x430, 1920x1080}: assert no interactive GuiObject's absolute rect intersects the inset area, and TableRegion >= 58% of S height.
+1. For each of {844x390 notched, 640x360, 932x430, 1920x1080}: assert no interactive GuiObject's absolute rect intersects the inset area, and `TableRegion >= 58%` of S height. **The 58% bound is guaranteed only while S.height >= 300 physical px** (see Vertical budget); the test also logs the measured fraction, and if a real device's S.height falls below 300 the planner reports it rather than loosening the number.
 2. Assert every interactive hit rect has `AbsoluteSize` >= 48 x 48 *physical* px (after scale) — see Touch Targets.
 3. Assert the projected 3D table bounds (Camera:WorldToViewportPoint on the table's 8 bounding-box corners) lie within TableRegion with the margin above.
 4. Real-phone check is mandatory (record in `MANUAL-CHECKS.md`): the Studio emulator does not prove thumb reach or safe-area behaviour.
@@ -104,16 +104,16 @@ Default movement controls are hidden **per player while seated**, not for the wh
 
 | Element | Interactive? | Hit rect (design units) | Floor met? |
 |---------|--------------|-------------------------|-----------|
-| Card slot 1..5 | Yes — select, then send | **58 wide x 120 tall** (card 100 + lift 20), one invisible `TextButton` per slot, independent of card z-order | Yes (58 >= 48) |
-| Last card in fan (widest) | Yes | 68 x 120 | Yes |
+| Card slot 1..5 | Yes — select, then send | **60 wide x 108 tall** (card 92 + lift 16), one invisible `TextButton` per slot, independent of card z-order. 60 x 0.85 = 51 physical px at the scale floor | Yes (60 >= 48) |
+| Last card in fan (widest) | Yes | 72 x 108 | Yes |
 | Left pile panel | Yes — draw | 84 x 96 whole panel | Yes |
-| Right pile panel | **No — inert (D-06).** `Active=false`, `Interactable=false` (but see hint nudge below) | 84 x 96, display only | N/A — exempt by D-06 |
+| Right pile panel | **Inert as a game action (D-06):** `Active=true` no-op sink (see Sinks below); sends nothing | 84 x 96 | Yes anyway (exempt by D-06, but meets 48) |
 | Backdrop (HandZone + TableRegion) | Yes — "tap off" clears selection (D-04) | full rect | N/A |
 | Status strip / hints / callouts / flourish | No | — | N/A |
 
-**Hit areas are slot strips, not card visuals.** A lifted card is drawn on top and overlaps its right neighbour by 10 px, but the neighbour's *hit strip* is unchanged. This guarantees tapping the selected card again (D-01) always lands on the same strip, and no neighbouring card's strip shrinks below 48.
+**Hit areas are slot strips, not card visuals.** A lifted card is drawn on top and overlaps its right neighbour by 12 px, but the neighbour's *hit strip* is unchanged. This guarantees tapping the selected card again (D-01) always lands on the same strip, and no neighbouring strip shrinks below 48 physical px. **Known behaviour, accepted:** the lifted card is drawn 72 wide but hit-tested 60 wide (the last card is 72), so tapping the visible 12 px overhang of a lifted card selects its right-hand neighbour instead of sending. Widening the lifted hit rect would shrink that neighbour's strip to 48 design px = 40.8 physical px at the 0.85 floor, below the floor; the overhang is therefore deliberately un-hit-tested for the lifted card.
 
-**Backdrop vs controls:** tapping the locked left pile is a **no-op that keeps the selection** **[R-DISC]** (a fumbled tap must not deselect a card the player is about to send). Tapping the inert right pile with a card selected **keeps the selection and pulses the hint "Tap the raised card again to send"** **[R-DISC]**; players will try the right pile (D-01 rejected it as a commit target) and this is guidance, not an error message.
+**Sinks (explicit):** the **locked left pile** and the **right pile** are `Active = true` **no-op sinks** so a tap on them never reaches the backdrop (which would CLEAR the selection, D-04). Tapping the locked left pile does nothing and keeps the selection **[R-DISC]** (a fumbled tap must not deselect a card the player is about to send). Tapping the right pile with a card selected keeps the selection and pulses the strip hint to `Tap the raised card again to send` for 2.0 s **[R-DISC]**: players will try it (D-01 rejected it as a commit target) and this is guidance, not an error message. Neither sink sends anything, so D-06 (right pile inert to taps as a game action) holds; the 84 x 96 sink meets the 48 floor anyway.
 
 ---
 
@@ -123,15 +123,14 @@ Declared values (multiples of 4), design units:
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| xs | 4 | Icon-to-text gap, pip inset, stroke padding |
-| sm | 8 | Pile/fan margin from safe-rect edge, strip padding |
-| md | 16 | Gap between panel elements, hint-to-fan gap |
+| xs | 4 | Icon-to-text gap, index top inset, drain-bar row, callout stack gap, fan bottom margin |
+| sm | 8 | Pile margin from safe-rect edge, pile bottom margin |
+| md | 16 | Card lift, gap between panel elements, 16 px pips |
 | lg | 24 | Minimum fan-to-pile clear gap |
-| xl | 32 | Gap between callout stack entries |
-| 2xl | 48 | Touch-target floor (physical), callout banner height |
-| 3xl | 64 | Reserved |
+| xl | 32 | Callout banner height |
+| 2xl | 48 | Touch-target floor (physical px), not a layout size |
 
-Exceptions: card geometry is a fixed physical card model, not spacing tokens: **68 x 100 card, 58 fan step, 10 overlap, 20 lift, 12 index inset, 150 zone height, 84 x 96 pile panel**. Of these, 58, 10, 68 and 150 are not multiples of 4; 58 is derived (step must be >= 48/0.85 = 56.5 so the physical strip clears the floor) and overlap = card width - step. The 48 hit-slot minimum is a hard floor, not a token.
+Exceptions: **none.** The card model is on the 4-grid too: **72 x 92 card, 60 step, 12 overlap, 16 lift, 12 left / 4 top index inset, 144 HandZone, 28 strip, 84 x 96 pile panel, 52 x 68 pile art**. The 48 hit-slot minimum is a physical floor, not a token: the 0.85 UIScale floor requires `step >= 48 / 0.85 = 56.5`, and 60 satisfies it (60 x 0.85 = 51). Stroke widths (2, 3) and pulse ranges are line weights, not spacing.
 
 ---
 
@@ -139,19 +138,21 @@ Exceptions: card geometry is a fixed physical card model, not spacing tokens: **
 
 ### Data contract the UI needs (flag to planner)
 The engine has **no suits** (`Types.luau`): a card is `cardId` with `rankOf[cardId]` an integer in `1..ranks`, or `JOKER_RANK = 0`. `cardId` is a re-shuffled deck position, so `cardId mod 4` does NOT give four distinct suits per rank. The server shell must therefore send the holder, privately, a face record `{ cardId, rank, copy }` where `copy` in `1..4` is assigned by the **adapter** (e.g. sort the four ids of a rank ascending at deal time, copy = index). The engine is not changed. This record goes **only to the holder**; no client ever receives another seat's face data (derived constraint, CLAUDE.md rule 3). Public events (`Passed`, `Drew`) carry `cardId` only; a card passing in the open is shown **face-down**.
+The engine has **no suits** (`Types.luau`): a card is `cardId` with `rankOf[cardId]` an integer in `1..ranks`, or `JOKER_RANK = 0`. `cardId` is a re-shuffled deck position, so `cardId mod 4` does NOT give four distinct suits per rank. The server shell must therefore send the holder, privately, a face record `{ cardId, rank, copy }` where `copy` in `1..4` is assigned by the **adapter** (e.g. sort the four ids of a rank ascending at deal time, copy = index). The engine is not changed. This record goes **only to the holder**; no client ever receives another seat's face data (derived constraint, CLAUDE.md rule 3). Public events (`Passed`, `Drew`) carry `cardId` only; a card passing in the open is shown **face-down**.
 
+**Privacy test (named check):** with a recording fake of the Roblox send layer, assert that (a) the private face record and (b) `ValveForcedPass` are each sent via a **per-player** send (`FireClient(player)`) to exactly the owning/affected player and never via a broadcast (`FireAllClients`, a shared remote fired without a target); with 3 players, only the owner's recorder sees the face record, only the affected seat's player sees `ValveForcedPass`, while all see the ordinary `Passed`. Add a lint/grep rule that the card publish module does not reference `FireAllClients` for those two event kinds. Mutation-test: switch either send to a broadcast and the test must fail.
 ### Rank glyph mapping (D-21, D-22)
 A fixed constant table (stable for the whole round and across rounds):
 `RANK_LADDER = { "A","K","Q","J","10","7","4","2","5","3","9","8" }` — engine rank `r` in `1..12` maps to `RANK_LADDER[r]`; `r = 0` is the joker; **"6" is never used** (the 13th rank is unreachable since max ranks = 12). Order is by *visual distinctness*, so small tables (3 players = 5 ranks: A K Q J 10) use the five most dissimilar glyphs, and the confusable 6/8/9 trio enter last. Mapping is `r -> glyph` independent of round size, so a given integer never changes glyph mid-round. Copy-to-suit: `copy 1 = spade, 2 = heart, 3 = club, 4 = diamond`.
 
 ### Anatomy at two sizes
 
-| Part | **Fan size** (68 x 100, resting) | **Lifted** (same 68 x 100, raised 20, top z-order, full face) |
+| Part | **Fan size** (72 x 92, resting) | **Lifted** (same 72 x 92, raised 16, top z-order, full face) |
 |------|----------------------------------|----------------------------------------------------------------|
-| Corner index (top-left, inset 12 from left, 6 from top) | Rank glyph 20 bold + suit pip 16 below it. **This is all that is visible of a card under its right neighbour** (visible strip 58 wide). Index must be fully legible in the 58-wide strip. | Same index, unchanged |
-| Centre | hidden by neighbour | Rank glyph 48 bold, with suit pip 28 above it (centred) |
-| Opposite corner (bottom-right, rotated 180) | hidden | Index repeated, rotated 180 |
-| Joker face | Corner: star shape 24 + `JK` at 16 bold. Double border (two nested strokes) | Large star 36, `JOKER` 16 bold, **rule band** across the lower third (below) |
+| Corner index (top-left, inset **12 from left, 4 from top**) | Rank glyph 20 bold (y 4..24) + suit pip 16 below it (y 26..42). **This is all that is visible of a card under its right neighbour** (visible strip 60 wide; index spans x 12..~36). Must be fully legible in the 60-wide strip. | Same index, unchanged |
+| Centre | hidden by neighbour | Suit pip 28, centred |
+| Opposite corner (bottom-right, rotated 180) | hidden | Index repeated, rotated 180 (not on jokers) |
+| Joker face | Corner: star shape 24 + `JK` at 16 bold (below the star). Double border (two nested strokes) | Star 28 centred high, **rule band** across the lower third (y 62..88) with `WILD`/`BLOCK` 16 bold (<= 5 chars, ~50 px of the 72) |
 
 Card face colour `Color3.fromRGB(244,240,230)`; 2 px outer stroke `fromRGB(24,24,30)` (4 px double stroke on jokers). `UICorner` radius 8.
 
@@ -161,7 +162,7 @@ The rule band is driven by `CardPool.JOKER_MODE` as published to the client in t
 | `JOKER_MODE` | Band text (16 bold, max 5 chars) | Band shape | Status-strip explainer when the joker is selected (20 bold, single line) |
 |--------------|----------------------------------|------------|------------------------------------------------------------------------|
 | `"Wild"` (shipped) | `WILD` | solid star, no bar | `Joker: counts as any rank.` |
-| `"Blocker"` (live behind flag) | `BLOCK` | the same star with a diagonal bar drawn through it | `Joker: blocks a set. It completes nothing.` |
+| `"Blocker"` (live behind flag) | `BLOCK` | the same star with a diagonal bar drawn through it | `Joker: completes no set.` |
 
 Both text AND shape differ (greyscale-safe, D-24). The art/copy tables key off the mode string, with no `if mode == "Wild"` baked into a texture. Adding a third mode must fail a test (exhaustive map over the `JokerMode` type).
 
@@ -174,17 +175,17 @@ Pips MUST be four **shape-distinct** silhouettes (spade, heart, club, diamond). 
 |-------|--------|-------------------|-------|
 | **Idle** (in fan) | Corner index visible; at rest slot position | — | tappable slot |
 | **Selected** (lifted) | Raised 20 up, top z-order, full face, **3 px accent outline** + the lift itself. Not colour-only: position (lift) and stroke thickness (3 vs 2) carry it | Lift **0.08 s** Quad Out; begins on the same frame as the input | second tap on the same slot = send |
-| **Arriving** (just drawn, predicted) | **Face-down** card back appears in the next free slot (the client cannot know the face until the server answers) | Flies from left pile to slot **0.15 s** Quad Out; on face arrival flips (width 1->0->1) **0.12 s** | tappable only after flip completes **[R-DISC]**, but the flip window is <= 0.12 s on a normal link |
-| **In flight** (committed, predicted) | Card leaves the fan toward the right pile, shrinking to 60 % | **0.18 s** Quad In; others close the gap **0.12 s** | none (gone); a stray second tap on the old slot lands on a neighbour or backdrop, never a double-send |
-| **Returning** (server correction, D-11) | Card flies back from the right pile (or, for a rejected draw, face-down back to the left pile) to its original slot | **0.25 s** Quad Out with slight overshoot (`Back`). Deliberately slower and bouncier than the 0.18 s send so it reads as a *return*. Pile counts revert as it moves. | tappable on landing |
-| **Forced out** (AFK auto-pass or `ValveForcedPass`) | Leaves exactly like In flight, plus the private cue ring (below) | same as In flight | selection cleared if that card was selected |
+| **Arriving** (just drawn, predicted) | **Face-down** card back appears in the next free slot | Flies from left pile to slot **0.15 s** Quad Out; on face arrival flips (width 1->0->1) **0.12 s** | **not tappable until the server's answer carries its `cardId` and face.** This is information-limited, not a gate: the client does not know the id of the card it just drew (draw intents carry no card), so there is nothing it could name in a Pass intent (CLAUDE.md rule 7). It is not a timer and adds no delay beyond the round trip |
+| **In flight** (committed, predicted) | Card leaves the fan toward the right pile, shrinking to 60 % | **0.18 s** Quad In; others close the gap **0.12 s (visual only)** | none (gone). Neighbour hit strips **jump to their final slot positions at the instant of commit**; only the drawn cards tween, so a tap during the 0.12 s closing lands on the final layout. A stray second tap on the old slot lands on a neighbour or backdrop, never a double-send |
+| **Returning** (server correction, D-11) | Card flies back from the right pile (or, for a rejected draw, face-down back to the left pile) to its original slot | **0.25 s** Quad Out with slight overshoot (`Back`). Deliberately slower and bouncier than the 0.18 s send so it reads as a *return*. Pile counts revert as it moves. | **tappable immediately** — the hit strip is at the card's slot for the whole flight and a tap selects/sends it normally. The flight is cosmetic and gates nothing (D-02: no arming delay) |
+| **Forced out** (AFK auto-pass or `ValveForcedPass`) | Leaves exactly like In flight, plus the private cue (neutral ring, strip message) | same as In flight | selection cleared if that card was selected |
 
 Selection is tracked by `cardId`. If the selected card leaves the hand for any reason, the selection clears silently. **Cards are laid out in arrival order, never re-sorted by rank** **[R-DISC]**: a re-sort on draw would move slots under a thumb. (Optional sort-by-rank is a Phase 8 candidate.)
 
 ### Greyscale must survive (D-24) — acceptance test
 - **Identity key:** each face is uniquely identified by `(rankGlyph, pipShape)`; the joker by `(star, mode band text)`. Colour (red/black tint) is NOT part of the key.
-- **Pure-Luau spec-lock test:** enumerate all 12 ranks x 4 copies + joker x both modes (50 faces). Assert the identity key is injective, that no two faces share a key, and that stripping tint from the face data leaves all 50 keys distinct. Mutation-test it (collapse two pip shapes and confirm the test fails — this repo's record is that gates like this are the ones that turn out unable to fire).
-- **Studio visual test:** render the fan-size corner index of all 50 faces in a grid with `ColorCorrectionEffect.Saturation = -1` (and `Contrast` untouched) at the 844x390 reference viewport; a reviewer must be able to name each rank and copy. Any pair needing colour to tell apart fails.
+- **Pure-Luau spec-lock test, two layers:** (1) enumerate all 12 ranks x 4 copies + joker x both modes (50 faces) and assert the identity key is injective; (2) **assert each key maps to a distinct DRAWN asset** — the glyph codepoint (or, if sprites are used, the `ImageRectOffset`/`ImageRectSize` pair) the renderer will actually use — so a renderer that draws the same silhouette for two different `pipShape` ids fails. Layer (2) reads the renderer's own pip table, not a copy of the key. Mutation-test both (collapse two pip shapes in the data; point two pip ids at the same asset; each must fail — this repo's record is that gates like this are the ones that turn out unable to fire). Tint is not in the key, so no "strip tint" step is asserted.
+- **Studio visual test:** render the fan-size corner index of all 50 faces in a grid with `ColorCorrectionEffect.Saturation = -1` at the reference viewport and on a real phone; a reviewer must be able to name each rank and copy. **Spade vs club at 16 px is the expected hardest pair**; if they are not reliably distinguishable, enlarge the pip to 20 or thicken the club's lobed silhouette rather than lean on colour. Any pair needing colour to tell apart fails.
 - **Luma contrast:** glyph vs face >= 4.5:1 in luma for both black and red pips (red `200,45,40` on cream is ~5:1 — measure, don't trust this estimate).
 - Phase 7 deck skins inherit all of the above.
 
@@ -193,7 +194,7 @@ Selection is tracked by `cardId`. If the selected card leaves the hand for any r
 ## Hand, Fan and Piles
 
 ### Fan geometry (D-25)
-Cards 68 x 100, step 58, so 10 px overlap; later cards (right) sit above earlier ones. Five slots span `68 + 4*58 = 300`. At 4 cards the fan is 242 wide; slots re-centre on hand changes with a 0.12 s tween. Fan is bottom-aligned 4 above the HandZone bottom, so a resting card's top is 46 from the zone top and a lifted card's top is **26**. The status strip occupies 0..24 and is single-line, so a lifted card **never touches the strip** (2 px clear). Acceptance: at every viewport in the layout test, a lifted card's rect and the strip's rect do not intersect. The lifted card overlaps its right neighbour by 10 px; the 12 px index inset keeps that neighbour's index clear.
+Cards **72 x 92**, step **60**, so **12 px overlap** (card width − step); later cards (right) sit above earlier ones. Five slots span `72 + 4*60 = 312`. At 4 cards the fan is 252 wide; slots re-centre on hand changes (visual tween 0.12 s; hit strips jump to the final layout at once, see Hit Model). **Vertical budget of the 144 HandZone:** status strip 0..28 (24 text area + 4 drain-bar row); resting card top at 144 − 4 − 92 = **48**; lifted (16 up) card top at **32**, so a lifted card is **4 px clear** of the strip. Acceptance: at every viewport in the layout test, a lifted card's rect and the strip's rect do not intersect. The 12 px left index inset equals the overlap, so the lifted card never covers a neighbour's index.
 
 ### Piles (D-26, D-06, CARD-13)
 Both panels 84 x 96, `fromRGB(38,45,66)` with `UICorner` 8, at the two bottom corners flanking the fan, 8 from the safe-rect edge. Contents: label at top (16 regular), card-back art 52 x 68 (up to 3 offset layers = `min(count,3)`), and the **exact count numeral** (28 bold) centred over the art, white with a dark stroke.
@@ -216,16 +217,15 @@ Every public `Passed` event spawns a **face-down** card that hops anchor to anch
 
 ## Typography
 
-Four sizes, two weights (Regular 400, Bold 700), design units:
+Three sizes, two weights (Regular 400, Bold 700), design units. **All text is single-line with LineHeight 1.0**; wrapping is forbidden (every string is budgeted to fit, see Copywriting), so the web 1.5/1.2 line-height rule does not apply to this HUD. One exception: the rotate prompt may wrap (LineHeight 1.25) because it shows in portrait where the layout does not exist.
 
 | Role | Size | Weight | Line Height | Used for |
 |------|------|--------|-------------|----------|
-| Label | 16 | Regular (also Bold for the joker band and `Locked`) | 1.25 | pile labels, joker band text, secondary hints, rotate prompt body |
-| Body | 20 | Bold | 1.25 (callout/explainer may wrap; strip text is single-line) | corner rank index, status strip hints and messages, callout name |
-| Heading | 28 | Bold | 1.0 (single line, never wraps) | pile counts, AFK numeral, callout headline |
-| Display | 48 | Bold | 1.0 | centre rank glyph on a lifted card |
+| Label | 16 | Regular (Bold for the joker band and `Locked`) | 1.0 | pile labels, joker band text, joker corner `JK` |
+| Body | 20 | Bold | 1.0 (strip text area is 24 high, so 20 fits; 25 would not) | corner rank index, status strip hints and messages, callout line, rotate prompt |
+| Heading | 28 | Bold | 1.0 | pile count numerals only |
 
-Weight is Regular or Bold only; size 16 may be Bold. Line height 1.25 where wrapping is permitted, 1.0 where it is forbidden (a deliberate departure from the web 1.5/1.2 rule: this is HUD text, not prose). Minimum on-screen size is 16 x scale >= 13.6 physical px, a documented floor. Text uses `TextScaled=false`, `RichText=false`; truncate display names with `TextTruncate = AtEnd`.
+There is no Display size: a lifted card's centre shows the suit pip (28), not a larger rank glyph, because a 48 glyph collides with the corner index in a 72 x 92 face. Minimum on-screen size is 16 x 0.85 = 13.6 physical px, a documented floor. Text uses `TextScaled=false`, `RichText=false`; truncate display names with `TextTruncate = AtEnd`.
 
 ---
 
@@ -237,18 +237,18 @@ Colours are decorative and structural only — **meaning is always carried by sh
 |------|-------|-------|
 | Dominant (60%) | `fromRGB(20,24,36)` @ 0.15 transparency | HandZone plate, status strip backing, callout backing |
 | Secondary (30%) | Card face `fromRGB(244,240,230)`; pile panel `fromRGB(38,45,66)`; card back `fromRGB(52,64,110)` with `fromRGB(120,136,190)` pattern | Cards, piles |
-| Accent (10%) | `fromRGB(255,176,32)` amber | **Reserved for exactly:** (1) selected-card 3 px outline, (2) drawable left-pile ring, (3) AFK drain-bar fill, (4) the "You're out" callout underline |
+| Accent (10%) | `fromRGB(255,176,32)` amber | **Reserved for exactly five uses:** (1) selected-card 3 px outline, (2) drawable left-pile ring, (3) AFK drain-bar fill, (4) AFK fan-outline pulse (hand 5 only), (5) the "You're out" callout underline |
 | Suit red / black (decorative) | `fromRGB(200,45,40)` / `fromRGB(24,24,30)` | Pip and glyph tint only. **Red vs black must never be the only difference between two cards.** |
 | Text | `fromRGB(240,243,250)` on dark; `fromRGB(24,24,30)` on cream | All text |
 | Destructive | **none** | This phase has no destructive action; the error red is not used (D-02/D-03 deliberately remove confirmation) |
 
-Each accent use has a redundant carrier: selection = lift, ring = `Draw` label + pulse, drain bar = numeral + copy, callout = the words. Estimated contrast (to be measured, not trusted): text on plate >= 7:1; amber on plate >= 8:1.
+Each accent use has a redundant carrier: selection = lift, ring = `Draw` label + pulse, drain bar and fan pulse = the countdown text `Pass a card: 2`, callout underline = the words. The forced-pass ring and stall pulse are **neutral**, not accent, so the accent list stays closed. Estimated contrast (to be measured, not trusted): text on plate >= 7:1; amber on plate >= 8:1.
 
 ---
 
 ## Hints and Input Method (UX-04, D-08, D-09)
 
-Hints follow the **last input actually used** via `UserInputService.LastInputTypeChanged` and switch **instantly** (no fade) at any time, including mid-round. Input types: **Touch**, **Mouse**, **Keyboard**, **Gamepad**. Hint lives in the status strip (Body 20, single line), always visible, never hidden after N plays (first-time teaching is Phase 8, UX-05).
+Hints follow the **last input actually used** via `UserInputService.LastInputTypeChanged` and switch **instantly** (no fade) at any time, including mid-round. Input types: **Touch**, **Mouse**, **Keyboard**, **Gamepad**. Hint lives in the status strip (Body 20, single line, LH 1.0), always visible, never hidden after N plays (first-time teaching is Phase 8, UX-05).
 
 **Keyboard accelerators are additive (D-08):** `1`..`5` selects the slot left-to-right; pressing the **same number again** or `Space` / `Enter` sends the selected card (D-01 semantics: the second action on the same card commits); `Space` also **draws** when hand = 4 and the pile has cards (no ambiguity: draw only at 4, pass only at 5). Binding via `ContextActionService` **V-27, unverified**. **Gamepad [R-DISC]:** `LB`/`RB` (or D-pad left/right) moves selection, `A` selects/commits/draws; exact `GuiService.SelectedObject` behaviour is **V-27 unverified**; if the planner cannot confirm it, gamepad degrades to showing the Mouse hint set and this row is dropped.
 
@@ -256,7 +256,7 @@ Hints follow the **last input actually used** via `UserInputService.LastInputTyp
 
 ## Copywriting Contract
 
-Voice: short, imperative, plain. No exclamation except the starting-gun callout.
+Voice: short, imperative, plain. **Exclamation marks appear only in the starting-gun callouts** (`is out!` / `Find a spoon!`); no other string uses one. **Every strip string is single-line and <= 38 characters** (budget: ~450 design px strip at 20 bold, ~11 px per character, at the smallest viewport); the planner adds a test that measures each string with `TextService:GetTextSize` against the strip width.
 
 ### Hint strip (input-aware)
 | State | Touch | Mouse | Keyboard | Gamepad |
@@ -265,23 +265,23 @@ Voice: short, imperative, plain. No exclamation except the starting-gun callout.
 | Card selected | `Tap it again to pass` | `Click it again to pass` | `Press Space to pass` | `Press A to pass` |
 | Hand 4, pile has cards | `Tap your pile to draw` | `Click your pile to draw` | `Press Space to draw` | `Press A to draw` |
 | Hand 4, pile empty | `Waiting for cards` | same | same | same |
-| Right pile tapped while selected | `Tap the raised card again to send` (Touch), `Click the raised card again to send` (Mouse), others as "Card selected" | | | |
+| Right pile tapped while selected (sink, selection kept) | `Tap the raised card again to send` | `Click the raised card again to send` | `Press Space to pass` | `Press A to pass` |
 
 ### Contract rows
 | Element | Copy |
 |---------|------|
 | Primary CTA | There is no button; the primary action is *Draw / Pass*. Touch: `Tap your pile to draw` then `Tap it again to pass` (table above covers every input) |
 | Empty state heading | `Waiting for cards` |
-| Empty state body | `Cards arrive from your left.` (shown as the 16 regular line under the heading while hand = 4 and the pile is empty, including during the start-up ramp) |
+| Empty state body | The strip is one line, so heading and body render joined as `Waiting for cards from your left` (heading = `Waiting for cards`, body = `from your left`; shown while hand = 4 and the pile is empty, including the start-up ramp) |
 | **Error state** | **DELIBERATELY EMPTY. There is no error copy.** (D-12) A server correction or hard rejection (rate-limited, `NotYourCard`, `HandNotFour`, `HandNotFive`, `InboxEmpty`, `SeatNotLive`, `UnknownCard`, `UnknownSeat`) looks IDENTICAL: the card returns visibly (D-11) with no text, no toast, no colour flash, no sound, no shake. A legitimate player should never see one; a message would be noise and would hand a prober the name of the guard they tripped. Reject codes remain server telemetry. Do not add error copy to "help" — this row is empty on purpose. |
 | Destructive confirmation | **None.** No destructive action in this phase; the send is instant and unconfirmed by design (D-02, D-03; the fumbled fast double-tap that sends a card is a recorded, accepted trade) |
-| AFK countdown | Hand 5: `Pass a card!` ; hand 4: `Draw a card!` ; numeral `2` / `1` beside it (Heading 28) |
-| AFK strike 1 | `Passed a card for you. Strike 1 of 3.` |
-| AFK strike 2 | `Passed a card for you. Strike 2 of 3. One more and you're benched.` |
+| AFK countdown | Hand 5: `Pass a card: 2` ; hand 4: `Draw a card: 2` (then `1`). One Body 20 line, no exclamation |
+| AFK strike 1 | `Auto-passed a card. Strike 1 of 3.` |
+| AFK strike 2 | `Strike 2 of 3. One more benches you.` |
 | Benched (strike 3) | `You were benched for being idle.` (what follows — spectate / leave — is Phase 6; this phase only shows the line and removes the hand overlay) |
-| Forced pass (private, D-18) | `The table was stuck, so a card was passed for you.` |
-| Stall cue (D-20) | `The table is stuck. Try passing something different.` |
-| Who-went callout, others | `{DisplayName} is out! Find a spoon!` |
+| Forced pass (private, D-18) | `Table stuck. We passed a card for you.` |
+| Stall cue (D-20) | `Table is stuck. Pass something else.` |
+| Who-went callout, others | `{DisplayName} is out! Find a spoon!` (name truncated to fit; <= 38 chars with a 16-char name) |
 | Who-went callout, self | `You're out! Find a spoon!` |
 | Rotate prompt (D-28 fallback) | `Rotate your device to landscape` |
 | Joker rule | see Card Face Anatomy table |
@@ -294,14 +294,14 @@ All cues are visual **plus** non-colour redundancy; none blocks input (D-30 is a
 
 | Cue | Trigger (engine/shell signal) | Who sees it | Treatment | Duration | Copy | Audio |
 |-----|------------------------------|-------------|-----------|----------|------|-------|
-| **Late AFK countdown** (D-16) | Server-published idle deadline; shown when `remaining <= AFK_WARN_SECONDS = 2.0` of the 8.0 s window (nothing is shown for the first 6.0 s). Idle clock runs only while the seat has a legal action (D-15) | Local player only | A 4 px drain bar along the bottom edge of the status strip, full fan width, shrinking linearly to 0 (accent fill), plus numeral `2`/`1`, plus pulse on the target (fan outline if hand 5, left-pile ring if hand 4) at 1.5 Hz | last 2.0 s; removed instantly on any accepted action | `Pass a card!` / `Draw a card!` | none |
+| **Late AFK countdown** (D-16) | Server-published idle deadline; shown when `remaining <= AFK_WARN_SECONDS = 2.0` of the 8.0 s window (nothing is shown for the first 6.0 s). Idle clock runs only while the seat has a legal action (D-15) | Local player only | In the status strip: text `Pass a card: 2` / `Draw a card: 2` (the numeral is part of the Body 20 line), plus a 4 px drain bar along the strip's bottom edge, full strip width, shrinking linearly to 0 (accent fill), plus a pulse on the target at 1.5 Hz: 2 px **accent** outline on the fan if hand 5, the left-pile ring if hand 4 | last 2.0 s; removed instantly on any accepted action | `Pass a card: 2` / `Draw a card: 2` | none |
 | **AFK auto-pass struck** (D-14, D-17) | Shell issues a uniformly-random pass | Local player only | Card leaves like a send + strike message | message 3.0 s | strike lines above | quiet pass sound (own pass) |
-| **Forced pass, private** (D-18) | `ValveForcedPass` for my seat. Roughly 1 round in 12 at a full roster — an ordinary feature. The table sees only a normal `Passed` | Affected player only | Card departs normally; a 3 px ring around the departing card flashes once (0.4 s, at 1 Hz max) and a strip message. Distinct from the AFK strike (no strike count) | 3.0 s | `The table was stuck, so a card was passed for you.` | none |
+| **Forced pass, private** (D-18) | `ValveForcedPass` for my seat. Roughly 1 round in 12 at a full roster — an ordinary feature. The table sees only a normal `Passed`. **Delivered by a per-player send only (`FireClient(player)`), never a broadcast** — see the privacy test in the Data contract | Affected player only | Card departs normally; a 3 px ring in the **neutral text colour** `fromRGB(240,243,250)` (not accent) flashes once around the departing card (0.4 s, 1 Hz max) and a strip message. Distinct from the AFK strike (no strike count). The message, not the ring colour, carries the meaning | 3.0 s | `Table stuck. We passed a card for you.` | none |
 | **Cards travelling the ring** (D-19) | every public `Passed` | Everyone | face-down hops, 16 concurrent cap | 0.30 s per hop | — | none for others (D-33) |
-| **Stall cue** (D-20) | Server-side no-progress detector (never valve events); threshold is **[R-DISC]**, suggested start: no `Completed`/`SeatRemoved` for max(45 s, 2 x `VALVE_ARM_ACTIONS_PER_SEAT` x live seats / observed action rate), tunable; also emits telemetry | Every seated player | Strip message + a slow 0.8 Hz outline pulse on the fan | shows 5 s, repeats every 30 s while the stall persists; clears on progress | stall copy above | none |
+| **Stall cue** (D-20) | Server-side no-progress detector (never valve events); threshold is **[R-DISC]**, suggested start: no `Completed`/`SeatRemoved` for max(45 s, 2 x `VALVE_ARM_ACTIONS_PER_SEAT` x live seats / observed action rate), tunable; also emits telemetry | Every seated player | Strip message + a slow 0.8 Hz 2 px outline pulse on the fan in the **neutral text colour** `fromRGB(240,243,250)` (not accent) | shows 5 s, repeats every 30 s while the stall persists; clears on progress | stall copy above | none |
 | **Starting gun** (D-30, D-31, D-32) | `Completed` | Finisher: hand overlay gone same frame, controls back instantly, avatar stands and runs. Table: the 4 retired cards turn face-up at the seat and slide away; the avatar stands | Flourish hook, fixed 1.5 s (below) | **exactly 1.5 s** | — | **completion sting at t = 0**, same for everyone, played once |
-| **Who-went callout** (D-31) | `Completed` | Everyone | Banner 48 high at top centre of TableRegion, dominant plate, name in Body 20 bold + headline Heading 28; accent underline for self only. Multiple simultaneous callouts stack (newest on top, max 3), they do NOT queue serially | 2.5 s (fade 0.2 s) | callout copy above | none beyond the sting |
-| **Waiting for cards** | hand = 4 and inbox empty | Local player | Strip heading + body, left pile in empty state | while true | `Waiting for cards` | none |
+| **Who-went callout** (D-31) | `Completed` | Everyone | One-line banner, 32 high, top centre of TableRegion, dominant plate, Body 20 bold, `TextTruncate` on the name; accent underline (3 px) for the self callout only. Simultaneous callouts stack (newest on top, **max 2**, 4 gap = 68 total), they do NOT queue serially; a third evicts the oldest. Never covers more than ~40% of the smallest TableRegion | 2.5 s (fade 0.2 s) | callout copy above | none beyond the sting |
+| **Waiting for cards** | hand = 4 and inbox empty | Local player | Strip line (single line) + left pile in empty state | while true | `Waiting for cards from your left` | none |
 | **Own draw / own pass sound** (D-33) | local accepted/predicted action | Local only | — | <= 120 ms | — | soft tick (draw) and soft whoosh (pass), volume ~0.3. **Nothing for other seats' passes.** Audio asset ids are owner-supplied (human gate); a missing id must be silent, never an error. |
 
 ---
@@ -312,11 +312,11 @@ PROJECT.md requires every deal animation to have the same fixed duration so that
 
 - `FLOURISH_DURATION_SECONDS = 1.5` for **both** kinds `"Deal"` (round-start hands appearing) and `"Completion"` (the starting gun). Config value in `src/shared/Config/`, not inlined. 1.5 s is **[R-DISC]**: long enough to read, and irrelevant to input because nothing waits on it.
 - Hook shape (type sketch, not final code): `Flourish = { kind: "Deal" | "Completion", play: (ctx: FlourishContext) -> () }` with `FlourishContext = { root: Folder, seat: number, anchor: CFrame, isLocalSeat: boolean, durationSeconds: number, faces: { number } (public ranks only, completion only) }`.
-- **The driver owns the duration, not the flourish.** It creates `ctx.root`, calls `play` in a protected call, and destroys `ctx.root` at exactly `durationSeconds` even if the flourish is still running (an over-long flourish is cut, never honoured). Time is the injected client clock.
-- A flourish may only create instances under `ctx.root`, may not create `Active`/interactive GuiObjects, may not yield its caller, may read nothing about hands or score, and **never delays input, `Completed` handling, avatar standing or control restoration.**
-- **The registry is injected** (Phase 7 supplies skin flourishes). Gameplay modules (`Scoring`, `CardTable`, `SpoonPlacement`) get no import path to cosmetics or shop (CLAUDE.md rule 1); Phase 4 ships only the default flourish.
-- **Falsifiable tests (with a mocked clock):** (a) a flourish that asks for 5 s is torn down at 1.5 s; (b) the default flourish finishes inside 1.5 s; (c) input handlers fire during the flourish; (d) **mutation test:** remove the driver's cut-off and test (a) must fail.
-- Default "Plain" Completion: the four cards flip face-up at the seat (0.3 s), hold (0.7 s), slide to the table centre and fade (0.5 s). Default "Plain" Deal: the 4 hand cards fly from the left-pile corner into the fan, staggered 0.1 s, settled by 0.6 s.
+- **The driver owns the duration, not the flourish, and arms the cut-off BEFORE `play` runs.** Order: (1) create `ctx.root`; (2) schedule teardown at exactly `durationSeconds` on the injected client clock; (3) only then start `play` in its **own cancellable thread** (`task.spawn`, cancelled with `task.cancel` at teardown). `pcall` alone bounds neither time nor yields, so a flourish that yields or waits is cancelled by the driver's own timer instead of blocking it. **Known limit, stated honestly:** a synchronous infinite loop inside `play` cannot be stopped in Luau; the defence is the post-play scan below plus code review of any registered flourish, not a runtime guarantee.
+- A flourish may only create instances under `ctx.root`, may not create `Active`/interactive GuiObjects, may read nothing about hands or score, and **never delays input, `Completed` handling, avatar standing or control restoration.** **Enforced, not trusted:** a post-play scan (when `play` returns and again at cut-off) walks `ctx.root` descendants and fails/destroys on any `GuiObject` with `Active` or `Interactable` true, and diffs the children of every parent the flourish could reach (`Workspace`, the card `ScreenGui`) against a pre-play snapshot, destroying and logging any new instance that is not under `ctx.root`.
+- **The registry is injected** (Phase 7 supplies skin flourishes). Gameplay modules (`Scoring`, `CardTable`, `SpoonPlacement`) get no import path to cosmetics or shop (CLAUDE.md rule 1). FOUND-05 names only those server gameplay modules, so it does **not** cover the client flourish driver: add a lint rule or spec-lock test (scan the driver's require graph) asserting the driver and the card UI modules have **no require path to cosmetics or shop modules**. The driver receives the registry as an argument. Phase 4 ships only the default flourish.
+- **Falsifiable tests (mocked clock):** (a) a flourish that asks for 5 s is torn down at 1.5 s; (b) a flourish that **yields** (waits 5 s) is cancelled at 1.5 s and does not delay the driver; (c) the default flourishes finish strictly before 1.5 s (>= 1 frame of margin); (d) input handlers fire during the flourish; (e) the post-play scan catches an `Active` GuiObject and an instance parented outside `ctx.root`; (f) **mutation tests:** remove the driver's cut-off and (a) must fail; arm the cut-off after `play` instead of before and (b) must fail.
+- Default "Plain" Completion (**1.2 s total**, leaving margin under the 1.5 s cut-off): the four cards flip face-up at the seat (0.3 s), hold (0.5 s), slide to the table centre and fade (0.4 s). Default "Plain" Deal: the 4 hand cards fly from the left-pile corner into the fan, staggered 0.1 s, settled by 0.6 s.
 
 ---
 
@@ -340,7 +340,7 @@ Selection never goes to the server. Only the committing intent does, carrying st
 | V-25 mobile min target size | UNVERIFIED | 48 is the project's own floor; do not cite 44 as platform fact |
 | V-26 disable default controls | UNVERIFIED | Confirm `PlayerModule:GetControls():Disable()` hides the thumbstick/jump and `Enable()` restores it |
 | V-27 `ContextActionService` / gamepad `SelectedObject` | UNVERIFIED | Confirm, or drop the gamepad column |
-| Font availability (BuilderSans Regular/Bold) | UNVERIFIED | Check in Studio, fall back to Gotham |
+| Font availability (BuilderSans Regular/Bold) | UNVERIFIED | Check in Studio; fall back to `Enum.Font.Gotham` (Regular) / `Enum.Font.GothamBold` (Bold) so the two-weight rule holds |
 | Suit pip rendering (glyph vs sprite) | OPEN | Test glyphs on a phone; else owner-uploaded sprite (human gate) |
 | Landscape lock | HUMAN GATE | Creator Dashboard setting; `MANUAL-CHECKS.md` + `NEEDS_HUMAN.md` |
 | Audio asset ids (sting, draw, pass) | HUMAN GATE | Owner-supplied; missing = silent |
