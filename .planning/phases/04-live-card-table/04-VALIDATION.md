@@ -29,9 +29,25 @@ lives at `~/.rokit/bin/lune` and is **not on `PATH`**. Use `--root`, never `--fi
 | **Quick run command** | `lune run tests/run.luau -- --root tests/card` |
 | **Full suite command** | `lune run tests/run.luau` |
 | **Baseline runtime** | **657 passing in ~20.5 s** before this phase. Measured three times: 23.07 s (research), 20.53 s (planner), **20.15 s (orchestrator, `lune run tests/run.luau`)**. The 23.07 s reading was taken under load and is NOT the baseline — using it would have handed this phase ~2.5 s of slack that does not exist |
-| **Phase budget** | **+3 s maximum, so the ceiling is 23.5 s.** All new specs in-process and pure. No new subprocess gates beyond the three guard fixtures plan 04-02 justifies (~0.15 s) and the new pure zone's selene run (~0.4 s) |
+| **Phase budget** | **+3 s of real work. The 23.5 s figure is a target, NOT a tripwire — see the load warning below.** All new specs in-process and pure. No new subprocess gates beyond the three guard fixtures plan 04-02 justifies (~0.15 s) and the new pure zone's selene run (~0.4 s) |
 
-### Why the budget is a hard number
+### Container load swamps this budget — read this before declaring a breach
+
+**An UNCHANGED tree measured 31.54 s during planning** (657 cases, no source touched) against the
+same tree's 20.15 s floor. That is an 11 s spread from container load alone, roughly **3.7x this
+phase's entire +3 s allowance**. A single reading therefore proves nothing about this phase's cost.
+
+**Protocol, which overrides any single-number reading:**
+1. Take **three** readings and compare the **minimum**, not the mean or the latest.
+2. If even the minimum looks implausible, **record the load condition and re-measure when quiet** —
+   do NOT declare a breach. A false breach spends an owner decision on noise, which is worse than
+   no gate at all.
+3. **The real gate is the case count plus the per-spec allocation table in plan 04-20**, which
+   measures work rather than wall clock. Wall clock is corroboration.
+4. Never cut a mutation, a non-vacuity assertion or a clean control to save time. If the budget
+   genuinely cannot hold, that is the owner's decision at 04-20's checkpoint.
+
+### Why the budget exists at all
 
 CI was 15.94 s at the Phase 1 baseline, ~25-26 s at Phase 2 close (owner-accepted departure), and
 29.9 s at Phase 3 close (a **second** approved departure). STATE.md records that this phase adds
@@ -167,7 +183,7 @@ stated in the phase gate rather than discovered there.
 - [ ] No watch-mode flags
 - [ ] Feedback latency < 3 s per task
 - [ ] Every gate in the mutation table has a clean control **and** a non-vacuity assertion
-- [ ] Suite runtime **<= 23.5 s** (baseline ~20.5 s + 3 s), measured three times, or an explicit owner decision recorded
+- [ ] Suite runtime: **minimum of three readings** <= 23.5 s, or the load condition recorded and a quiet re-measure taken. Per-spec allocations in 04-20 within budget (2.73 s allocated against 3.0 s). Never satisfied by cutting a mutation, a non-vacuity assertion or a clean control
 - [ ] Device rows written to `MANUAL-CHECKS.md` before execution, not after
 - [ ] `nyquist_compliant: true` set in frontmatter
 
