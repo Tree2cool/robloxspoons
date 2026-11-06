@@ -29,7 +29,7 @@ lives at `~/.rokit/bin/lune` and is **not on `PATH`**. Use `--root`, never `--fi
 | **Quick run command** | `lune run tests/run.luau -- --root tests/card` |
 | **Full suite command** | `lune run tests/run.luau` |
 | **Baseline runtime** | **657 passing in ~20.5 s** before this phase. Measured three times: 23.07 s (research), 20.53 s (planner), **20.15 s (orchestrator, `lune run tests/run.luau`)**. The 23.07 s reading was taken under load and is NOT the baseline — using it would have handed this phase ~2.5 s of slack that does not exist |
-| **Phase budget** | **+3 s of real work. The 23.5 s figure is a target, NOT a tripwire — see the load warning below.** All new specs in-process and pure. No new subprocess gates beyond the three guard fixtures plan 04-02 justifies (~0.15 s) and the new pure zone's selene run (~0.4 s) |
+| **Phase budget** | **+3 s of real work. The 23.5 s figure is a target, NOT a tripwire — see the load warning below.** All new specs in-process and pure. No new subprocess gates beyond the **four** guard fixture roots plan 04-02 justifies (**~0.20 s**) and the new pure zone's selene run (~0.4 s). Allocated total is **2.73 s against 3.0 s** (2.09 s of specs), reserve 0.27 s — the per-spec table in plan 04-20 is the authoritative breakdown |
 
 ### Container load swamps this budget — read this before declaring a breach
 
