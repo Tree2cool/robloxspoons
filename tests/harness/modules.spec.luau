@@ -3,6 +3,7 @@
 -- so a failure here is a failure of Test/FakeClock/FakeScheduler, not of the inner scenario.
 local FakeClock = require("./FakeClock")
 local FakeScheduler = require("./FakeScheduler")
+local RecordingPublisher = require("./RecordingPublisher")
 local Test = require("./Test")
 
 local function failureOf(fn: () -> ()): string?
@@ -218,5 +219,56 @@ return function(t: Test.Runner)
 		s.advance(5)
 		t.equal(count, 3)
 		t.equal(s.pending(), 0)
+	end)
+
+	t.test("RecordingPublisher records method, userId, kind and payload in call order", function()
+		local pub = RecordingPublisher.new()
+		pub.toPlayer(7, "Sync", { a = 1 })
+		pub.toSeated("Table", { b = 2 })
+		pub.toAll("Notice", { c = 3 })
+		local calls = pub.calls()
+		t.equal(#calls, 3)
+		t.equal(calls[1].method, "toPlayer")
+		t.equal(calls[2].method, "toSeated")
+		t.equal(calls[3].method, "toAll")
+		t.equal(calls[1].userId, 7)
+		t.equal(calls[2].userId, nil)
+		t.equal(calls[1].kind, "Sync")
+		pub.toAll("Later", {})
+		t.equal(#calls, 3, "calls() is a copy and does not grow")
+		t.equal(#pub.calls(), 4)
+		t.equal(#pub.callsOfKind("Sync"), 1)
+		pub.reset()
+		t.equal(#pub.calls(), 0)
+	end)
+
+	t.test("RecordingPublisher callsTo includes broadcasts and excludes another player's private call", function()
+		local pub = RecordingPublisher.new()
+		local a, b, c = { "a" }, { "b" }, { "c" }
+		pub.toPlayer(1, "Sync", a)
+		pub.toPlayer(2, "Sync", b)
+		pub.toSeated("Table", c)
+		local mine = pub.callsTo(1)
+		t.equal(#mine, 2)
+		t.equal(mine[1].kind, "Sync")
+		t.equal(mine[2].kind, "Table")
+		for _, call in mine do
+			t.truthy(call.payload ~= b, "player 1 must never see player 2's private payload")
+		end
+	end)
+
+	t.test("RecordingPublisher leak mode turns a private per-player send into a broadcast", function()
+		local payload = { "secret" }
+		-- clean control
+		local clean = RecordingPublisher.new()
+		clean.toPlayer(1, "Sync", payload)
+		t.equal(clean.calls()[1].method, "toPlayer")
+		t.equal(#clean.callsTo(2), 0, "clean: player 2 sees nothing")
+		-- broken variant
+		local broken = RecordingPublisher.new({ leak = true })
+		broken.toPlayer(1, "Sync", payload)
+		t.equal(broken.calls()[1].method, "toAll")
+		t.equal(broken.calls()[1].userId, nil)
+		t.equal(#broken.callsTo(2), 1, "leak: player 2 now receives the private payload")
 	end)
 end
