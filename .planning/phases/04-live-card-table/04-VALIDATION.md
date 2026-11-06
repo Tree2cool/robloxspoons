@@ -58,7 +58,7 @@ the most test weight of any remaining phase. A third silent overshoot is not ava
 
 ## Sampling Rate
 
-- **After every task commit:** `lune run tests/run.luau -- --root tests/card` (target <= 3 s) **and**
+- **After every task commit:** `lune run tests/run.luau -- --root tests/card` (allocated **2.09 s**; see plan 04-20's per-spec table, which is the gate) **and**
   `lune run scripts/ci/check-guards.luau`
 - **After every plan wave:** `lune run tests/run.luau` (full suite) + `lune run scripts/verify.luau`
 - **Before `/gsd-verify-work`:** full suite green, `verify.luau` all steps green
@@ -139,7 +139,7 @@ every gate here carries three obligations, following the `valve.spec` "MUTATION"
 | 8.0 s ceiling | `AUTO_PASS_DECI` 80 -> 81 |
 | D-35 hand-4 behaviour | an auto-**draw** fires at hand 4; must fail |
 | Strike reset | an accepted action does not reset strikes |
-| Bench path | bench issues `Remove` with cause `Completed`, or bypasses `Remove` |
+| Bench path | **Row rewritten 2026-11-06 — the original mutation was not reachable.** It read "bench issues `Remove` with cause `Completed`", but `ShellRemoveCause` excludes `Completed`, so a shell issuing it is a **type error** rather than a test failure, and the real `CardTable` cannot be made to pass it because `Engine` is required directly. Reaching it would need a monkeypatch of the unfrozen `Engine.apply`, which risks cross-test leakage. **What is tested instead:** an injected `IdleClock` mutant returns a malformed command — containment holds, the following command still runs, the collected batches still publish, `Invariants.check` stays clean and the card count is conserved. The engine's own refusal is asserted directly in 04-12 case 4, and a shell that issued `Completed` would additionally fail case 2 on the real path (no `SeatRemoved{Benched}`). The table is corrected to match the plans, not the reverse |
 | D-14 selection rule | auto-pass picks the lowest-rank card (greedy) instead of uniform-random |
 | Stall independence (D-20) | detector keyed on `ValveForcedPass` — must fail the "stuck, valve silent" case |
 | Prediction rollback | `onSync` does not drop acked pending; watchdog never fires |
