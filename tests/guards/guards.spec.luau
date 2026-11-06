@@ -98,6 +98,42 @@ local CASES: { Case } = {
 		rules = { "R3" },
 		needles = { "banned construct: os.", "src/server/engine/Clocked.luau:" },
 	},
+	-- Phase 4 (04-CONTEXT.md CORRECTIONS 2026-11-05): the original D-37/D-38 claims were wrong, and the
+	-- first draft of this group shipped a fixture that went red with or without the change it claimed to
+	-- prove. A guard without a fixture that runs against the UNMODIFIED configuration is an unproven guard.
+	-- A: IdleClock matches no guardedNamePrefixes entry; it is an R2 root purely by pure-zone location.
+	{
+		root = `{FIXTURES}/import-pure-zone`,
+		ok = false,
+		rules = { "R2" },
+		needles = {
+			"IdleClock -> CosmeticsBridge",
+			"src/server/core/IdleClock.luau:6",
+			'path segment matches "cosmetic"',
+		},
+	},
+	-- B: the forbidden require of ShopPanel is load-bearing. With it present, the exact set { R4 }
+	-- asserts src/client/ui is NOT an R2 root (Phase 7 needs the renderer to import deck skins, CARD-18).
+	{
+		root = `{FIXTURES}/net-hygiene-client`,
+		ok = false,
+		rules = { "R4" },
+		needles = { "OnClientEvent may appear only in src/client/net/ClientNet.luau", "CardHud.luau:" },
+	},
+	-- C: rankOf in a STRING LITERAL fires R5 at the string's line (5), not the comment's line (2).
+	{
+		root = `{FIXTURES}/secret-rankof`,
+		ok = false,
+		rules = { "R5" },
+		needles = { "rankOf", "src/shared/Leak.luau:5" },
+	},
+	-- C control: rankOf only in a comment is invisible to R5, which is the correct scope.
+	{
+		root = `{FIXTURES}/secret-rankof-comment`,
+		ok = true,
+		rules = {},
+		needles = { "check-guards: ok (1 files, 0 requires, 0 guarded roots)" },
+	},
 }
 
 local function guard(args: { string }): process.ExecResult
