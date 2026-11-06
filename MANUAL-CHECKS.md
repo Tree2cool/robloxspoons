@@ -1,12 +1,20 @@
 # Manual Checks (D-04)
 
-Phase 1 produced everything the automated chain can verify. These nine checks need Roblox Studio, the Creator
-Hub or a real playtest, which the build container does not have. Each check is owned by the phase that raised it:
+Phases 1 to 4 produced everything the automated chain can verify. These seventeen checks need Roblox Studio, the
+Creator Hub, a real phone or a real playtest, which the build container does not have. Each check is owned by the
+phase that raised it:
 M-01 to M-06 belong to Phase 1 (**Phase 1 closes only when those boxes are ticked**), M-07 to Phase 2's pacing
 claim, and M-08, M-09 and M-10 to Phase 3. M-08 and M-09 check placement constants; M-10 is different in kind: it is
 the only check covering a gap CI cannot close (runtime versus CI snapshot values), not a check on an out-of-repo
 setting. Phase 3's closure depends on M-08 and M-10 but not on M-09, which needs a full-roster playtest that does not
-exist yet. Silence is
+exist yet.
+
+**M-11 to M-17 belong to Phase 4 (Live Card Table). M-11, M-12, M-13, M-14, M-15 and M-17 are blocking for Phase 4's
+close; M-16 is not** (a missing audio id is silent by contract and the suit pips ship with a marked placeholder).
+Note that four of Phase 4's five ROADMAP success criteria are device-dependent, and the build container has neither
+Studio nor a phone, so these rows are the phase's real evidence rather than a formality. They were written in plan 04-02,
+before any UI wave was executed, so that nothing device-dependent can be ticked by a machine. M-11 is the
+highest-risk row in the phase. Silence is
 not success: `lune run scripts/verify.luau` prints every unticked check after a green run.
 
 How to use this file:
@@ -436,3 +444,193 @@ would have thrown `ServerStorage.Maps does not exist` otherwise. An unrelated St
 `rbxassetid://203785492 ... Asset type does not match requested type`, is not from this repo.
 
 - [x] M-10 signed off: alejandrog_m 2026-11-04   (Studio; blocking Phase 3)
+
+---
+
+## M-11 (UX-02 / D-29, D-30) Control hide and restore, under both Input Action System settings
+
+**Why manual:** this is the highest-risk row in Phase 4. `require(PlayerScripts.PlayerModule):GetControls()` is
+undocumented and on a staff-announced removal path (V-26), and no replacement is proven under the Input Action System
+(IAS). The documented replacements (server-set `Player.DevComputerMovementMode` / `DevTouchMovementMode = Scriptable`,
+client-set `GuiService.TouchControlsEnabled = false`, and a higher-priority sinking binding for keys) have never been run
+in this project. Only a real input device and a real Studio session can show whether the controls come back cleanly.
+
+Matrix: rows = `Workspace.PlayerScriptsUseInputActionSystem` set **Disabled**, then **Enabled**; columns = PC keyboard,
+phone touch, gamepad. For **every** cell:
+
+1. While seated, `Controls.hide()` leaves **no thumbstick or jump graphics** and produces no movement from touch or
+   `W/A/S/D` / the left stick.
+2. `Space` (or the gamepad jump button) does not jump.
+3. `Controls.restore()` **while `W` is held**, and again **while a thumb is down**, resumes movement within one second
+   *without* releasing and re-pressing.
+4. Record the measured seat-release-to-first-controllable-frame time.
+
+Watch for the three community bug reports: a held key that does not resume after re-enable, a stuck jump button, and a
+dead thumbstick after `TouchControlsEnabled` is restored.
+
+**Cheat-client cell, four separately recorded attempts.** `Dev*MovementMode = Scriptable` disabling the default control
+scripts is **not** the same as the server refusing a `Move` call, so a hidden control is not a held avatar. From a
+client-side executor or the Studio command bar on the client, while the avatar is held, attempt each of these and record
+the result of **each one on its own line**:
+
+- (a) `GuiService.TouchControlsEnabled = true`: expected to show the thumbstick again, which is cosmetic only.
+- (b) `Humanoid.WalkSpeed = 16`: expected to leave the avatar in place because the server owns the hold.
+- (c) `Humanoid:Move(Vector3.new(0, 0, -1))`: expected to leave the avatar in place.
+- (d) a `CFrame` / `PivotTo` write on the character: expected to be corrected or ignored by the server.
+
+**Ticking this check on attempt (a) alone is forbidden.** (a) only shows the control graphics, and says nothing about
+whether the avatar can actually be moved.
+
+**Expected:** every matrix cell passes, or a failing cell has a **written fallback**. If layer (b) (`Dev*MovementMode`)
+fails under IAS, the recorded fallback is layer (a) alone (the server avatar hold) plus (c) and (d), because nothing in
+the default scripts is mutated and so there is nothing to restore. A failing cell with no written fallback is not
+acceptable.
+
+**Blocking: yes for Phase 4's close.** It is the phase's highest-risk row.
+
+Observed:
+
+- [ ] M-11 signed off: <name> <date>
+
+---
+
+## M-12 (UX-01, UX-03 / D-36) Real phone, landscape: targets on glass, safe area, Largest text
+
+**Why manual:** physical target size, thumb reach, the notch and the Roblox top bar, and rendered text width at the
+largest text setting are device and setting dependent. The Studio device emulator does not prove any of them.
+
+Steps: on a real notched phone in landscape, open the card table and confirm:
+
+1. Every card slot, the left pile and the right pile measure **>= 48 physical px** on glass.
+2. The fan and both piles are reachable with thumbs at rest, without shifting the grip.
+3. Nothing interactive sits under the notch or the Roblox top bar, with `ScreenInsets = CoreUISafeInsets`.
+4. Set Settings > Text Size to **Largest** and confirm every status-strip string stays on **one line**.
+
+Record the device model, its physical resolution, and the measured status-strip width.
+
+**Expected:** all four hold. A tight-but-passing strip is recorded with its measured width so a later copy change has a
+baseline.
+
+**Blocking: yes for Phase 4's close.**
+
+Observed:
+
+- [ ] M-12 signed off: <name> <date>
+
+---
+
+## M-13 (CARD-14) Prediction feel at 150-300 ms simulated lag
+
+**Why manual:** virtual time in the headless suite proves that the client and server converge, not what it *feels*
+like. Only a human watching a real client under real latency can judge whether a correction looks like a glitch.
+
+Steps: with Studio's network latency simulation (or the debug send-delay flag if the setting cannot be found), set
+150 ms, then 300 ms, and:
+
+1. Commit a pass: the card is visibly gone **within one frame**.
+2. Cause a server correction: it is a smooth return with **no teleport**.
+3. Cause a hard rejection: it looks **identical** to a correction, with no message, no sound and no colour flash (D-12).
+4. Fumble a fast double-tap, and record what happens, so D-03's accepted residual is observed rather than assumed.
+
+**Expected:** 1 to 3 hold at both latencies; 4 is recorded whatever it shows.
+
+**Blocking: yes for Phase 4's close.**
+
+Observed:
+
+- [ ] M-13 signed off: <name> <date>
+
+---
+
+## M-14 (CARD-19 / D-24) Greyscale render of all 50 faces
+
+**Why manual:** the automated test proves face-key injectivity, not human legibility. Legibility at fan size is a
+judgement about a rendered image.
+
+Steps: render the fan-size corner index of all 12 ranks x 4 copies, plus the joker in both modes, in a grid with
+`ColorCorrectionEffect.Saturation = -1`, at the reference viewport **and** on a real phone. A reviewer must be able to
+name each rank and copy. Also measure glyph-versus-face luma contrast for both the black and the red pip.
+
+**Spade versus club at 16 px is the expected hardest pair.** If they are not reliably distinguishable, enlarge the pip
+to 20 or thicken the club silhouette. Never lean on colour.
+
+**Expected:** all 50 faces named correctly in greyscale by someone who did not build them, on both surfaces.
+
+**Blocking: yes for Phase 4's close.**
+
+Observed:
+
+- [ ] M-14 signed off: <name> <date>
+
+---
+
+## M-15 (D-28 / D-29 note) Landscape lock and the IAS flag pinned explicitly
+
+**Why manual:** both are Creator Dashboard or place settings, which no repo change can set. The IAS flag is the
+dangerous one: left at `Default`, the player scripts flip underneath the project in early 2027 with no commit to blame.
+
+Steps:
+
+1. Creator Dashboard: set the supported orientation to **landscape only**, on **both** places (dev and production).
+2. Place settings: set `Workspace.PlayerScriptsUseInputActionSystem` **explicitly** to `Disabled` for Phase 4
+   verification (not left at `Default`), and re-run M-11 under `Enabled` before launch.
+3. Record whether Rojo 7.7.1 can set the property via `$properties`. Research assumes it cannot, because the property
+   is newer than the pinned reflection database. If it can, the pin becomes code instead of a human gate.
+
+**Expected:** both places landscape-locked; the flag explicitly `Disabled`; the Rojo question answered either way.
+
+**Blocking: yes for Phase 4's close.**
+
+Observed:
+
+- [ ] M-15 signed off: <name> <date>
+
+---
+
+## M-16 (CARD-19, D-33) Owner assets: audio ids, suit pips, Builder Sans weights
+
+**Why manual:** audio asset ids and any sprite upload are owner-uploaded assets, and font availability is a property of
+the Roblox platform that this container cannot query.
+
+Steps:
+
+1. Supply the three audio asset ids (completion sting, own draw, own pass) into the `AUDIO` table in
+   `src/shared/Config/Card.luau`. An **empty id must stay silent, never an error.**
+2. Confirm the four suit glyphs render at 16 px in Builder Sans on a phone. If any is missing or ugly, upload the
+   4-cell sprite sheet.
+3. Confirm Builder Sans **Regular and Bold** both exist. **`Enum.Font.Gotham*` has been removed and maps to
+   Montserrat, so there is no fallback**: unavailability is a blocker to raise, not a substitution to make.
+
+**Expected:** ids supplied (or deliberately left silent), glyphs legible, both weights present.
+
+**Blocking: no.** A missing audio id is silent by contract and the suit pips ship with a marked placeholder. A missing
+font weight is the exception: raise it as a blocker.
+
+Observed:
+
+- [ ] M-16 signed off: <name> <date>
+
+---
+
+## M-17 (CARD-02, CARD-15, CARD-17) Three-player starting-gun playtest
+
+**Why manual:** whether the moment of completing a set reads as a starting gun is subjective, and tap behaviour needs
+real thumbs. Three real players are the minimum roster.
+
+Steps: run a real three-player session and confirm:
+
+1. One tap selects, and only a second tap on the **same** card sends.
+2. An accidental single tap **never** sends.
+3. The completion sting, the avatar standing and running, and the who-went callout together read as a starting gun.
+4. The finisher is **running before the flourish ends.**
+
+This session also supplies the evidence **M-07** (CARD-11, the simulator's human reaction model, V-35) has been waiting
+for since Phase 2. Run them together.
+
+**Expected:** 1 to 4 hold, and the M-07 evidence is recorded in the same session.
+
+**Blocking: yes for Phase 4's close.**
+
+Observed:
+
+- [ ] M-17 signed off: <name> <date>
