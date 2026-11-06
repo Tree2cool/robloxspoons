@@ -33,6 +33,32 @@ local intents: { [string]: Intent } = {
 		-- exercise the finite check. It is required, not optional, so `{}` is a MissingKey.
 		validate = Validate.exactKeys({ nonce = Validate.integer({ min = 0, max = 2 ^ 31 }) }),
 	},
+	-- CARD-02 / CARD-14. Both are Round-only: a card intent outside the round is dropped by the
+	-- gateway's phase gate before it costs a lookup or a token.
+	--
+	-- RULE 7 IS STRUCTURAL HERE, not a handler check. `exactKeys` rejects any key outside the
+	-- schema as `UnknownKey`, so there is no `seat`, no `to`, no `target` and no `index` a client
+	-- could send. The server resolves the actor's seat from the Player the platform hands it, and
+	-- `Ring.pass` resolves `next` inside `Engine.apply`. tests/net/manifest.spec.luau asserts each
+	-- of those four names is rejected, for both intents.
+	--
+	-- `seq` is a client-chosen CORRELATION COUNTER, not a clock and not an index (rule 5). The
+	-- server echoes it back as `ackSeq` so the client's pending queue can be resolved cumulatively.
+	Draw = {
+		phases = { "Round" } :: { RoundPhase },
+		validate = Validate.exactKeys({ seq = Validate.integer({ min = 0, max = 2 ^ 31 }) }),
+	},
+	-- `cardId` is a STABLE CARD ID, which is a shuffled deck position carrying no rank information
+	-- (engine Types.luau guarantee 2). The 64 bound is a SANITY CAP, not a game rule: the largest
+	-- shipped pool is 4 * 12 + 1 = 49 cards. The rule is the engine's `UnknownCard` / `NotYourCard`,
+	-- which this bound must never be mistaken for.
+	Pass = {
+		phases = { "Round" } :: { RoundPhase },
+		validate = Validate.exactKeys({
+			seq = Validate.integer({ min = 0, max = 2 ^ 31 }),
+			cardId = Validate.integer({ min = 1, max = 64 }),
+		}),
+	},
 }
 
 -- Type and length come before the lookup (research check-order item 1): a name we have never heard of

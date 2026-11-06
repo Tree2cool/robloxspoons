@@ -5,6 +5,7 @@
 -- Every rejection asserts the exact code, never a bare failure.
 local Manifest = require("../../src/shared/Net/Manifest")
 local Test = require("../harness/Test")
+local Validate = require("../../src/shared/Net/Validate")
 
 local NAN: number = 0 / 0
 local INF: number = math.huge
@@ -29,6 +30,39 @@ local function phaseProblems(phases: { any }): { string }
 		end
 	end
 	return problems
+end
+
+-- Rule 7, written once as data. `base` is a COMPLETE valid payload, so each case adds exactly one
+-- defect: exactKeys reports MissingKey before UnknownKey, and a case that omitted a required key
+-- while adding a forbidden one would assert the wrong code and prove nothing about rule 7.
+local FORBIDDEN_KEYS = { "seat", "to", "target", "index", "hand", "slot", "userId" }
+local BASES: { [string]: { [string]: any } } = {
+	Draw = { seq = 1 },
+	Pass = { seq = 1, cardId = 7 },
+}
+
+local function realValidators(): { [string]: Validate.Validator }
+	return { Draw = Manifest.intents.Draw.validate, Pass = Manifest.intents.Pass.validate }
+end
+
+-- The forbidden-key checker. It takes its validators as a PARAMETER so a mutation is an injected broken
+-- dependency, not a source edit. Returns how many cases ran and a sorted list of failures.
+local function forbiddenKeyRun(validators: { [string]: Validate.Validator }): (number, { string })
+	local seen = 0
+	local failures: { string } = {}
+	local names = { "Draw", "Pass" }
+	for _, name in names do
+		for _, key in FORBIDDEN_KEYS do
+			local payload = table.clone(BASES[name])
+			payload[key] = 1
+			local ok, code = validators[name](payload)
+			seen += 1
+			if ok or code ~= "UnknownKey" then
+				table.insert(failures, `{name}/{key}: expected UnknownKey, got {if ok then "true" else tostring(code)}`)
+			end
+		end
+	end
+	return seen, failures
 end
 
 return function(t: Test.Runner)
@@ -76,12 +110,13 @@ return function(t: Test.Runner)
 		t.deepEqual(phaseProblems({ "Round" }), {})
 	end)
 
-	t.test("Manifest.intents has exactly one key in Phase 1: Ping", function()
+	t.test("Manifest.intents has exactly Ping, Draw and Pass (Phase 4 added the two card intents)", function()
 		local keys: { string } = {}
 		for name in Manifest.intents do
 			table.insert(keys, name)
 		end
-		t.deepEqual(keys, { "Ping" })
+		table.sort(keys)
+		t.deepEqual(keys, { "Draw", "Pass", "Ping" })
 	end)
 
 	t.test("every intent has a callable validate", function()
@@ -146,6 +181,181 @@ return function(t: Test.Runner)
 			local ok, code = validate(c.payload)
 			t.equal(ok, false, `{c.label}: should be rejected`)
 			t.equal(code, c.code, `{c.label}: wrong rejection code`)
+		end
+	end)
+
+	t.test("Draw and Pass accept their exact payload and return a clean copy", function()
+		-- The clean control every hostile case below needs beside it.
+		local seen = 0
+		for name, base in BASES do
+			local ok, clean = Manifest.intents[name].validate(base)
+			t.equal(ok, true, `{name}: the exact payload must be accepted`)
+			t.deepEqual(clean, base, `{name}: clean copy`)
+			t.truthy(clean ~= base, `{name}: the result must be a copy, not the caller's table`)
+			seen += 1
+		end
+		t.equal(seen, 2, "expected to drive exactly Draw and Pass")
+	end)
+
+	t.test("rule 7: no card intent accepts a seat, a pass target or a hand index", function()
+		local seen, failures = forbiddenKeyRun(realValidators())
+		t.equal(seen, 14, "2 intents x 7 forbidden keys must all have run")
+		t.deepEqual(failures, {}, "a forbidden key was not rejected as UnknownKey")
+		print(`rule 7 gate: {seen} cases ran, {#failures} failures`)
+	end)
+
+	t.test("rule 7 MUTATION: the gate goes red when the schema is loosened or the checker is blind", function()
+		-- Mutations are injected as a broken dependency, never by editing the source. Each one is run
+		-- through the SAME checker the real schemas pass through.
+
+		-- exactKeys has no optional keys, so "loosening" cannot be expressed by adding a required field
+		-- (that would fail the other cases with MissingKey). The faithful mutation is a validator that
+		-- TOLERATES a key: it drops the key, then runs the real schema.
+		local function tolerating(real: Validate.Validator, tolerated: { string }): Validate.Validator
+			return function(value: unknown): (boolean, unknown)
+				if type(value) ~= "table" then
+					return real(value)
+				end
+				local copy = table.clone(value :: { [string]: unknown })
+				for _, key in tolerated do
+					copy[key] = nil
+				end
+				return real(copy)
+			end
+		end
+
+		-- (a) Draw tolerates `seat`: exactly the one (Draw, seat) case must fail.
+		local looseDraw = realValidators()
+		looseDraw.Draw = tolerating(Manifest.intents.Draw.validate, { "seat" })
+		local seenA, failuresA = forbiddenKeyRun(looseDraw)
+		t.equal(seenA, 14, "mutation (a): all 14 cases must still run")
+		t.deepEqual(failuresA, { "Draw/seat: expected UnknownKey, got true" })
+
+		-- (b) Pass tolerates `index` and `target`: exactly those two cases fail.
+		local loosePass = realValidators()
+		loosePass.Pass = tolerating(Manifest.intents.Pass.validate, { "index", "target" })
+		local seenB, failuresB = forbiddenKeyRun(loosePass)
+		t.equal(seenB, 14, "mutation (b): all 14 cases must still run")
+		t.deepEqual(failuresB, {
+			"Pass/target: expected UnknownKey, got true",
+			"Pass/index: expected UnknownKey, got true",
+		})
+
+		-- (c) A permissive validator that accepts anything: all 14 fail.
+		local acceptAll: Validate.Validator = function(value: unknown): (boolean, unknown)
+			return true, value
+		end
+		local seenC, failuresC = forbiddenKeyRun({ Draw = acceptAll, Pass = acceptAll })
+		t.equal(seenC, 14, "mutation (c): all 14 cases must still run")
+		t.equal(#failuresC, 14, "an accept-everything validator must fail every case")
+
+		-- (d) A validator that rejects everything for the WRONG reason must not pass the gate either:
+		-- it would if the checker only looked at `ok`.
+		local rejectAll: Validate.Validator = function(_value: unknown): (boolean, unknown)
+			return false, "MissingKey"
+		end
+		local seenD, failuresD = forbiddenKeyRun({ Draw = rejectAll, Pass = rejectAll })
+		t.equal(seenD, 14, "mutation (d): all 14 cases must still run")
+		t.equal(#failuresD, 14, "a wrong-code rejection must fail every case")
+		print(`rule 7 mutations: (a) {#failuresA} (b) {#failuresB} (c) {#failuresC} (d) {#failuresD} red`)
+	end)
+
+	t.test("negative control: the forbidden-key checker can tell a tight schema from a loose one", function()
+		local loose = Validate.exactKeys({
+			seq = Validate.integer({ min = 0, max = 2 ^ 31 }),
+			seat = Validate.integer({ min = 0, max = 4 }),
+		})
+		local looseOk = loose({ seq = 1, seat = 1 })
+		t.equal(looseOk, true, "the loose schema must ACCEPT seat, or this control proves nothing")
+		local tightOk, tightCode = Manifest.intents.Draw.validate({ seq = 1, seat = 1 })
+		t.equal(tightOk, false, "the real Draw schema must reject seat")
+		t.equal(tightCode, "UnknownKey")
+	end)
+
+	t.test("Draw and Pass reject NaN, infinity and a non-number seq", function()
+		-- Establish what the field validator itself reports, then require the manifest to agree.
+		local seqValidator = Validate.integer({ min = 0, max = 2 ^ 31 })
+		local cases: { { label: string, seq: unknown, code: string } } = {
+			{ label = "NaN", seq = NAN, code = "NotFinite" },
+			{ label = "+inf", seq = INF, code = "NotFinite" },
+			{ label = "-inf", seq = -INF, code = "NotFinite" },
+			{ label = "string", seq = "1", code = "WrongType" },
+			{ label = "fraction", seq = 1.5, code = "NotInteger" },
+			{ label = "negative", seq = -1, code = "OutOfRange" },
+		}
+		local seen = 0
+		for _, c in cases do
+			local fieldOk, fieldCode = seqValidator(c.seq)
+			t.equal(fieldOk, false, `{c.label}: Validate.integer must reject`)
+			t.equal(fieldCode, c.code, `{c.label}: Validate.integer code`)
+			for name, base in BASES do
+				local payload = table.clone(base)
+				payload.seq = c.seq
+				local ok, code = Manifest.intents[name].validate(payload)
+				t.equal(ok, false, `{name} {c.label}: should be rejected`)
+				t.equal(code, c.code, `{name} {c.label}: wrong rejection code`)
+				seen += 1
+			end
+		end
+		t.equal(seen, 12, "6 defects x 2 intents must all have run")
+	end)
+
+	t.test("Pass rejects a cardId outside the sanity bound, and 49 is inside it", function()
+		-- The 64 bound is a SANITY CAP, not a game rule. The real rule is the engine's UnknownCard /
+		-- NotYourCard (plan 04-12); a cardId inside the cap that is not yours is still rejected there.
+		local validate = Manifest.intents.Pass.validate
+		local cases: { { cardId: number, ok: boolean, code: string? } } = {
+			{ cardId = 0, ok = false, code = "OutOfRange" },
+			{ cardId = 65, ok = false, code = "OutOfRange" },
+			{ cardId = 49, ok = true },
+			{ cardId = 1, ok = true },
+			{ cardId = 64, ok = true },
+		}
+		for _, c in cases do
+			local ok, result = validate({ seq = 1, cardId = c.cardId })
+			t.equal(ok, c.ok, `cardId {c.cardId}`)
+			if not c.ok then
+				t.equal(result, c.code, `cardId {c.cardId}: code`)
+			end
+		end
+		local nanOk, nanCode = validate({ seq = 1, cardId = NAN })
+		t.equal(nanOk, false)
+		t.equal(nanCode, "NotFinite")
+	end)
+
+	t.test("Draw and Pass reject a missing key, an extra key, a non-table and a forbidden type", function()
+		local seen = 0
+		for name, base in BASES do
+			local validate = Manifest.intents[name].validate
+			local extra = table.clone(base)
+			extra.extra = 1
+			local cases: { { label: string, payload: unknown, code: string } } = {
+				{ label = "empty table", payload = {}, code = "MissingKey" },
+				{ label = "extra key", payload = extra, code = "UnknownKey" },
+				{ label = "string", payload = "nope", code = "NotTable" },
+				{ label = "function", payload = print, code = "ForbiddenType" },
+				{ label = "nil", payload = nil, code = "NotTable" },
+			}
+			for _, c in cases do
+				local ok, code = validate(c.payload)
+				t.equal(ok, false, `{name} {c.label}: should be rejected`)
+				t.equal(code, c.code, `{name} {c.label}: wrong rejection code`)
+				seen += 1
+			end
+		end
+		t.equal(seen, 10, "5 defects x 2 intents must all have run")
+	end)
+
+	t.test("both card intents are Round-only", function()
+		-- The gateway's phase gate runs BEFORE the token bucket (D-22, reviewed and kept in plan
+		-- 04-07), so a wrong-phase card message costs no token. That is why plan 04-07 throttles the
+		-- reject LOG instead of reordering the gate.
+		for _, name in { "Draw", "Pass" } do
+			local phases = Manifest.intents[name].phases
+			t.deepEqual(phases, { "Round" }, `{name} must be Round-only`)
+			for _, banned in { "Lobby", "Hide", "Podium" } do
+				t.truthy(table.find(phases, banned :: any) == nil, `{name} must not allow {banned}`)
+			end
 		end
 	end)
 
