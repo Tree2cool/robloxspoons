@@ -76,12 +76,13 @@ return function(t: Test.Runner)
 		t.deepEqual(phaseProblems({ "Round" }), {})
 	end)
 
-	t.test("Manifest.intents has exactly one key in Phase 1: Ping", function()
+	t.test("Manifest.intents has exactly Ping, Draw and Pass (Phase 4 added the two card intents)", function()
 		local keys: { string } = {}
 		for name in Manifest.intents do
 			table.insert(keys, name)
 		end
-		t.deepEqual(keys, { "Ping" })
+		table.sort(keys)
+		t.deepEqual(keys, { "Draw", "Pass", "Ping" })
 	end)
 
 	t.test("every intent has a callable validate", function()
