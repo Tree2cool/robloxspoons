@@ -368,7 +368,9 @@ function CardService.new(deps: Deps): CardService
 			sweepConnection = RunService.Heartbeat:Connect(function(dt: number)
 				accumulator += dt
 				if accumulator >= interval then
-					accumulator -= interval
+					-- IN-03: subtracted (no drift) and clamped to one interval, so a long hitch leaves a
+					-- backlog of at most one extra tick, never a run of catch-up ticks every frame.
+					accumulator = math.min(accumulator - interval, interval)
 					table_:tick()
 				end
 			end)

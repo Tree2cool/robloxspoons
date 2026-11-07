@@ -124,6 +124,26 @@ local function audienceProblems(raw: string): ({ string }, number, number)
 	return problems, #removed, #leaver
 end
 
+-- IN-03. The sweep accumulator must be clamped after a hitch, and still subtract rather than reset.
+local function sweepProblems(raw: string): ({ string }, number)
+	local text = lex.stripComments(raw)
+	local problems: { string } = {}
+	local body = slice(text, "Heartbeat:Connect(function(dt: number)", "return true")
+	if body == "" then
+		return { "sweep connection body not found" }, 0
+	end
+	if at(body, "accumulator = math.min(accumulator - interval, interval)") == nil then
+		table.insert(problems, "the sweep accumulator is not clamped to one interval after subtracting")
+	end
+	if at(body, "accumulator = 0") ~= nil then
+		table.insert(problems, "the sweep accumulator is reset, which drifts the 10 Hz sweep")
+	end
+	if at(body, "table_:tick()") == nil then
+		table.insert(problems, "the sweep no longer ticks the table")
+	end
+	return problems, #body
+end
+
 return function(t: Test.Runner)
 	local raw = fs.readFile(SERVICE_PATH)
 
@@ -234,5 +254,28 @@ return function(t: Test.Runner)
 		end
 		t.equal(seen, #mutants, "every mutant seen")
 		print(`service_wiring WR-05: {seen}/{#mutants} mutants seen, twin green`)
+	end)
+
+	t.test("IN-03: the sweep accumulator is clamped after a hitch and still subtracts", function()
+		local problems, size = sweepProblems(raw)
+		t.deepEqual(problems, {}, "clean path")
+		t.truthy(size > 100, `non-vacuity: sweep body only {size} chars`)
+		local clamp = "accumulator = math.min(accumulator - interval, interval)"
+		t.deepEqual((sweepProblems(replaceOnce(raw, clamp, clamp))), {}, "the no-defect twin must be green")
+		local mutants: { { name: string, edited: string } } = {
+			{ name = "unclamped (the reviewed defect)", edited = replaceOnce(raw, clamp, "accumulator -= interval") },
+			{ name = "reset instead of subtract", edited = replaceOnce(raw, clamp, "accumulator = 0") },
+			{ name = "tick removed", edited = replaceOnce(raw, "table_:tick()", "(nil)") },
+		}
+		local seen = 0
+		for _, mutant in mutants do
+			local found = sweepProblems(mutant.edited)
+			t.truthy(#found >= 1, `mutant "{mutant.name}" was not seen`)
+			if #found >= 1 then
+				seen += 1
+			end
+		end
+		t.equal(seen, #mutants, "every mutant seen")
+		print(`service_wiring IN-03: sweep body {size} chars, {seen}/{#mutants} mutants seen, twin green`)
 	end)
 end
