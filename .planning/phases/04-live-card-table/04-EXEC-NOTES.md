@@ -265,6 +265,40 @@ replace it, the public `Table` batch silently goes to zero clients and every sea
 plain `Player`, while `tests/run.luau`, selene **and** stylua all passed. Five independent
 confirmations now (04-06, 04-08, 04-10, 04-12, 04-13).
 
+## A typecheck trap for the renderer waves, found by 04-11
+
+**The standard-platform solver widens string-literal-union tables to `string` when they pass through
+`table.freeze({...})`.** So a frozen table of literal-union keys loses its narrowing and the
+typecheck fails. 04-11's fix: **build the typed local first, freeze it afterwards.** Any later plan
+freezing a literal-keyed table will hit this.
+
+(This is the **fifth** independent confirmation of the `verify.luau` gap — the suite ran green before
+`verify.luau` did, again.)
+
+## 04-11's shipped copy facts the renderers need
+
+- **Hint table: 20 cells** (state x input). 41 strings audited in total — 20 cells, 17 messages
+  including 2 joker explainers and the rotate prompt, and 2 callouts.
+- **Longest strip string is exactly 34 characters** — "Auto-passed a card. Strike 1 of 3." — i.e. hard
+  against the cap. Longest callout is 40, with the display name truncated to 18. Worst-case strip
+  headroom measured **1.806** against a `>= 1.5` assertion, over 4 viewports and 156 measurements.
+- **The forced-pass copy names no card on purpose:** "Table stuck. We passed for you." That is what
+  makes it read correctly in 04-09's race (a forced pass landing while the player's own `Pass` is in
+  flight produces two changes at once) **and** after a `Draw` placeholder rollback, where there is no
+  `cardId` to name at all.
+- **Exclamation marks appear only in the starting-gun callouts.** A stray one in an AFK line turns
+  the gate red (`stray exclamation: message waiting`), as does any error copy
+  (`forbidden error copy: ... contains "rejected"`) — D-12's silent-rejection rule, enforced.
+- **The "four F4 rewrites" are four UI-SPEC rows but five literals**, because the RightPileSink Touch
+  and Mouse strings share one row.
+- **D-30 order is asserted, not assumed:** a never-restoring mutant and a flourish-first mutant both
+  fail with explicit order traces (`D-30: flourish at 4 not after controls restored at -1`).
+
+**Self-consistency catch worth copying:** the `Controls` header says "legacy controls getter" rather
+than spelling `GetControls` / `PlayerModule`, because the `src/`-wide forbidden-identifier scan
+**reads comments too**. A header that named the identifiers would have failed the very scan it
+documents. 50 files walked, 0 hits, negative control fires exactly once.
+
 ## Bookkeeping the orchestrator owns
 
 **Do not run `requirements.mark-complete` from an executor.** Plans 04-01 and 04-02 each ran it
