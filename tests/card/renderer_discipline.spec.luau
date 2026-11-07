@@ -196,6 +196,171 @@ local function replaceOnce(text: string, from: string, to: string): string
 	return string.sub(text, 1, a - 1) .. to .. string.sub(text, (b :: number) + 1)
 end
 
+-- ---------------------------------------------------------------------------------------------------------------
+-- Plan 04-17 scanners: the card faces, the hit strips and the connection balance
+-- ---------------------------------------------------------------------------------------------------------------
+
+-- Every string literal's content, comments already stripped by the caller. Single-line only, like the rest.
+local function literalsOf(code: string): { string }
+	local out: { string } = {}
+	local i, n = 1, #code
+	while i <= n do
+		local c = string.sub(code, i, i)
+		if c == '"' or c == "'" or c == "`" then
+			local j = i + 1
+			while j <= n do
+				local d = string.sub(code, j, j)
+				if d == "\\" then
+					j += 2
+				elseif d == c then
+					break
+				else
+					j += 1
+				end
+			end
+			table.insert(out, string.sub(code, i + 1, j - 1))
+			i = j + 1
+		else
+			i += 1
+		end
+	end
+	return out
+end
+
+-- Case 7's predicate. Rank glyphs are matched EXACTLY (a bare "A" is a rank, "Active" is not); suit names and
+-- band texts are matched anywhere inside a literal, since they are long enough not to collide.
+local function faceLiteralProblems(code: string, glyphs: { string }, words: { string }): { string }
+	local problems: { string } = {}
+	for _, literal in literalsOf(code) do
+		for _, glyph in glyphs do
+			if literal == glyph then
+				table.insert(problems, `rank glyph literal "{literal}"`)
+			end
+		end
+		for _, word in words do
+			if string.find(literal, word, 1, true) then
+				table.insert(problems, `face word "{word}" in literal "{literal}"`)
+			end
+		end
+	end
+	return problems
+end
+
+-- Whole-word occurrences of a name in comment-stripped code: catches `== "Wild"`, `Wild =` and `.Wild` alike.
+local function wordCount(code: string, word: string): number
+	local n = 0
+	for _ in string.gmatch(code, "%f[%w_]" .. word .. "%f[^%w_]") do
+		n += 1
+	end
+	return n
+end
+
+local function modeBranchProblems(code: string, modes: { string }): { string }
+	local problems: { string } = {}
+	for _, mode in modes do
+		local n = wordCount(code, mode)
+		if n > 0 then
+			table.insert(problems, `joker mode {mode} named {n} times`)
+		end
+	end
+	return problems
+end
+
+-- The body of every function whose NAME contains `relayout` or `apply`, found by indentation (the project is
+-- stylua-formatted with tabs, so a body ends at the first `end` at the same indent). A text approximation,
+-- and it says so: the real guarantee is that a tap never lands on a button mid-destruction.
+local function layoutPathBodies(code: string): { { name: string, lines: { string } } }
+	local lines = string.split(code, "\n")
+	local found: { { name: string, lines: { string } } } = {}
+	local i = 1
+	while i <= #lines do
+		local line = lines[i]
+		local indent, name = string.match(line, "^(\t*)([%w_]+)%s*=%s*function%(")
+		if name == nil then
+			indent, name = string.match(line, "^(\t*)local function ([%w_]+)")
+		end
+		if name == nil then
+			indent, name = string.match(line, "^(\t*)function [%w_%.:]-([%w_]+)%(")
+		end
+		local lower = if name ~= nil then string.lower(name) else ""
+		if name ~= nil and (string.find(lower, "relayout", 1, true) or string.find(lower, "apply", 1, true)) then
+			local body: { string } = {}
+			local k = i + 1
+			while k <= #lines and lines[k] ~= `{indent}end` and lines[k] ~= `{indent}end,` do
+				table.insert(body, lines[k])
+				k += 1
+			end
+			table.insert(found, { name = name, lines = body })
+			i = k
+		end
+		i += 1
+	end
+	return found
+end
+
+local function constructorInLayoutPath(code: string): { string }
+	local hits: { string } = {}
+	for _, fn in layoutPathBodies(code) do
+		for _, l in fn.lines do
+			if string.find(l, "Instance.new", 1, true) then
+				table.insert(hits, `{fn.name}: {l}`)
+			end
+		end
+	end
+	return hits
+end
+
+local function handProblems(code: string, maxButtons: number): { string }
+	local problems: { string } = {}
+	local buttons = countOf(code, 'Instance.new("TextButton")')
+	if buttons < 1 or buttons > maxButtons then
+		table.insert(problems, `TextButton constructors: {buttons}, expected 1..{maxButtons}`)
+	end
+	for _, hit in constructorInLayoutPath(code) do
+		table.insert(problems, `constructor in a layout path: {hit}`)
+	end
+	return problems
+end
+
+local function connectBalance(code: string): (number, number)
+	return countOf(code, ":Connect("), countOf(code, ":Disconnect(")
+end
+
+-- Case 11's predicate: the input surface. Strips and sinks must stay Active, the cards must never be, and
+-- the hand has no error path or user-facing error wording (D-12).
+local function surfaceProblems(hand: string, piles: string, face: string): { string }
+	local problems: { string } = {}
+	for _, required in { "AutoButtonColor = false", "Active = true", "BackgroundTransparency = 1", 'Text = ""' } do
+		if countOf(hand, required) < 1 then
+			table.insert(problems, `CardHand lacks: {required}`)
+		end
+	end
+	if countOf(hand, "Active = false") > 0 then
+		table.insert(problems, "CardHand deactivates something (a tap would fall through to the backdrop)")
+	end
+	for _, forbidden in { "error(", "assert(", "pcall(" } do
+		if countOf(hand, forbidden) > 0 then
+			table.insert(problems, `CardHand has an error path: {forbidden}`)
+		end
+	end
+	for _, literal in literalsOf(hand) do
+		local lower = string.lower(literal)
+		for _, word in { "error", "invalid", "reject", "wrong", "failed", "illegal" } do
+			if string.find(lower, word, 1, true) then
+				table.insert(problems, `user-facing error wording in CardHand: "{literal}"`)
+			end
+		end
+	end
+	local sinks = countOf(piles, ".button.Active = true")
+	if sinks < 2 then
+		table.insert(problems, `CardPiles has {sinks} Active sinks, expected 2`)
+	end
+	if countOf(face, "Active = true") > 0 then
+		table.insert(problems, "a card is Active (hit-testing belongs to the strips)")
+	end
+	return problems
+end
+
 return function(t: Test.Runner)
 	t.test("no geometry number from Layout.DESIGN appears as a literal anywhere under src/client/ui", function()
 		-- Whole numbers 0..4 are excluded: grid and index arithmetic (slot 1, a 2-up split, a 4-grid), not geometry.
@@ -225,7 +390,7 @@ return function(t: Test.Runner)
 		)
 
 		local files = uiFiles()
-		t.truthy(#files >= 2, `non-vacuity: scanned {#files} files`)
+		t.truthy(#files >= 5, `non-vacuity: scanned {#files} files, at least 5 expected`)
 		print(`  renderer_discipline[1]: {#files} files, {#needles} needles: {join(needles)}`)
 		local total = 0
 		local sawTheme = false
@@ -267,7 +432,7 @@ return function(t: Test.Runner)
 		t.equal(hitsIn(lex.stripComments("local c = Color3.fromRGB(1, 2, 3)")), 1, "negative control: code")
 
 		local files = uiFiles()
-		t.truthy(#files >= 2, `non-vacuity: scanned {#files} files`)
+		t.truthy(#files >= 5, `non-vacuity: scanned {#files} files, at least 5 expected`)
 		local withHits: { string } = {}
 		local report: { string } = {}
 		local themeHits = 0
@@ -302,7 +467,7 @@ return function(t: Test.Runner)
 		t.equal(#numberHits(stripCode("-- 0.15\nlocal d = 5"), source, true), 0, "negative control: comment")
 
 		local files = uiFiles()
-		t.truthy(#files >= 2, `non-vacuity: scanned {#files} files`)
+		t.truthy(#files >= 5, `non-vacuity: scanned {#files} files, at least 5 expected`)
 		print(`  renderer_discipline[3]: {#files} files, needles: {join(source)}`)
 		for _, path in files do
 			-- CardTheme is NOT exempt here: timings have exactly one home.
@@ -332,7 +497,7 @@ return function(t: Test.Runner)
 		t.equal(hitsIn("local x = node.OnClientEvent"), 1, "negative control: fires on a planted identifier")
 		-- RAW text, comments included: stricter than the guards, and it keeps headers honest.
 		local files = uiFiles()
-		t.truthy(#files >= 2, `non-vacuity: scanned {#files} files`)
+		t.truthy(#files >= 5, `non-vacuity: scanned {#files} files, at least 5 expected`)
 		local total = 0
 		for _, path in files do
 			local n = hitsIn(fs.readFile(path))
@@ -420,4 +585,277 @@ return function(t: Test.Runner)
 		reported(replaceOnce(code, "MaxTextSize = CardTheme.TEXT_SIZE.BODY", "MaxTextSize = 20"), "literal MaxTextSize")
 		reported(code .. '\nlabel.Text = "Tap a card to pick it"', "prose composed in the strip")
 	end)
+	t.test("no rank glyph, suit name or joker band text appears as a literal outside Faces.luau", function()
+		local Faces = require("../../src/shared/Card/Faces")
+		local glyphs: { string } = {}
+		for _, g in Faces.RANK_LADDER do
+			table.insert(glyphs, g)
+		end
+		local words: { string } = {}
+		for _, suit in Faces.SUIT_OF_COPY do
+			table.insert(words, suit)
+		end
+		for _, mode in Faces.JOKER_MODES do
+			table.insert(words, Faces.JOKER_BAND[mode].text)
+		end
+		t.equal(#glyphs, 12, "non-vacuity: the ladder is 12 glyphs")
+		t.equal(#words, 6, "non-vacuity: four suits and two band texts")
+
+		-- negative controls: each kind is caught, and a comment, an identifier and "Active" are not
+		t.equal(#faceLiteralProblems('local g = "K"', glyphs, words), 1, "negative control: a rank glyph")
+		t.equal(#faceLiteralProblems("local s = 'spade'", glyphs, words), 1, "negative control: a suit name")
+		t.equal(#faceLiteralProblems('x.Text = "WILD"', glyphs, words), 1, "negative control: a band text")
+		t.equal(
+			#faceLiteralProblems(lex.stripComments('-- "K" "WILD"\nlocal Active = "Active"'), glyphs, words),
+			0,
+			"negative control: comment and the word Active"
+		)
+
+		local files = uiFiles()
+		t.truthy(#files >= 5, `non-vacuity: scanned {#files} files, at least 5 expected`)
+		local perFile: { string } = {}
+		local sources: { [string]: string } = {}
+		local literals = 0
+		for _, path in files do
+			local code = lex.stripComments(fs.readFile(path))
+			sources[baseName(path)] = code
+			literals += #literalsOf(code)
+			table.insert(perFile, `{baseName(path)}={#literalsOf(code)}`)
+			t.deepEqual(faceLiteralProblems(code, glyphs, words), {}, `face literal in {path}`)
+		end
+		print(`  renderer_discipline[7]: {#files} files, literals {literals} ({join(perFile)})`)
+		print(`  renderer_discipline[7]: glyph needles {join(glyphs)}; word needles {join(words)}`)
+		t.truthy(literals >= 30, `non-vacuity: {literals} string literals were actually examined`)
+
+		-- twin: the same mutation function with an identity edit is clean, so a red mutant is not the harness
+		local face = sources["CardFace.luau"]
+		t.deepEqual(
+			faceLiteralProblems(replaceOnce(face, "bandText.Text = b.text", "bandText.Text = b.text"), glyphs, words),
+			{},
+			"twin: an identity edit of the real CardFace is clean"
+		)
+		-- real-source mutations: the shipped CardFace is what is judged
+		t.truthy(
+			#faceLiteralProblems(
+					replaceOnce(face, "bandText.Text = b.text", 'bandText.Text = "WILD"'),
+					glyphs,
+					words
+				) > 0,
+			"MUTATION: band text hard-coded in CardFace is caught"
+		)
+		t.truthy(
+			#faceLiteralProblems(
+					replaceOnce(face, "corner1.rank.Text = resolved.rankGlyph", 'corner1.rank.Text = "K"'),
+					glyphs,
+					words
+				) > 0,
+			"MUTATION: rank glyph hard-coded in CardFace is caught"
+		)
+		t.truthy(
+			#faceLiteralProblems(
+					replaceOnce(face, "bandText.Text = b.text", 'bandText.Text = "club"'),
+					glyphs,
+					words
+				) > 0,
+			"MUTATION: suit name hard-coded in CardFace is caught"
+		)
+	end)
+
+	t.test("no file under src/client/ui branches on the joker mode", function()
+		local Faces = require("../../src/shared/Card/Faces")
+		local modes: { string } = {}
+		for _, m in Faces.JOKER_MODES do
+			table.insert(modes, m)
+		end
+		t.truthy(#modes >= 2, `non-vacuity: {#modes} joker modes ({join(modes)})`)
+		t.equal(#modeBranchProblems('if mode == "Wild" then', modes), 1, "negative control: a mode comparison")
+		t.equal(#modeBranchProblems("local t = { Blocker = 1 }", modes), 1, "negative control: a mode-keyed table")
+		t.equal(#modeBranchProblems(lex.stripComments("-- Wild Blocker"), modes), 0, "negative control: comment")
+
+		local files = uiFiles()
+		t.truthy(#files >= 5, `non-vacuity: scanned {#files} files, at least 5 expected`)
+		local sources: { [string]: string } = {}
+		for _, path in files do
+			local code = lex.stripComments(fs.readFile(path))
+			sources[baseName(path)] = code
+			t.deepEqual(modeBranchProblems(code, modes), {}, `joker mode named in {path}`)
+		end
+		print(`  renderer_discipline[8]: {#files} files, modes {join(modes)}, 0 hits`)
+
+		local face = sources["CardFace.luau"]
+		t.deepEqual(modeBranchProblems(replaceOnce(face, "local JK", "local JK"), modes), {}, "twin: identity edit")
+		t.truthy(
+			#modeBranchProblems(replaceOnce(face, "local JK", 'if mode == "Wild" then end\nlocal JK'), modes) > 0,
+			"MUTATION: a Wild comparison in CardFace is caught"
+		)
+		t.truthy(
+			#modeBranchProblems(
+					replaceOnce(face, "local JK", "local _b = Faces.JOKER_BAND.Blocker\nlocal JK"),
+					modes
+				) > 0,
+			"MUTATION: indexing the band by a mode name is caught"
+		)
+	end)
+
+	t.test("the hit-strip buttons are created once, not per layout", function()
+		-- A TEXT-LEVEL APPROXIMATION, and it says so: the real guarantee is that a tap can never land on a
+		-- button mid-destruction. The certain-defect shape is a constructor inside the layout path.
+		local maxHand = #Layout.solve(
+			{ width = 1920, height = 1080, insets = { top = 0, bottom = 0, left = 0, right = 0 } },
+			5
+		).slots
+		t.equal(maxHand, 5, "MAX_HAND derived from the real layout")
+		local limit = maxHand + 1
+
+		local hand = lex.stripComments(fs.readFile(`{UI_DIR}/CardHand.luau`))
+		local bodies = layoutPathBodies(hand)
+		local names: { string } = {}
+		local lineTotal = 0
+		for _, b in bodies do
+			table.insert(names, `{b.name}({#b.lines})`)
+			lineTotal += #b.lines
+		end
+		local buttons = countOf(hand, 'Instance.new("TextButton")')
+		print(
+			`  renderer_discipline[9]: CardHand TextButton constructors {buttons} (limit {limit}); layout-path bodies {join(
+				names
+			)}`
+		)
+		t.truthy(#bodies >= 2, `non-vacuity: found {#bodies} layout-path functions`)
+		t.truthy(lineTotal >= 30, `non-vacuity: {lineTotal} body lines examined`)
+		t.deepEqual(handProblems(hand, limit), {}, "CardHand constructs its buttons once")
+
+		-- negative controls for the body finder and the predicate
+		t.equal(
+			#constructorInLayoutPath('\tapply = function(a)\n\t\tInstance.new("Frame")\n\tend,\n'),
+			1,
+			"negative control: constructor inside apply"
+		)
+		t.equal(
+			#constructorInLayoutPath('\tlocal function build()\n\t\tInstance.new("Frame")\n\tend\n'),
+			0,
+			"negative control: constructor outside the layout path"
+		)
+		-- twin, then real-source mutations
+		t.deepEqual(
+			handProblems(replaceOnce(hand, "selectedNow = selected", "selectedNow = selected"), limit),
+			{},
+			"twin"
+		)
+		t.truthy(
+			#handProblems(
+					replaceOnce(
+						hand,
+						"selectedNow = selected",
+						'selectedNow = selected\nlocal late = Instance.new("TextButton")'
+					),
+					limit
+				) > 0,
+			"MUTATION: a strip built inside apply is caught"
+		)
+		local inRelayout = replaceOnce(hand, "sol = solution2", 'sol = solution2\nlocal late = Instance.new("Frame")')
+		t.truthy(#handProblems(inRelayout, limit) > 0, "MUTATION: a constructor inside relayout is caught")
+		local many = hand
+		for _ = 1, limit do
+			many ..= '\nlocal extra = Instance.new("TextButton")'
+		end
+		t.truthy(#handProblems(many, limit) > 0, "MUTATION: more strips than slots plus the backdrop is caught")
+	end)
+
+	t.test("every connection in the renderer has a matching Disconnect", function()
+		t.deepEqual(
+			{ connectBalance("x:Connect(f) y:Connect(g) z:Disconnect()") },
+			{ 2, 1 },
+			"negative control: counts"
+		)
+		t.deepEqual({ connectBalance(lex.stripComments("-- a:Connect(f)")) }, { 0, 0 }, "negative control: comment")
+
+		local files = uiFiles()
+		t.truthy(#files >= 5, `non-vacuity: scanned {#files} files, at least 5 expected`)
+		local report: { string } = {}
+		local creators = 0
+		local sources: { [string]: string } = {}
+		for _, path in files do
+			local code = lex.stripComments(fs.readFile(path))
+			sources[baseName(path)] = code
+			local connects, disconnects = connectBalance(code)
+			table.insert(report, `{baseName(path)}={connects}/{disconnects}`)
+			if connects > 0 then
+				creators += 1
+				t.truthy(disconnects >= connects, `{path}: {connects} Connect against {disconnects} Disconnect`)
+			end
+		end
+		print(`  renderer_discipline[10]: Connect/Disconnect per file {join(report)}`)
+		t.truthy(creators >= 3, `non-vacuity: {creators} files create connections (Hud, Hand, Piles expected)`)
+
+		local function balanced(code: string): boolean
+			local c, d = connectBalance(code)
+			return c == 0 or d >= c
+		end
+		t.truthy(balanced(sources["CardPiles.luau"]), "twin: the real CardPiles is balanced")
+		t.truthy(
+			not balanced(replaceOnce(sources["CardPiles.luau"], "c:Disconnect()", "c:Destroy()")),
+			"MUTATION: CardPiles.destroy no longer disconnects"
+		)
+		t.truthy(
+			not balanced(replaceOnce(sources["CardHand.luau"], "c:Disconnect()", "c:Destroy()")),
+			"MUTATION: CardHand.destroy no longer disconnects"
+		)
+		t.truthy(
+			not balanced(sources["CardHud.luau"] .. "\ncam:GetPropertyChangedSignal('x'):Connect(f)"),
+			"MUTATION: an extra render connection with no Disconnect"
+		)
+	end)
+
+	t.test(
+		"the input surface: strips and sinks stay Active, cards never are, and the hand has no error path",
+		function()
+			local hand = lex.stripComments(fs.readFile(`{UI_DIR}/CardHand.luau`))
+			local piles = lex.stripComments(fs.readFile(`{UI_DIR}/CardPiles.luau`))
+			local face = lex.stripComments(fs.readFile(`{UI_DIR}/CardFace.luau`))
+			print(
+				`  renderer_discipline[11]: CardHand Active = true x{countOf(hand, "Active = true")}, CardPiles sinks x{countOf(
+					piles,
+					".button.Active = true"
+				)}, CardFace Active = true x{countOf(face, "Active = true")}`
+			)
+			t.truthy(
+				countOf(hand, "Active = true") >= 1 and countOf(piles, ".button.Active = true") >= 2,
+				"non-vacuity"
+			)
+			t.deepEqual(surfaceProblems(hand, piles, face), {}, "the shipped input surface")
+
+			t.deepEqual(surfaceProblems(replaceOnce(hand, "Active = true", "Active = true"), piles, face), {}, "twin")
+			local function reported(h: string, p: string, f: string, label: string)
+				t.truthy(#surfaceProblems(h, p, f) > 0, `MUTATION not caught: {label}`)
+			end
+			reported(replaceOnce(hand, "Active = true", "Active = false"), piles, face, "strip made inactive")
+			reported(hand .. '\nbutton.Text = "Invalid move"', piles, face, "a user-facing error string (D-12)")
+			reported(hand .. '\nerror("nope")', piles, face, "an error path")
+			reported(
+				hand,
+				replaceOnce(piles, "right.button.Active = true", "right.button.Visible = true"),
+				face,
+				"right sink lost"
+			)
+			reported(
+				hand,
+				replaceOnce(piles, "left.button.Active = true", "left.button.Visible = true"),
+				face,
+				"left sink lost"
+			)
+			reported(
+				hand,
+				piles,
+				replaceOnce(face, "frame.Active = false", "frame.Active = true"),
+				"a card takes input"
+			)
+			reported(
+				replaceOnce(hand, "AutoButtonColor = false", "AutoButtonColor = true"),
+				piles,
+				face,
+				"strip flashes"
+			)
+		end
+	)
 end
