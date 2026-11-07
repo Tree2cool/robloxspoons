@@ -638,6 +638,44 @@ return function(t: Test.Runner)
 		print(`  renderer_discipline[IN-05]: {#raw} chars scanned, 0 clock reads, mutant seen`)
 	end)
 
+	t.test("IN-06: the rotate prompt restores the orientation it overrode", function()
+		local raw = fs.readFile(`{UI_DIR}/CardHud.luau`)
+		-- Returns the problems with newRotatePrompt: capture before the set, restore inside destroy.
+		local function orientationProblems(text: string): ({ string }, number)
+			local code = lex.stripComments(text)
+			local problems: { string } = {}
+			local a = string.find(code, "function CardHud.newRotatePrompt", 1, true)
+			if a == nil then
+				return { "newRotatePrompt not found" }, 0
+			end
+			local body = string.sub(code, a)
+			local capture = string.find(body, "local previousOrientation = pg.ScreenOrientation", 1, true)
+			local set = string.find(body, "pg.ScreenOrientation = Enum.ScreenOrientation.LandscapeSensor", 1, true)
+			if capture == nil or set == nil or capture > set then
+				table.insert(problems, "the prior orientation is not captured before it is overridden")
+			end
+			local destroyAt = string.find(body, "destroy = function", 1, true)
+			local restore = string.find(body, "pg.ScreenOrientation = previousOrientation", 1, true)
+			if destroyAt == nil or restore == nil or restore < destroyAt then
+				table.insert(problems, "destroy does not restore the captured orientation")
+			end
+			return problems, #body
+		end
+		local problems, size = orientationProblems(raw)
+		t.deepEqual(problems, {}, "clean path")
+		t.truthy(size > 500, `non-vacuity: newRotatePrompt scan covered {size} chars`)
+		t.deepEqual((orientationProblems(replaceOnce(raw, "previousOrientation", "previousOrientation"))), {}, "twin")
+		local noRestore =
+			replaceOnce(raw, "pg.ScreenOrientation = previousOrientation", "local _ = previousOrientation")
+		local neverCaptured =
+			replaceOnce(raw, "local previousOrientation = pg.ScreenOrientation", "local previousOrientation = nil")
+		local seenRestore = #(orientationProblems(noRestore))
+		local seenCapture = #(orientationProblems(neverCaptured))
+		t.truthy(seenRestore >= 1, "MUTATION: destroy stops restoring")
+		t.truthy(seenCapture >= 1, "MUTATION: the prior value is never captured")
+		print(`  renderer_discipline[IN-06]: {size} chars scanned, mutants seen {seenRestore}/{seenCapture}`)
+	end)
+
 	t.test("the ScreenInsets string in Layout maps to the enum member the HUD sets", function()
 		-- negative control: a comment must not satisfy the scan, code must.
 		local commentOnly = lex.stripComments("-- ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets\nlocal x = 1")

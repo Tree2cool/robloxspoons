@@ -269,7 +269,9 @@ end
 
 function CardHud.newRotatePrompt(): RotatePrompt
 	local pg = playerGui()
-	-- Belt and braces only (header point 8).
+	-- Belt and braces only (header point 8). IN-06: the value is captured first and put back by destroy, so
+	-- tearing the prompt down no longer leaves the whole PlayerGui locked to landscape.
+	local previousOrientation = pg.ScreenOrientation
 	pg.ScreenOrientation = Enum.ScreenOrientation.LandscapeSensor
 
 	local gui = Instance.new("ScreenGui")
@@ -312,6 +314,7 @@ function CardHud.newRotatePrompt(): RotatePrompt
 		destroy = function(_self: RotatePrompt)
 			connection:Disconnect()
 			gui:Destroy()
+			pg.ScreenOrientation = previousOrientation
 		end,
 	}
 	return prompt
