@@ -66,6 +66,12 @@ return {
 	TABLE_HOP_CONCURRENT_CAP = 16,
 	SEAT_STACK_STUDS_PER_CARD = 0.25,
 	SEAT_STACK_CAP = 16,
+	-- Stud geometry for the 3D table cosmetics (CardTableView, CardFlourish). Starting values: the real
+	-- tuning is on the real map (M-12). Named here so no client file carries a stud literal.
+	TABLE_CARD_STUDS = { WIDTH = 1.4, LENGTH = 2.0, THICKNESS = 0.05 },
+	SEAT_STACK_OFFSET_STUDS = 3.0,
+	HOP_PEAK_STUDS = 1.0,
+	FLOURISH_FAN_SPACING_STUDS = 1.6,
 	TWEEN = {
 		SELECT = 0.08,
 		SEND = 0.18,
@@ -82,5 +88,5 @@ return {
 	},
 	PULSE_HZ = { DRAW_RING = 1.5, AFK = 1.5, STALL = 0.8 },
 	-- Owner-supplied asset ids (human gate, NEEDS_HUMAN). Empty string is silent (header point 5).
-	AUDIO = { STING = "", DRAW = "", PASS = "", VOLUME = 0.3 },
+	AUDIO = { STING = "", DRAW = "", PASS = "", VOLUME = 0.3, OWN_CAP_SECONDS = 0.12 },
 }
