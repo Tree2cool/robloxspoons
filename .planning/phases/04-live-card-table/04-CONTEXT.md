@@ -380,6 +380,38 @@ I added after pattern mapping were wrong. I verified its findings myself before 
   fixture A, which the checker observed goes red with or without the prefixes and therefore proved
   nothing.
 
+### Owner decision at the phase gate, 2026-11-07
+
+- **D-39: the deadline stays at 80 deci (8.0 s), and CARD-16's bound is restated as applying to the
+  CONFIGURED value rather than the realised wall-clock window.** `AUTO_PASS_DECI` remains 80; no
+  code, test or config changes.
+
+  **What is true and now written down.** `nowDeci = floor(10 * clock)`, so expiry fires when
+  `floor(10t) >= floor(10c) + D` and elapsed is `(D - frac(10c))/10`. Flooring is therefore
+  **one-sided-SHORT** and can never lengthen the window. Confirmed by a 200,000-phase simulation and
+  independently re-derived twice. At `D = 80` detection lands in **[7.900, 8.000]** and, with up to
+  0.1 s of 10 Hz sweep lateness, the realised window is **7.9007 to 8.0996 s** — so a *literal*
+  reading of "must not exceed 8.0 s" is exceeded by up to 0.1 s.
+
+  **Why the owner kept 80.** 80 deci *is* exactly 8.0 s as configured, and it is the value D-13 chose
+  and **every Gate G1 cell ran at** — so keeping it preserves the correspondence between the shipped
+  game and the 320,000 gated rounds that justified it. The alternative (79 deci) genuinely **closes**
+  the overshoot rather than halving it, but it moves off that number and costs more than the plan
+  estimated: five test sites including a `WHOLE_LINE` argument pin the plan missed, plus the call site
+  itself, which cannot be a one-argument tweak because its first argument is the config constant
+  `config_lock` locks — needing a derived expression or a literal 7.9, a reworded `assert` and two
+  comments.
+
+  **The scale, which is why this is not a gamble.** The G1 sweep recorded **zero** auto-passes at this
+  deadline (2 at 5.0 s, 58 at 3.0 s, 38,516 at 1.5 s). The 0.1 s therefore bounds an event the sweep
+  never once observed firing.
+
+  **Recorded honestly, not resolved away:** research assumption A5's "±0.1 s" is **wrong** and should
+  read "−0.1 s on detection, +0.1 s from the sweep". `79` deci remains the one-line fix if a real
+  playtest ever shows the realised window matters, and it is carried as **D-04-13** for Phase 8
+  alongside **V-35** (whether the bot reaction-time model represents humans), which is the open half
+  of why 8.0 s was chosen at all.
+
 ### Claude's Discretion
 
 - The exact `Draw` / `Pass` intent payload shapes and their `Validate` schemas (within rule 7:
