@@ -89,7 +89,7 @@ function CardSeatHold.new(effects: Effects): CardSeatHold
 			if held[playerId] ~= nil then
 				return
 			end
-			-- Copy the pose so a caller mutating its table later cannot move the queued pose.
+			-- Copy the pose so a caller mutating its table later does not move the queued pose.
 			held[playerId] = {
 				position = { x = pose.position.x, y = pose.position.y, z = pose.position.z },
 				look = { x = pose.look.x, y = pose.look.y, z = pose.look.z },

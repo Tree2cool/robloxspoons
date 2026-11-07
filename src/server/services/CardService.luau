@@ -32,6 +32,7 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
 local CardRouting = require("../core/CardRouting")
+local CardSeatHold = require("../core/CardSeatHold")
 local CardTable = require("../core/CardTable")
 local CardTiming = require("../core/CardTiming")
 local Gateway = require("../core/Gateway")
@@ -133,13 +134,118 @@ function CardService.newRejectThrottle(): RejectThrottle.RejectThrottle
 	})
 end
 
--- Plan 04-15: avatar seat / hold / release goes here.
--- The avatar hold is the only security-relevant control layer; the client-side hiding (plan 04-11) is
--- ergonomics. Until 04-15 these are deliberate no-ops (M-17 is not closed by this plan).
-local function holdAvatar(_playerId: number, _pose: SeatPose) end
-local function releaseAvatar(_playerId: number) end
+-- Avatar seat hold (plan 04-15). THE SERVER-SIDE HALF OF UX-02, written as an ATTEMPT.
+-- This is the only layer where holding a seated avatar is even possible: the client-side hiding (plan
+-- 04-11) is ergonomics, since a client re-enables its own controls at will. WHETHER THIS LAYER HOLDS
+-- ANYTHING IS UNPROVEN until manual check M-11 passes (assumption A2). The trust-boundary assumption is
+-- that a cheat client controls its own input but not the server-set humanoid properties; M-11 cells
+-- b-d exist to test exactly that. The movement-mode setting used below is documented to disable the
+-- default control scripts, which is NOT the same as refusing a Humanoid:Move call or a client position
+-- write, so cells c and d are the sharp ones.
+--   Mechanism (A2, unverified): Player.Dev*MovementMode = Scriptable, a zeroed humanoid, a PivotTo.
+--   Rejected: anchoring the root part (fights the physics solver; jitter and sliding); a Humanoid
+--   physics state change (undocumented under the Input Action System migration); a real seated state
+--   on the map seats (they are plain Parts, so converting them is a Phase 6 map-contract change).
+--   RECORDED NEXT ATTEMPT if M-11 fails: a seated state on a converted seat Part (Phase 6, not a hot
+--   fix), then a server-side position check that returns a wandering seated avatar to its anchor.
+-- Release is the first thing in the Completed path (D-30): capability back, then control, before the
+-- flourish. Every effect tolerates a missing Player, Character or Humanoid; a player can leave between
+-- the decision and the effect.
+--
+-- Restore targets are captured from StarterPlayer ONCE at boot, not hard-coded: the place's own default
+-- is the right thing to restore, and capturing it means a later Studio change to StarterPlayer is
+-- honoured instead of silently overridden.
+local StarterPlayer = game:GetService("StarterPlayer")
+local RESTORE_COMPUTER_MODE = StarterPlayer.DevComputerMovementMode
+local RESTORE_TOUCH_MODE = StarterPlayer.DevTouchMovementMode
+local RESTORE_WALK_SPEED = StarterPlayer.CharacterWalkSpeed
+local RESTORE_JUMP_HEIGHT = StarterPlayer.CharacterJumpHeight
+local RESTORE_JUMP_POWER = StarterPlayer.CharacterJumpPower
+
+local function humanoidOf(playerId: number): Humanoid?
+	local player = Players:GetPlayerByUserId(playerId)
+	local character = if player ~= nil then player.Character else nil
+	if character == nil then
+		return nil
+	end
+	return character:FindFirstChildOfClass("Humanoid")
+end
+
+local function makeSeatHold(onTelemetry: (name: string, data: { [string]: number }) -> ()): CardSeatHold.CardSeatHold
+	return CardSeatHold.new({
+		setMovementScriptable = function(playerId: number, scriptable: boolean)
+			local player = Players:GetPlayerByUserId(playerId)
+			if player == nil then
+				return
+			end
+			-- Server only: these properties are documented as settable only from a server Script.
+			if scriptable then
+				player.DevComputerMovementMode = Enum.DevComputerMovementMode.Scriptable
+				player.DevTouchMovementMode = Enum.DevTouchMovementMode.Scriptable
+			else
+				player.DevComputerMovementMode = RESTORE_COMPUTER_MODE
+				player.DevTouchMovementMode = RESTORE_TOUCH_MODE
+			end
+		end,
+		freezeHumanoid = function(playerId: number, frozen: boolean)
+			local humanoid = humanoidOf(playerId)
+			if humanoid == nil then
+				return
+			end
+			-- UseJumpPower decides which jump property applies; set both and let the unused one be inert.
+			humanoid.WalkSpeed = if frozen then 0 else RESTORE_WALK_SPEED
+			humanoid.JumpHeight = if frozen then 0 else RESTORE_JUMP_HEIGHT
+			humanoid.JumpPower = if frozen then 0 else RESTORE_JUMP_POWER
+		end,
+		pivotTo = function(playerId: number, pose: CardSeatHold.Pose): boolean
+			local player = Players:GetPlayerByUserId(playerId)
+			local character = if player ~= nil then player.Character else nil
+			if character == nil or character.PrimaryPart == nil then
+				return false
+			end
+			local position = Vector3.new(pose.position.x, pose.position.y, pose.position.z)
+			local look = Vector3.new(pose.look.x, pose.look.y, pose.look.z)
+			character:PivotTo(
+				if look.Magnitude > 0 then CFrame.lookAt(position, position + look) else CFrame.new(position)
+			)
+			return true
+		end,
+		onTelemetry = onTelemetry,
+	})
+end
 
 function CardService.new(deps: Deps): CardService
+	local seatHold = makeSeatHold(deps.onTelemetry)
+	local connections: { RBXScriptConnection } = {}
+
+	local function holdAvatar(playerId: number, pose: SeatPose)
+		seatHold:hold(playerId, pose)
+	end
+	-- One generic release for completion, bench and disconnect (idempotent in the core).
+	local function releaseAvatar(playerId: number)
+		seatHold:release(playerId)
+	end
+
+	-- A respawn hands back a fresh humanoid; the core re-applies the freeze only for a held player.
+	local function watchCharacter(player: Player)
+		table.insert(
+			connections,
+			player.CharacterAdded:Connect(function()
+				seatHold:onCharacterAdded(player.UserId)
+			end)
+		)
+	end
+	for _, player in Players:GetPlayers() do
+		watchCharacter(player)
+	end
+	table.insert(connections, Players.PlayerAdded:Connect(watchCharacter))
+	-- Drops the entry with no effect: there is no avatar left to restore.
+	table.insert(
+		connections,
+		Players.PlayerRemoving:Connect(function(player: Player)
+			seatHold:forget(player.UserId)
+		end)
+	)
 	local cardTable: CardTable.CardTable? = nil
 	local sweepConnection: RBXScriptConnection? = nil
 	-- Player ids currently seated, in seat order. NetServer.toSeated reads this as its audience.
@@ -235,6 +341,7 @@ function CardService.new(deps: Deps): CardService
 		for _, playerId in seated do
 			releaseAvatar(playerId)
 		end
+		seatHold:releaseAll()
 		table.clear(seated)
 		cardTable = nil
 		deps.setPhase("Lobby")
@@ -266,6 +373,10 @@ function CardService.new(deps: Deps): CardService
 
 	local function destroy(self: CardService)
 		endRound(self)
+		for _, connection in connections do
+			connection:Disconnect()
+		end
+		table.clear(connections)
 	end
 
 	return {

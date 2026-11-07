@@ -488,6 +488,32 @@ acceptable.
 
 **Blocking: yes for Phase 4's close.** It is the phase's highest-risk row.
 
+**Server hold (plan 04-15).** The server sets `Dev*MovementMode = Scriptable`, a zeroed humanoid and a `PivotTo` on seating
+(assumption A2, unverified; whether this holds anything is what these rows find out). Record each on its own line, under
+**both** `PlayerScriptsUseInputActionSystem` settings:
+
+1. A seated seeker still cannot move with a thumbstick, with `W/A/S/D`, with a gamepad stick, or by jumping.
+2. The avatar sits at the seat anchor facing the table with **no sliding and no physics jitter** (A2's named failure mode).
+3. **Respawn while seated**: the avatar returns to the seat and is still held.
+4. On completion the avatar is controllable **within one second**; record the measured seat-release-to-first-controllable-frame
+   time. The overlay is gone in the same frame, and the flourish visibly plays **around** a player who is already running
+   (D-30, D-31).
+5. **Cheat-client cell, the only cell that can show whether this layer holds anything.** From the **client** command bar while
+   seated, try each in turn and record each separately (this is the same four-attempt cell as above, restated for the hold):
+   - (a) `game:GetService("GuiService").TouchControlsEnabled = true`: does the thumbstick return, and does it move the avatar?
+   - (b) `game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = 16`: does the server's value win, and how quickly?
+   - (c) `game.Players.LocalPlayer.Character.Humanoid:Move(Vector3.new(0, 0, -1), false)`: a move request that bypasses the
+     control scripts. `Scriptable` is documented to disable the default *controls*, which is not the same as refusing a `Move`
+     call, so this is the sharpest test of the chosen mechanism.
+   - (d) `game.Players.LocalPlayer.Character:PivotTo(CFrame.new(0, 10, 0))` and a direct `HumanoidRootPart.CFrame` write:
+     does the avatar move, is it corrected, and how far does it get first?
+
+   **Expected:** the avatar does not leave the seat, or is returned within a fraction of a second. **If any of b, c or d
+   succeeds, the chosen mechanism does not hold the avatar** and the fallbacks apply in order: a seated state on a converted
+   seat Part (a Phase 6 map-contract change), then a server-side position check returning a wandering avatar to its anchor.
+   Do not tick M-11 on cell (a) alone; it only tests the cosmetic layer.
+6. Record which mechanism passed, so the rejected list in `CardService.luau`'s header can be narrowed.
+
 Observed:
 
 - [ ] M-11 signed off: <name> <date>
