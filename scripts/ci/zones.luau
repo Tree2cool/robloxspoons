@@ -6,7 +6,9 @@
 -- If a later phase needs a Roblox datatype validator, it goes in a NEW directory outside this
 -- list; nothing is ever removed from `src/server/engine` or `src/server/core`.
 return {
-	pureZones = { "src/server/engine", "src/server/core", "src/shared/Net" },
+	-- Phase 4 added src/shared/Card: roughly +0.4 s of selene subprocess time (purity.spec runs one pass
+	-- per zone), budgeted against the phase's +3 s allowance.
+	pureZones = { "src/server/engine", "src/server/core", "src/shared/Net", "src/shared/Card" },
 	-- R1 (strict header) scans everything we author. R3 (non-resolvable constructs)
 	-- scans ONLY the pure zones and guarded roots -- see implementation item 4. A
 	-- repo-wide R3 would self-trip on tests/run.luau's computed require and on
