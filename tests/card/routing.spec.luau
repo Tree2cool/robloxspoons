@@ -102,7 +102,7 @@ return function(t: Test.Runner)
 				t.equal(CardRouting.AUDIENCE[kind], "seated", `{kind} is public so its audience is seated`)
 			end
 		end
-		t.equal(seen, 5, "non-vacuity: all five kinds exercised")
+		t.equal(seen, 6, "non-vacuity: all six kinds exercised")
 		local known: { [string]: boolean } = {}
 		for _, kind in CardRouting.KINDS do
 			known[kind] = true
@@ -140,7 +140,7 @@ return function(t: Test.Runner)
 					CardRouting.assertPublic(kind)
 				end
 			end
-			t.equal(exercised, 5, "non-vacuity: five kinds exercised")
+			t.equal(exercised, 6, "non-vacuity: six kinds exercised")
 			t.throws(function()
 				CardRouting.assertPublic("Nope")
 			end, "Nope")
@@ -192,7 +192,7 @@ return function(t: Test.Runner)
 			pub.toPlayer(7, kind, {})
 			t.equal(fired, 1, `toPlayer({kind}) fires without a guard`)
 		end
-		t.equal(attempted, 15, "non-vacuity: 5 kinds x 3 methods")
+		t.equal(attempted, 18, "non-vacuity: 6 kinds x 3 methods")
 		-- empty seated list is a no-op, not an error
 		local empty = CardRouting.makePublisher({
 			fireToPlayer = effects.fireToPlayer,

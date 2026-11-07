@@ -33,9 +33,9 @@
 --     is worse than one visible error.
 -- 10. THE JOKER EXPLAINER is a lookup keyed by the mode from RoundStart, with no branch on its value, so the
 --     live JOKER_MODE flag is never made to lie to the player (D-23).
--- 11. KNOWN GAPS, recorded rather than papered over. (a) The Table payload carries no per-seat depth
---     snapshot, so the depth list handed to the reducer is whatever it already held (empty); plan 04-19's
---     stacks need a server-supplied depth field. (b) There is no round-end message among the five kinds, so
+-- 11. KNOWN GAPS, recorded rather than papered over. (a) CLOSED in 04-19: pile depths arrive as their own
+--     public `Depths` message (counts only, built by the server), so the stacks never depend on counting
+--     events client-side. (b) There is no round-end message among the five kinds, so
 --     the overlay ends on the local seat's removal or the next RoundStart. (c) A keyboard or gamepad send
 --     tells the hand through markSent, since it does not pass through a strip. (d) Nothing about feel,
 --     controls or audio on a device is proven here: M-11, M-12, M-13, M-16.
@@ -64,6 +64,8 @@ export type Hooks = {
 	-- Plan 04-19 parents into these. `payload` is the RoundStart table (seat poses and jokerMode).
 	onRoundStart: ((payload: any, localSeat: number) -> ())?,
 	onTable: ((events: { any }, depths: { number }, localSeat: number) -> ())?,
+	-- Server-supplied pile depths (CARD-13): one count per seat, seat order, counts only.
+	onDepths: ((depths: { number }, localSeat: number) -> ())?,
 	-- Called by Controls.onLocalCompleted LAST, after the overlay is gone and the controls are back.
 	startFlourish: ((completed: any) -> ())?,
 }
@@ -506,6 +508,28 @@ function CardClient.new(): CardClient
 		end
 	end
 
+	-- CARD-13: the server's pile depths. Validated as plain finite non-negative counts; anything else is
+	-- ignored (D-12), never repaired, so a malformed message cannot put an invented number on a stack.
+	local function onDepths(payload: any)
+		local r = round
+		if r == nil or type(payload) ~= "table" or type(payload.depths) ~= "table" then
+			return
+		end
+		local list: { number } = {}
+		for i = 1, #payload.depths do
+			local v = payload.depths[i]
+			if type(v) ~= "number" or v ~= v or v < 0 or v == math.huge then
+				return
+			end
+			list[i] = v
+		end
+		r.reducer:onTable({}, list)
+		local fn = hooks.onDepths
+		if fn ~= nil then
+			fn(list, r.localSeat)
+		end
+	end
+
 	local function onNotice(payload: any)
 		local r = round
 		if r == nil then
@@ -538,6 +562,7 @@ function CardClient.new(): CardClient
 		Table = onTable,
 		Notice = onNotice,
 		Stall = onStall,
+		Depths = onDepths,
 	}
 
 	local function contained(fn: () -> ())

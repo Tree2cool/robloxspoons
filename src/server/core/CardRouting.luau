@@ -20,7 +20,11 @@
 --      up at the seat); the fifth card stays in the finisher's hand, so its face stays private.
 --   6. Copy assignment lives here, not in src/shared (D-37). Guard R5 bans the engine's rank table
 --      identifier from src/shared and src/client; this file is under src/server, so it may name it.
---   7. No hash, ever, in anything client-bound (Types.luau guarantee 6).
+--   7. DEPTHS ARE SERVER-SUPPLIED (CARD-13), NEVER DERIVED CLIENT-SIDE. Reconstructing them from the
+--      event stream needs the complete stream from RoundStart, and one gateway reject or resync would
+--      silently desync the counters with nothing to detect it. The `Depths` kind is public ("seated")
+--      and carries counts only; CardTable builds it from the live engine state after each apply.
+--   8. No hash, ever, in anything client-bound (Types.luau guarantee 6).
 local Types = require("../engine/Types")
 
 export type Publisher = {
@@ -54,9 +58,13 @@ export type PublicEvent =
 		routedTo: number?,
 		cards: number,
 	}
+-- CARD-13's "only the pile depths of other seats", as a wire shape. `depths[seat]` is the number of
+-- cards waiting in that seat's left pile (0 for a removed seat). COUNTS ONLY: no key but `depths`, no
+-- value but a non-negative integer. The privacy gate walks this payload by key name and by value type.
+export type DepthsPayload = { depths: { number } }
 export type PrivateNotice = { seat: number, notice: Notice }
 
-local KINDS = { "RoundStart", "Sync", "Notice", "Table", "Stall" }
+local KINDS = { "RoundStart", "Sync", "Notice", "Table", "Stall", "Depths" }
 table.freeze(KINDS)
 
 local AUDIENCE: { [string]: Audience } = {
@@ -65,6 +73,7 @@ local AUDIENCE: { [string]: Audience } = {
 	Notice = "owner",
 	Table = "seated",
 	Stall = "seated",
+	Depths = "seated",
 }
 table.freeze(AUDIENCE)
 

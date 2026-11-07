@@ -282,6 +282,76 @@ local function keyList(t: any): string
 	return table.concat(keys, ",")
 end
 
+-- CARD-13 "only the pile depths of other seats" (gap 1). The `Depths` payload is COUNTS ONLY. The helper
+-- walks it by KEY NAME (no rank, cardId, copy, hand, inbox, faces, ... anywhere, at any depth) and by
+-- VALUE TYPE (every value under `depths` is a non-negative integer, never a table), checks the shape is
+-- exactly `{ depths = { n1 .. nSeats } }`, that every Depths call went toSeated, and that the last one
+-- equals the true inbox sizes. Returns (problems, depthsCalls, nodesVisited).
+local DEPTH_BANNED_KEYS: { [string]: true } = {
+	rank = true,
+	cardId = true,
+	copy = true,
+	hand = true,
+	inbox = true,
+	faces = true,
+	card = true,
+	cards = true,
+	fifth = true,
+}
+
+local function depthsProblems(fx: Fixture): ({ string }, number, number)
+	local problems: { string } = {}
+	local visited = 0
+	local calls = fx.rec.callsOfKind("Depths")
+	for index, call in calls do
+		if call.method ~= "toSeated" then
+			table.insert(problems, `Depths call {index} went {call.method}`)
+		end
+		if keyList(call.payload) ~= "depths" then
+			table.insert(problems, `Depths call {index} keys are {keyList(call.payload)}, expected exactly depths`)
+		end
+		local function walk(node: any, path: string)
+			visited += 1
+			if type(node) ~= "table" then
+				return
+			end
+			for key, value in node do
+				local keyName = tostring(key)
+				if DEPTH_BANNED_KEYS[keyName] then
+					table.insert(problems, `{path}.{keyName} is a card-identity key inside a Depths payload`)
+				end
+				walk(value, `{path}.{keyName}`)
+			end
+		end
+		walk(call.payload, `Depths{index}`)
+		local list: any = call.payload.depths
+		if type(list) ~= "table" or #list ~= #fx.users then
+			table.insert(problems, `Depths call {index} has {if type(list) == "table" then #list else -1} entries`)
+		else
+			for seat, value in list do
+				if type(value) ~= "number" or value < 0 or value % 1 ~= 0 then
+					table.insert(problems, `Depths call {index} seat {seat} is {tostring(value)}, not a count`)
+				end
+			end
+		end
+	end
+	if #calls > 0 then
+		local last: any = calls[#calls].payload.depths
+		local st = fx.state()
+		for seat = 1, #fx.users do
+			local seatState = st.seats[seat]
+			local truth = if seatState.live then #seatState.inbox else 0
+			if type(last) == "table" and last[seat] ~= truth then
+				table.insert(
+					problems,
+					`the last Depths says seat {seat} holds {tostring(last[seat])}, truth is {truth}`
+				)
+			end
+		end
+	end
+	return problems, #calls, visited
+end
+
 -- Puts `cardId` at hand[index] / inbox[index] of a seat by swapping with wherever it currently is. Every
 -- container is live, so the in-play counters are unaffected.
 local function place(state: Types.State, seatId: number, where: "hand" | "inbox", index: number, cardId: number)
@@ -394,6 +464,57 @@ local function wrapNoticeToSuccessor(
 		toSeated = base.toSeated,
 		toAll = base.toAll,
 	}
+end
+
+-- Depths mutants (injected broken publishers). Each rewrites the Depths payload on its way to `base`.
+local function wrapDepths(base: Rec, rewrite: (payload: any) -> any): CardRouting.Publisher
+	return {
+		toPlayer = base.toPlayer,
+		toSeated = function(kind: string, payload: unknown)
+			if kind == "Depths" then
+				base.toSeated(kind, rewrite(payload))
+			else
+				base.toSeated(kind, payload)
+			end
+		end,
+		toAll = base.toAll,
+	}
+end
+
+local function wrapDepthsRank(base: Rec): CardRouting.Publisher
+	return wrapDepths(base, function(payload: any): any
+		local leaked = table.clone(payload)
+		leaked.rank = 3
+		return leaked
+	end)
+end
+
+local function wrapDepthsCardIds(base: Rec): CardRouting.Publisher
+	return wrapDepths(base, function(payload: any): any
+		local leaked: { number | { cardId: number } } = {}
+		for seat, count in payload.depths do
+			leaked[seat] = if seat == 1 then { cardId = 5 } else count
+		end
+		return { depths = leaked }
+	end)
+end
+
+local function wrapDepthsStale(base: Rec): CardRouting.Publisher
+	return wrapDepths(base, function(payload: any): any
+		local zeros: { number } = {}
+		for seat in payload.depths do
+			zeros[seat] = 0
+		end
+		return { depths = zeros }
+	end)
+end
+
+-- The no-defect twin: the same wrapper machinery, rewrite = identity. If this is not green the mutants
+-- above could be red for harness reasons.
+local function wrapDepthsTwin(base: Rec): CardRouting.Publisher
+	return wrapDepths(base, function(payload: any): any
+		return payload
+	end)
 end
 
 return function(t: Test.Runner)
@@ -629,5 +750,69 @@ return function(t: Test.Runner)
 		t.equal(calls[1].payload.ackSeq, 7)
 		t.equal(calls[1].payload.seat, 0)
 		t.equal(Invariants.hash(fx.state()), before, "the engine state moved")
+	end)
+
+	t.test("CARD-13: the Depths payload carries counts only, supplied by the server, and matches the engine", function()
+		local fx = newFixture()
+		scriptedDeal(fx, 4)
+		local problems, calls, nodes = depthsProblems(fx)
+		t.deepEqual(problems, {}, "clean path")
+		t.truthy(calls >= 10, `non-vacuity: only {calls} Depths messages`)
+		t.truthy(nodes >= 3 * calls, `non-vacuity: only {nodes} nodes walked`)
+		-- The very first Depths is published with RoundStart: the stacks have something to draw at once.
+		local first = fx.rec.callsOfKind("Depths")[1].payload.depths
+		t.equal(#first, 3, "one entry per seat")
+		-- The dealer's pile is the deck: it is the tallest at the deal, with no marker saying so.
+		t.truthy(first[1] > first[2] and first[1] > first[3], `dealer inbox {first[1]} must be the tallest`)
+		-- Depths always follows the Table batch it describes (same sweep, same order).
+		local order: { string } = {}
+		for _, call in fx.rec.calls() do
+			if call.kind == "Table" or call.kind == "Depths" then
+				table.insert(order, call.kind)
+			end
+		end
+		local pairsSeen = 0
+		for i = 1, #order do
+			if order[i] == "Table" then
+				t.equal(order[i + 1], "Depths", "Depths follows every Table batch")
+				pairsSeen += 1
+			end
+		end
+		t.truthy(pairsSeen >= 5, `non-vacuity: {pairsSeen} Table/Depths pairs`)
+		print(`privacy case 6: {calls} Depths messages, {nodes} nodes walked, first = {table.concat(first, ",")}`)
+	end)
+
+	t.test("MUTATION: a rank or a card id in the Depths payload turns the gate red", function()
+		local cleanFx = newFixture()
+		scriptedDeal(cleanFx, 4)
+		t.deepEqual((depthsProblems(cleanFx)), {}, "control: helper green on the real path")
+
+		-- no-defect twin of the mutant harness
+		local twin = newFixture({ wrap = wrapDepthsTwin })
+		scriptedDeal(twin, 4)
+		local twinProblems, twinCalls = depthsProblems(twin)
+		t.deepEqual(twinProblems, {}, "the no-defect twin must be green")
+		t.truthy(twinCalls >= 10, "non-vacuity: the twin saw Depths messages")
+
+		local mutations = 0
+		local depthMutants: { { name: string, wrap: Wrap } } = {
+			{ name = "rank", wrap = wrapDepthsRank },
+			{ name = "cardId", wrap = wrapDepthsCardIds },
+			{ name = "stale", wrap = wrapDepthsStale },
+		}
+		for _, mutant in depthMutants do
+			local name = mutant.name
+			local fx = newFixture({ wrap = mutant.wrap })
+			scriptedDeal(fx, 4)
+			local problems = depthsProblems(fx)
+			t.truthy(#problems > 0, `a Depths mutant ({name}) must turn the gate red`)
+			mutations += 1
+			print(`  depths mutation {name}: {#problems} problems, e.g. {problems[1]}`)
+		end
+		t.equal(mutations, 3, "mutation count")
+		-- The whole-payload public walk (case 2) is a second, independent net for the rank mutant.
+		local rankFx = newFixture({ wrap = wrapDepthsRank })
+		scriptedDeal(rankFx, 4)
+		t.truthy(#(publicWalkProblems(rankFx)) > 0, "case 2's walk also reddens on a rank in Depths")
 	end)
 end
