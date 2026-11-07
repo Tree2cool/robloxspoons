@@ -172,6 +172,49 @@ scale 0.987, fraction 0.615; 1920x1080 -> scale 1.5, fraction 0.800).
 `{ leftPile = ..., rightPile = ... }` types as `unknown` under the roblox-platform analyze. That is
 now two independent confirmations; the rule stands for every remaining wave.
 
+## 04-12 disproved one of its own plan's claims — and the plan-checker's flag 4 is what saved the gate
+
+**The plan asserted that an interleaved pass into the seat being benched "does not commute".** 04-12
+measured it: **it DOES commute.** Hash, deadlines, strikes and action counts are all identical to the
+serial run. It also tried the benched seat's own `Draw` as the interleave, same result.
+
+**So the per-command `tick` mutant is caught ONLY by the structural assertion** — "at the first
+publish of a sweep, all commands have already been applied" (`first publish with 1 of 2 applies
+done`). That assertion exists **because the plan-checker added it as flag 4** in the final revision,
+specifically so the mutant would not depend on a scenario happening not to commute. Without it this
+gate would have been dead, and the composite-snapshot comparison would have reported no difference.
+04-12 prints the limit rather than asserting the plan's false claim.
+
+**The intent-level mutant (publishing between `apply` and `idle:sync`) is caught both ways** —
+structurally and by the snapshot (real deadlines 585,585 vs mutant 585,580).
+
+## Environment gotcha: Lune runs the main script inside a coroutine
+
+`coroutine.isyieldable()` is **true on Lune's main thread**, because the main script itself runs in a
+coroutine. 04-12's first yielding publisher therefore **killed the process silently mid-suite** — no
+error, just a truncated run. Its fix: yield only on the one thread the test rig names explicitly.
+Any later plan using a yielding fake must do the same.
+
+## Contract facts for plans 04-13 and 04-14, measured by 04-12
+
+- **The authoritative `Deps` and `CardTable` type text is in `src/server/core/CardTable.luau`.** Quote
+  it; do not re-derive it. The `Sync` / `RoundStart` / `Notice` / `Stall` key sets and the telemetry
+  names are listed in `04-12-SUMMARY.md`.
+- **Publish order is actor `Sync`, `Table`, `Notice`, then other `Sync`s** — `CardRouting.publish`
+  sends the Table batch **before** ForcedPass notices. The plan listed Notice before Table; 04-12
+  kept `publish` as the wave-2 handoff required rather than reordering it.
+- **The `Stall` payload is `{ active }` only.** `Deps` carries no cue seconds and `StallDetector`
+  keeps `cueDeci` private, so **the client (04-18) reads `STALL_CUE_SECONDS` itself.**
+- **The sweep scenario needs `maxStrikes = 1`**: with the shipped 3, an `AutoPass` and a `Bench` for
+  the same seat can never share a sweep. Injecting `IdleClock` makes that a one-line substitution —
+  another payoff of taking the cores as objects through `Deps`.
+
+## Weak gate recorded, not closed (cheap follow-up for the code review)
+
+**Sinks-after-publish ordering is not directly asserted** in 04-12. The crude "sinks fire first" edit
+also made them fire twice, so its failures are weak evidence rather than a clean signal. A dedicated
+assertion is a cheap addition.
+
 ## Bookkeeping the orchestrator owns
 
 **Do not run `requirements.mark-complete` from an executor.** Plans 04-01 and 04-02 each ran it
