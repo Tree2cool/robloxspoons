@@ -33,7 +33,35 @@ worktree at the earlier commit makes this exact.
 
 | 7 | `61658c1` | 25.39 s (832) | 25.20 s (837) | **~0.00 s** (-0.19 s, within noise) | +5 | One plan. Executor measured its own spec at +0.01-0.03 s and cut nothing. |
 
-**Running total against the +3.0 s allowance: ~2.20 s used, ~0.80 s remaining**
+| 8 | `5addff5` | 25.39 s (837) | 25.37 s (841) | ~0.00 s | +4 | One plan; executor measured its own spec at +0.03-0.05 s. |
+| 9 | `c2e01eb` | 25.66 s (841) | 24.89 s (858) | **~0.00 s** (-0.77 s, noise) | +17 | One plan plus two wire gaps and the `Surface` contract. Executor measured `tests/card` at +0.09 s. |
+
+---
+
+## THE AUTHORITATIVE FIGURE — measure the phase, not the sum of waves
+
+| | Commit | Cases | Min of 2 |
+|---|---|-------|----------|
+| **Pre-phase** | `ae376d6` (before wave 1) | 657 | **23.65 s** |
+| **Post-phase** | after wave 9 | 858 | **24.89 s** |
+| **PHASE COST** | | **+201 cases** | **+1.24 s** |
+
+**+1.24 s against the +3.0 s allowance. The budget holds with 1.76 s of headroom.**
+
+### Why this differs from the sum of the per-wave deltas (~2.20 s)
+
+**Summing per-wave deltas accumulates measurement noise; a single phase-wide pre/post does not.**
+Each wave's delta carried roughly +/-0.5 s of container noise, and nine of those summed drift upward
+even when several individual waves measured *negative* (waves 2, 4, 7, 8 and 9 all read at or below
+zero, which is not physically possible as a real cost).
+
+**So the per-wave rows above are useful for attribution — they tell you wave 1's guard fixtures were
+the one real subprocess cost — but the phase-wide row is the number the budget decision should use.**
+Had I reported the running sum at the gate, I would have claimed ~2.20 s of 3.00 s and left only
+0.80 s of apparent headroom, when the true figure is 1.24 s used and 1.76 s free.
+
+**Lesson for later phases: take ONE controlled pre/post measurement across the whole phase. Use
+per-wave deltas only to attribute cost, never to total it.**
 
 **Watch item for waves 7-9.** Three renderer plans and the gate plan remain, with **0.80 s** left.
 04-16's text-scan gate cost ~0.28 s together with 04-15's pure spec; 04-17/18/19 each add a similar
