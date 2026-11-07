@@ -66,7 +66,7 @@ return {
 	TABLE_HOP_CONCURRENT_CAP = 16,
 	SEAT_STACK_STUDS_PER_CARD = 0.25,
 	SEAT_STACK_CAP = 16,
-	-- Stud geometry for the 3D table cosmetics (CardTableView, CardFlourish). Starting values: the real
+	-- Stud geometry for the 3D table cosmetics (CardSeatsView, CardFlourish). Starting values: the real
 	-- tuning is on the real map (M-12). Named here so no client file carries a stud literal.
 	TABLE_CARD_STUDS = { WIDTH = 1.4, LENGTH = 2.0, THICKNESS = 0.05 },
 	SEAT_STACK_OFFSET_STUDS = 3.0,

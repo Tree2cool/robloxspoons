@@ -407,8 +407,8 @@ The container blocked `create.roblox.com`, `devforum.roblox.com`, `robloxapi.git
 
 | ID | Claim | Source and stated confidence | Re-check at |
 |----|-------|------------------------------|-------------|
-| V-12 | Same-remote ordering guarantee for `RemoteEvent` (cross-remote not guaranteed) | ARCH, explicitly not verified | P4: test in Studio |
-| V-13 | Signal deferred vs immediate default | ARCH, LOW (engine avoids depending on it) | P4 |
+| V-12 | Same-remote ordering guarantee for `RemoteEvent` (cross-remote not guaranteed) | ARCH, explicitly not verified **PHASE 4 UPDATE (04-RESEARCH.md): VERIFIED, reversed in our favour.** Ordered per connection per direction *including across different RemoteEvent instances*, for `FireClient` and `FireAllClients`; guarantees handler *start* order, not completion; undelivered messages are lost on disconnect. The old cross-remote caution is superseded. Parenting remotes after `Connect` avoiding a dropped-message window still needs a Studio observation (M-12). | P4: test in Studio |
+| V-13 | Signal deferred vs immediate default | ARCH, LOW (engine avoids depending on it) **PHASE 4 UPDATE (04-RESEARCH.md): VERIFIED.** `SignalBehavior` `Default` is currently `Immediate` and 'will eventually switch'; the repo sets none, so the built place runs `Default`. Design is correct under both. | P4 |
 | V-14 | `UnreliableRemoteEvent` 900-byte cap and about 500 invocations/s limit per client per remote | STACK HIGH, ARCH HIGH; but see Contradiction 7, treated as MEDIUM | P1 |
 | V-15 | Single-threaded atomicity of non-yielding handlers; instance/attribute replication scope | ARCH, MEDIUM, established practice | P2, P5 |
 | V-16 | Studio local multi-client cap (historically 8) vs the 10 needed; MCP `multiplayer_playtest` client count | PITFALLS, unverified | P4, P8 |
@@ -430,10 +430,10 @@ The container blocked `create.roblox.com`, `devforum.roblox.com`, `robloxapi.git
 
 | ID | Claim | Source and stated confidence | Re-check at |
 |----|-------|------------------------------|-------------|
-| V-24 | `ScreenInsets` enum values and behaviour | STACK/PITFALLS, MEDIUM-HIGH (snippets) | P4 |
-| V-25 | Roblox mobile minimum target size (48 px used; 44 px is a third-party guideline) | STACK/FEATURES, not verified | P4 |
-| V-26 | Disable default controls via `require(PlayerScripts.PlayerModule):GetControls():Disable()` still works | PITFALLS, MEDIUM | P4 |
-| V-27 | `ContextActionService` mobile button behaviour; `GuiService.SelectedObject` for gamepad | FEATURES, training | P4 |
+| V-24 | `ScreenInsets` enum values and behaviour | STACK/PITFALLS, MEDIUM-HIGH (snippets) **PHASE 4 UPDATE (04-DEBT-RECHECK.md, 04-RESEARCH.md): VERIFIED.** `CoreUISafeInsets` = 2, documented as recommended for interactive UI. **Remaining:** notched-device observation, and whether `readViewport` double-counts (M-12). | P4 |
+| V-25 | Roblox mobile minimum target size (48 px used; 44 px is a third-party guideline) | STACK/FEATURES, not verified **PHASE 4 UPDATE (04-RESEARCH.md): VERIFIED ABSENT, a negative claim, MEDIUM.** Roblox publishes no numeric minimum touch-target size in the pages searched. 48 px is the project's own decision; 44 stays an unattributed third-party figure. Cite neither as platform fact. | P4 |
+| V-26 | Disable default controls via `require(PlayerScripts.PlayerModule):GetControls():Disable()` still works | PITFALLS, MEDIUM **PHASE 4 UPDATE (04-RESEARCH.md): STILL OPEN and materially CHANGED. Not upgraded.** `GetControls()` is undocumented, has never been documented, and is on a staff-announced removal path (default flips early 2027, removed mid 2027). Replaced by the layered `Controls.hide/restore` seam. None of the replacements is proven under IAS; **M-11 decides, the phase's highest-risk row.** | P4 |
+| V-27 | `ContextActionService` mobile button behaviour; `GuiService.SelectedObject` for gamepad | FEATURES, training **PHASE 4 UPDATE (04-RESEARCH.md): PARTIALLY VERIFIED, not upgraded.** The APIs exist; device behaviour is open (M-11 gamepad column). Recorded fallback D-04-11. | P4 |
 | V-28 | `Players.CharacterAutoLoads = false`, `ResetButtonCallback` via `SetCore`, console/VR device settings, `ScreenOrientation` | PITFALLS, training | P6, P8 |
 | V-29 | `TextChatService` per-channel muting; chat age check (Jan 2026) | FEATURES MEDIUM, PITFALLS training | P6 |
 
@@ -444,8 +444,8 @@ The container blocked `create.roblox.com`, `devforum.roblox.com`, `robloxapi.git
 | V-31 | Client-server boundary guidance (validate values, rate limit server-side) | PITFALLS, MEDIUM-HIGH (snippet) | P1 |
 | V-32 | Client anti-tamper (Hyperion) state | PITFALLS, MEDIUM-LOW | P8 |
 | V-33 | Comparable-game conventions (MM2, Flee the Facility, NDS) | FEATURES, LOW-MEDIUM | Not required |
-| V-34 | Latency figures (50-150 ms PC, 100-250 ms mobile), tap rates, glint and pickup radii, 5 Hz interest rate, rate-limit numbers (burst 8 / 8 per s) | ARCH LOW; STACK starting points | Tune in P4, P5, P8 |
-| V-35 | A simulated-bot model's reaction-time distribution represents humans | Sim design, unverified | Calibrate against real playtests (P4/P6) |
+| V-34 | Latency figures (50-150 ms PC, 100-250 ms mobile), tap rates, glint and pickup radii, 5 Hz interest rate, rate-limit numbers (burst 8 / 8 per s) | ARCH LOW; STACK starting points **PHASE 4 UPDATE (04-RESEARCH.md): STILL OPEN, now with a documented ceiling:** about 500 requests/second/client, RemoteEvent excess delayed in order. Burst 8 / refill 6 per intent is a project parameter, not measured; Phase 8 tunes. | Tune in P4, P5, P8 |
+| V-35 | A simulated-bot model's reaction-time distribution represents humans | Sim design, unverified **PHASE 4 UPDATE: STILL OPEN and cannot be closed by documentation.** Home is M-07, unticked since Phase 2; M-17 supplies the evidence. D-13's 8.0 s is **not validated**; it is the conservative end chosen because V-35 is open. The *realised* window is (7.9, 8.1] s against the locked 8.0 s (owner decision pending: D-04-13 in `04-live-card-table/deferred-items.md`). | Calibrate against real playtests (P4/P6) |
 
 ---
 

@@ -17,6 +17,23 @@ before any UI wave was executed, so that nothing device-dependent can be ticked 
 highest-risk row in the phase. Silence is
 not success: `lune run scripts/verify.luau` prints every unticked check after a green run.
 
+**Phase 4 close block (written by plan 04-20; nothing below is ticked, and no machine may tick it).**
+Phase 4 is **not complete** until M-11, M-12, M-13, M-14, M-15 and M-17 are signed by a human. What a failure of each
+would mean for the requirement it carries:
+
+| Row | Blocking | Carries | A failure means |
+|-----|----------|---------|-----------------|
+| M-11 | yes (highest risk) | UX-02, D-29, D-30 | controls do not hide, or do not come back, or the avatar hold holds nothing: a finisher is held still and loses find-order score, or a seated player can walk away. Fallbacks D-04-10, D-04-11, D-04-12 only |
+| M-12 | yes | UX-01, UX-03, D-36, CARD-13 | targets are not 48 px on glass, are unreachable by a thumb, sit under the notch or top bar, the strip wraps at Largest text, or a second client can see a hand that is not its own |
+| M-13 | yes | CARD-14, CARD-02, CARD-15 | the card is not visibly gone within a frame at 150-300 ms, a return reads as a teleport, or a rejection is distinguishable from a correction |
+| M-14 | yes | CARD-19, D-24 | spade and club (or any pair) are not reliably distinguishable in greyscale: the colour-blind half of CARD-19 is unmet. Enlarge the pip or thicken the silhouette, never lean on colour |
+| M-15 | yes | D-28, D-29 note | landscape is not locked or the IAS flag is left at `Default`, which flips the player scripts under the project in early 2027 with no commit |
+| M-16 | **no** | CARD-19, D-33 | audio is silent by contract and the pip sprite is a marked placeholder; a missing Builder Sans weight is a blocker to raise, not a font to substitute |
+| M-17 | yes | CARD-02, CARD-15, CARD-17 (+ M-07 evidence) | the starting gun does not read as one, the finisher is not running before the flourish ends, or the fumbled double-tap (D-03) does something worse than expected |
+
+Requirements UX-01, UX-02, UX-03 and UX-04 are **not met by any plan**; they are met only by these rows. Do not run
+`requirements.mark-complete` for Phase 4.
+
 How to use this file:
 
 - Do the checks in any order, except M-04 first if you want M-03 and M-06 to run against the dev experience.

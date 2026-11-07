@@ -113,7 +113,7 @@ src/
 ├── client/                         # → StarterPlayer.StarterPlayerScripts.Client
 │   ├── Main.client.luau
 │   ├── controllers/
-│   ├── ui/                         # CardTableView, Hand, PileWidgets, HUD, Menus
+│   ├── ui/                         # CardSeatsView, Hand, PileWidgets, HUD, Menus
 │   └── input/                      # Pointer abstraction (mouse + touch → same events)
 ├── maps/                           # → ServerStorage.Maps (one folder per map)
 │   ├── _contract/                  # MapSpec type, validator, gray-box reference map
@@ -486,7 +486,7 @@ L0 (sequential, small, FIRST):
         │  B  PlayerDataService + CosmeticCatalog + Monetization receipts            │
         │  C  PlacementRules + WalkableGrid bake + MapService (needs reference map)  │
         │  D  Shared stages: waiting-room parkour, podium stage                      │
-        │  E  Client shell: pointer abstraction, UI kit, CardTableView against a     │
+        │  E  Client shell: pointer abstraction, UI kit, CardSeatsView against a     │
         │     MOCK engine feed (no server needed)                                    │
         │  F  Maps 1..5 content (needs only the contract + validator)                │
         ▼
