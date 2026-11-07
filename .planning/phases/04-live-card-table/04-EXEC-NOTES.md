@@ -215,6 +215,56 @@ Any later plan using a yielding fake must do the same.
 also made them fire twice, so its failures are weak evidence rather than a clean signal. A dedicated
 assertion is a cheap addition.
 
+## Checker flag W6 was load-bearing, and the proof is a privacy bug
+
+04-13 built the **swap mutant**: `fireToPlayer` broadcasts, `fireToAll` targets a single player.
+**The whole-file greps stayed GREEN** — `FireClient` 2, `FireAllClients` 1, exactly the expected
+totals. Only the **per-closure-body** assertion caught it: `fireToPlayer FireClient (expected 1,
+got 0)`.
+
+Why this matters beyond the gate: that swap routes the **private per-player `Sync`** — a seat's own
+hand — through a broadcast. It is a **CARD-13 / rule 3 violation**, the exact leak this phase's
+privacy work exists to prevent, and occurrence-counting across the file would have passed it.
+The plan-checker raised this as flag W6 ("asserting `FireAllClients` exactly once does not bind
+which closure it sits in"); it is now demonstrated rather than argued.
+
+Body slicing by consecutive effect markers was **not** formatting-brittle in practice (bodies
+measured 185 / 211 / 89 / 38 characters), so the stated fallback was unnecessary.
+
+Deleting `assertPublic` from `makePublisher` turns **three** tests red across two plans — netguard
+cases 1 and 2, and routing.spec's "makePublisher is the shipped assembly". Deleting it from `toAll`
+alone, or from both methods, gives the same three. The shipped-assembly approach means there is no
+longer a copy that can silently drift from production.
+
+## HANDOFF: plan 04-14 must replace `Main.server.luau`'s placeholder `seatedUserIds`
+
+04-13 added `seatedUserIds: () -> { number }` to `NetServer.Deps`, which broke the roblox-platform
+typecheck of the **existing** `NetServer.start` call in `Main.server.luau` — a file not in 04-13's
+plan. It added a **placeholder returning `{}`** with a comment saying CardService replaces it.
+
+**A placeholder returning an empty roster means `toSeated` reaches nobody.** If 04-14 does not
+replace it, the public `Table` batch silently goes to zero clients and every seat sees only its own
+`Sync`. **04-14 must replace it with the real roster.**
+
+## Shipped transport contracts for 04-14 and 04-18
+
+- `NetServer.start` returns `{ gateway, remote, cardRemote, publisher, destroy }`.
+- **Both remotes are parented AFTER every `Connect`** — deliberately, to avoid a dropped-message
+  window. (That this actually avoids it needs a Studio observation; it is not proven here.)
+- `PlayerRemoving` clears `roster[player.UserId]` beside `gateway:forget`; `PlayerAdded` and an
+  initial seed from `Players:GetPlayers()` keep it current.
+- `ClientNet.resolve(): ()` is **idempotent** and resolves both the Intent and Card remotes.
+- `ClientNet.onCard(handler) -> RBXScriptConnection` **errors** with "ClientNet.onCard called before
+  ClientNet.resolve" if `resolve` has not run. Its connected closure only calls the handler.
+- `OnClientEvent` appears in exactly **1** file under `src/`; `FireClient`/`FireAllClients` only in
+  `NetServer.luau`.
+
+## A fifth confirmation on `verify.luau`
+
+04-13's roster typed as `{ [number]: Player? }`: `verify.luau` rejected the nil comparisons against a
+plain `Player`, while `tests/run.luau`, selene **and** stylua all passed. Five independent
+confirmations now (04-06, 04-08, 04-10, 04-12, 04-13).
+
 ## Bookkeeping the orchestrator owns
 
 **Do not run `requirements.mark-complete` from an executor.** Plans 04-01 and 04-02 each ran it
