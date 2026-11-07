@@ -1063,6 +1063,54 @@ return function(t: Test.Runner)
 		end
 	end)
 
+	t.test("WR-01: a Draw-owed strike carries the re-armed deadline to the struck seat", function()
+		-- Seat 1 is the dealer: hand 4, inbox full, so it owes a DRAW and an expiry is strike-only
+		-- (D-35). No apply runs, so before the fix nothing told the client its window had restarted.
+		local function freshDeadlines(drop: boolean): (number, number, number)
+			local sink = RecordingPublisher.new()
+			local publisher: CardRouting.Publisher = sink
+			if drop then
+				-- MUTATION (broken dependency): a publisher that loses every Sync, which is what a shell
+				-- that queues no Sync after the strike looks like from the wire.
+				publisher = {
+					toPlayer = function(userId: number, kind: string, payload: unknown)
+						if kind ~= "Sync" then
+							sink.toPlayer(userId, kind, payload)
+						end
+					end,
+					toSeated = sink.toSeated,
+					toAll = sink.toAll,
+				}
+			end
+			local fx = newFixture({ seekers = 3, publisher = publisher })
+			sink.reset()
+			fx.now.value = 80
+			fx.ct:tick()
+			local struck, matching = 0, 0
+			for _, call in sink.callsOfKind("Notice") do
+				if call.userId == fx.users[1] and call.payload.code == "Strike" and call.payload.owes == "Draw" then
+					struck += 1
+				end
+			end
+			for _, call in sink.callsOfKind("Sync") do
+				-- unixDeadlineFor(remaining) = 1000 + remaining / 10, and the window is 80 deci from now.
+				if call.userId == fx.users[1] and call.payload.idleDeadlineUnix == 1000 + 80 / 10 then
+					matching += 1
+				end
+			end
+			return struck, matching, #sink.calls()
+		end
+		local struck, matching, calls = freshDeadlines(false)
+		t.equal(struck, 1, "non-vacuity: exactly one Draw-owed Strike notice reached the dealer")
+		t.equal(matching, 1, "the struck seat got no Sync carrying the re-armed deadline")
+		local mStruck, mMatching = freshDeadlines(true)
+		print(
+			`cardtable WR-01: real struck/fresh-Sync {struck}/{matching} ({calls} calls), Sync-dropping mutant {mStruck}/{mMatching}`
+		)
+		t.equal(mStruck, 1, "the mutant fixture must still strike, or the gate is vacuous")
+		t.equal(mMatching, 0, "the Sync-dropping mutant must be seen as missing the deadline")
+	end)
+
 	t.test("WR-02: the stall gate holds from a REALISTIC base clock, not only from deci 0", function()
 		-- The detector's own anchor starts at 0 and production nowDeci is uptime-based, so every earlier
 		-- spec (all driven from 0) could not see the 45 s gate being dead. This one starts the round at a

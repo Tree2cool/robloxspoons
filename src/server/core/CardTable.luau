@@ -543,7 +543,14 @@ local function new(deps: Deps): CardTable
 								owes = command.owes,
 								cardId = if autoSeat == seatId then autoCard else nil,
 							}
-							queueNotice(ctx, st.seats[seatId].playerId, notice)
+							local struckUserId = st.seats[seatId].playerId
+							queueNotice(ctx, struckUserId, notice)
+							-- IdleClock re-armed this seat's window, but a Draw-owed strike applies nothing, so
+							-- no Sync carries the fresh deadline and the client would count down to a stale one
+							-- (WR-01). A Pass-owed strike already queued one via its AutoPass.
+							if autoSeat ~= seatId and st.seats[seatId].live then
+								queueSync(ctx, struckUserId, syncFor(seatId, lastAck[struckUserId] or 0, ctx.now))
+							end
 						else
 							-- The ONE generic removal (rule 8), with the shell's own narrowed cause.
 							local cause: ShellRemoveCause = "Benched"
