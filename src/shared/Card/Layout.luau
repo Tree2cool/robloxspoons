@@ -308,7 +308,12 @@ function Layout.problems(viewport: Viewport, handSize: number, d: Design?): ({ s
 		end
 	end
 
-	for name, pile in { leftPile = s.leftPile, rightPile = s.rightPile } do
+	local piles: { { name: string, rect: Rect } } = {
+		{ name = "leftPile", rect = s.leftPile },
+		{ name = "rightPile", rect = s.rightPile },
+	}
+	for _, entry in piles do
+		local name, pile = entry.name, entry.rect
 		local gap = Layout.separation(s.fan, pile)
 		check(gap >= design.MIN_FAN_PILE_GAP * s.scale - EPS, `fan pile gap: fan to {name} is {gap}`)
 		check(gap >= 0, `overlap: fan and {name}`)
