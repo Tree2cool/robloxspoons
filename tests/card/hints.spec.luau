@@ -22,8 +22,8 @@ end
 local function realInput(): Hints.AuditInput
 	return {
 		hint = deepCopy(Hints.HINT),
-		states = Hints.STATES,
-		kinds = Hints.INPUT_KINDS,
+		states = Hints.STATES :: any,
+		kinds = Hints.INPUT_KINDS :: any,
 		messages = Hints.sampleMessages(Faces.JOKER_EXPLAINER),
 		callouts = Hints.sampleCallouts(),
 		maxChars = Card.STRIP_MAX_CHARS,
@@ -68,7 +68,7 @@ return function(t: Test.Runner)
 		local strings: { string } = {}
 		for _, state in Hints.STATES do
 			for _, kind in Hints.INPUT_KINDS do
-				table.insert(strings, Hints.HINT[state][kind])
+				table.insert(strings, (Hints.HINT :: any)[state][kind])
 			end
 		end
 		for _, s in input.messages do
@@ -129,25 +129,25 @@ return function(t: Test.Runner)
 	)
 
 	t.test("kindOf maps every pointer, key and pad type and ignores the rest", function()
-		local cases: { { string | nil } } = {
-			{ "Touch", "Touch" },
-			{ "MouseButton1", "Mouse" },
-			{ "MouseButton2", "Mouse" },
-			{ "MouseButton3", "Mouse" },
-			{ "MouseWheel", "Mouse" },
-			{ "MouseMovement", "Mouse" },
-			{ "Keyboard", "Keyboard" },
+		local cases: { { name: string, kind: string? } } = {
+			{ name = "Touch", kind = "Touch" },
+			{ name = "MouseButton1", kind = "Mouse" },
+			{ name = "MouseButton2", kind = "Mouse" },
+			{ name = "MouseButton3", kind = "Mouse" },
+			{ name = "MouseWheel", kind = "Mouse" },
+			{ name = "MouseMovement", kind = "Mouse" },
+			{ name = "Keyboard", kind = "Keyboard" },
 		}
 		for i = 1, 8 do
-			table.insert(cases, { `Gamepad{i}`, "Gamepad" })
+			table.insert(cases, { name = `Gamepad{i}`, kind = "Gamepad" })
 		end
 		for _, name in { "Focus", "Accelerometer", "Gyro", "TextInput", "InputMethod", "None", "banana" } do
-			table.insert(cases, { name, nil })
+			table.insert(cases, { name = name, kind = nil })
 		end
 		local distinct: { [string]: boolean } = {}
 		for _, c in cases do
-			local got = Hints.kindOf(c[1] :: string)
-			t.equal(got, c[2], `kindOf({c[1]})`)
+			local got = Hints.kindOf(c.name)
+			t.equal(got, c.kind, `kindOf({c.name})`)
 			if got ~= nil then
 				distinct[got] = true
 			end
@@ -163,7 +163,7 @@ return function(t: Test.Runner)
 
 	t.test("the countdown and strike builders interpolate correctly and stay inside the cap", function()
 		local generated = 0
-		local owesList: { "Pass" | "Draw" } = { "Pass", "Draw" }
+		local owesList: { any } = { "Pass", "Draw" }
 		for _, owes in owesList do
 			for s = 0, 2 do
 				local m = Hints.MESSAGES.countdown(owes, s)
@@ -198,6 +198,6 @@ return function(t: Test.Runner)
 			end)
 			t.equal(#tbl, before, name)
 		end
-		t.truthy(table.isfrozen(Hints.HINT.Selected), "rows frozen")
+		t.truthy(table.isfrozen((Hints.HINT :: any).Selected), "rows frozen")
 	end)
 end

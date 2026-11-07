@@ -35,6 +35,7 @@
 --    a card for that reason.
 
 export type InputKind = "Touch" | "Mouse" | "Keyboard" | "Gamepad"
+export type Owes = "Pass" | "Draw"
 export type State = "Hand5Idle" | "Selected" | "Hand4CanDraw" | "Hand4Empty" | "RightPileSink"
 
 export type AuditInput = {
@@ -48,15 +49,18 @@ export type AuditInput = {
 }
 
 -- A type alone is not enough: it is erased at runtime, so freezing the runtime lists is what stops drift.
-local INPUT_KINDS: { InputKind } = table.freeze({ "Touch", "Mouse", "Keyboard", "Gamepad" })
-local STATES: { State } = table.freeze({ "Hand5Idle", "Selected", "Hand4CanDraw", "Hand4Empty", "RightPileSink" })
+local inputKindList: { InputKind } = { "Touch", "Mouse", "Keyboard", "Gamepad" }
+local INPUT_KINDS = table.freeze(inputKindList)
+local stateList: { State } = { "Hand5Idle", "Selected", "Hand4CanDraw", "Hand4Empty", "RightPileSink" }
+local STATES = table.freeze(stateList)
 
 local function row(touch: string, mouse: string, keyboard: string, gamepad: string): { [InputKind]: string }
-	return table.freeze({ Touch = touch, Mouse = mouse, Keyboard = keyboard, Gamepad = gamepad })
+	local cells: { [InputKind]: string } = { Touch = touch, Mouse = mouse, Keyboard = keyboard, Gamepad = gamepad }
+	return table.freeze(cells)
 end
 
 -- A literal nested table, not generated, so a missing cell is visible on the page as well as to `audit`.
-local HINT: { [State]: { [InputKind]: string } } = table.freeze({
+local hintTable: { [State]: { [InputKind]: string } } = {
 	Hand5Idle = row(
 		"Tap a card to pick it",
 		"Click a card to pick it",
@@ -72,10 +76,11 @@ local HINT: { [State]: { [InputKind]: string } } = table.freeze({
 		"Press Space to pass",
 		"Press A to pass"
 	),
-})
+}
+local HINT = table.freeze(hintTable)
 
 -- Exhaustive over the pointer, key and pad types; everything else is nil on purpose.
-local KIND_OF: { [string]: InputKind } = table.freeze({
+local kindMap: { [string]: InputKind } = {
 	Touch = "Touch",
 	MouseButton1 = "Mouse",
 	MouseButton2 = "Mouse",
@@ -91,7 +96,8 @@ local KIND_OF: { [string]: InputKind } = table.freeze({
 	Gamepad6 = "Gamepad",
 	Gamepad7 = "Gamepad",
 	Gamepad8 = "Gamepad",
-})
+}
+local KIND_OF = table.freeze(kindMap)
 
 local NAME_BUDGET = 18
 
@@ -106,11 +112,11 @@ end
 -- Functions, not literals, wherever a number is interpolated, so a call site cannot build a string by
 -- concatenation and drift past the cap with nothing to catch it.
 local MESSAGES = table.freeze({
-	countdown = function(owes: "Pass" | "Draw", secondsLeft: number): string
+	countdown = function(owes: Owes, secondsLeft: number): string
 		local verb = if owes == "Draw" then "Draw" else "Pass"
 		return `{verb} a card: {whole(secondsLeft)}`
 	end,
-	strike = function(strikes: number, owes: "Pass" | "Draw"): string
+	strike = function(strikes: number, owes: Owes): string
 		if strikes <= 1 then
 			if owes == "Draw" then
 				return "Idle at your pile. Strike 1 of 3."
@@ -150,8 +156,7 @@ local ROTATE_PROMPT = "Rotate your device to landscape"
 -- an injected copy of these and never a source edit.
 local function sampleMessages(jokerExplainers: { [string]: string }?): { [string]: string }
 	local out: { [string]: string } = {}
-	local owesList: { "Pass" | "Draw" } = { "Pass", "Draw" }
-	for _, owes in owesList do
+	local function addFor(owes: Owes)
 		for s = 0, 2 do
 			out[`countdown {owes} {s}`] = MESSAGES.countdown(owes, s)
 		end
@@ -159,6 +164,8 @@ local function sampleMessages(jokerExplainers: { [string]: string }?): { [string
 			out[`strike {k} {owes}`] = MESSAGES.strike(k, owes)
 		end
 	end
+	addFor("Pass")
+	addFor("Draw")
 	out.benched = MESSAGES.benched()
 	out.forcedPass = MESSAGES.forcedPass()
 	out.stall = MESSAGES.stall()
