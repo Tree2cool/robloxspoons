@@ -676,6 +676,72 @@ return function(t: Test.Runner)
 		print(`  renderer_discipline[IN-06]: {size} chars scanned, mutants seen {seenRestore}/{seenCapture}`)
 	end)
 
+	t.test("IN-01: a partial buildUi failure undoes every piece it built", function()
+		local raw = fs.readFile(CARD_CLIENT)
+		local function buildProblems(text: string): ({ string }, number)
+			local code = lex.stripComments(text)
+			local a = string.find(code, "local function buildUi", 1, true)
+			local b = string.find(code, "local function onRoundStart", 1, true)
+			if a == nil or b == nil or b < a then
+				return { "buildUi body not found" }, 0
+			end
+			local body = string.sub(code, a, b - 1)
+			local problems: { string } = {}
+			for _, piece in { "hand", "piles", "strip", "input" } do
+				local made = string.find(body, `local {piece} = Card`, 1, true)
+				local undone = string.find(body, `{piece}:destroy()`, 1, true)
+				if made == nil or undone == nil or undone < made then
+					table.insert(problems, `{piece} is built but not registered for cleanup after it exists`)
+				end
+			end
+			local failureAt = string.find(body, "if not ok then", 1, true)
+			local loop = string.find(body, "for i = #cleanups, 1, -1 do", 1, true)
+			local hudAt = string.find(body, "hud:destroy()", 1, true)
+			if failureAt == nil or loop == nil or loop < failureAt then
+				table.insert(problems, "the failure path does not unwind the cleanups newest first")
+			elseif hudAt == nil or hudAt < loop then
+				table.insert(problems, "the hud is destroyed before the pieces on top of it")
+			end
+			return problems, #body
+		end
+		local problems, size = buildProblems(raw)
+		t.deepEqual(problems, {}, "clean path")
+		t.truthy(size > 1200, `non-vacuity: buildUi scan covered {size} chars`)
+		t.deepEqual((buildProblems(replaceOnce(raw, "pcall(cleanups[i])", "pcall(cleanups[i])"))), {}, "twin")
+		local mutants: { { name: string, edited: string } } = {
+			{
+				name = "piles never registered (the leaked RenderStepped)",
+				edited = replaceOnce(
+					raw,
+					"piles:destroy()\n\t\t\tend)\n\t\t\tlocal strip",
+					"(nil)\n\t\t\tend)\n\t\t\tlocal strip"
+				),
+			},
+			{
+				name = "input never registered (the leaked bindings)",
+				edited = replaceOnce(
+					raw,
+					"input:destroy()\n\t\t\tend)\n\t\t\tlocal ui",
+					"(nil)\n\t\t\tend)\n\t\t\tlocal ui"
+				),
+			},
+			{
+				name = "failure path no longer unwinds",
+				edited = replaceOnce(raw, "for i = #cleanups, 1, -1 do", "for i = 1, 0 do"),
+			},
+		}
+		local seen = 0
+		for _, mutant in mutants do
+			local found = buildProblems(mutant.edited)
+			t.truthy(#found >= 1, `mutant "{mutant.name}" was not seen`)
+			if #found >= 1 then
+				seen += 1
+			end
+		end
+		t.equal(seen, #mutants, "every mutant seen")
+		print(`  renderer_discipline[IN-01]: buildUi {size} chars, {seen}/{#mutants} mutants seen, twin green`)
+	end)
+
 	t.test("the ScreenInsets string in Layout maps to the enum member the HUD sets", function()
 		-- negative control: a comment must not satisfy the scan, code must.
 		local commentOnly = lex.stripComments("-- ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets\nlocal x = 1")
