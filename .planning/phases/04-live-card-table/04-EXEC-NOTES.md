@@ -52,6 +52,40 @@
   stays *green* on it (descending is still a valid permutation); only the
   compare-against-production assertion catches it. That assertion is load-bearing.
 
+## HARD DEPENDENCY: plan 04-19 must implement `Surface` or F8's protection is incomplete
+
+Plan 04-10 added **`Surface.destroyOffenders(root) -> number`** as a Rule-2 deviation, and the reason
+matters: the planned `Surface` contract had `scan` return **descriptions only**, so "the offending
+instance is destroyed" was not expressible. Without destruction, a mid-flight `Active` GuiObject
+would be **reported and then go on sinking input until the cut-off** — which is exactly the F8 hole
+the plan-checker found, half-fixed.
+
+**So plan 04-19 owes two things, and D-30 depends on both:**
+1. **`Surface.destroyOffenders(root)`** — actually destroys what `scan` finds, returning the count.
+2. **`Surface.scan` must cover all FIVE input-taking kinds**, not just `Active`. 04-10's driver
+   *trusts* that coverage and says so; it is **not proven** in 04-10's spec. If 04-19's `scan` covers
+   only `Active`, the flourish gate passes while the real hole stays open.
+
+Why this is not cosmetic: D-30 requires control to return to the finisher **instantly**, and find
+order drives SCORE-01..03 — holding a finisher still literally costs them points. An input-sinking
+GuiObject during the 1.5 s flourish breaks that silently.
+
+## A third confirmation: `verify.luau` catches what `tests/run.luau` does not
+
+Plan 04-10 hit it too: `local ok, err = pcall(voidFn)` is rejected by the standard-platform
+typecheck and **passes** under `tests/run.luau`. Its fix was a small `attempt` helper for void
+functions. Three independent confirmations now (04-06 command unions, 04-08 literal-table iteration,
+04-10 `pcall` of a void function). **Run `verify.luau`.**
+
+## Gate weaknesses executors recorded rather than hid
+
+- **04-10's "3 mutations" counter is order-dependent module state.** If the F8 case fails first, the
+  `(f)` count assertion fails as a **cascade**, so that second failure is not an independent signal.
+  Read it as one finding, not two.
+- **04-10's rule-1 spec-lock reads the driver source** and asserts its only require is
+  `../Config/Card` and that nothing names shop or cosmetics. That is the enforcement for the driver
+  side of FOUND-05, since the renderer deliberately is not a guarded root.
+
 ## Findings from executors that are NOT defects, and must not be "fixed"
 
 - **The D-20 stall threshold's healthy control cannot distinguish 96 from 48** (plan 04-07, reported
