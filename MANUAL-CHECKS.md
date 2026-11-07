@@ -464,6 +464,69 @@ would have thrown `ServerStorage.Maps does not exist` otherwise. An unrelated St
 
 ---
 
+## Phase 4 session plan — suggested order, and what blocks what
+
+The seven sections below are self-contained. This is only the **order that wastes least time**, plus
+the traps that are easy to hit. Owner decision 2026-11-07: the owner signs these personally.
+
+**Do these two first — everything else is cheaper afterwards.**
+
+1. **M-15 (Creator Dashboard + Studio, ~10 min).** Lock landscape, and **pin
+   `Workspace.PlayerScriptsUseInputActionSystem` explicitly** rather than leaving it `Default`.
+   Do it first for two reasons: **M-11's matrix requires toggling that flag**, so you need to know
+   where it is, and **M-12 needs landscape already locked** or you are measuring the wrong layout.
+2. **M-16 (asset upload, non-blocking).** Audio ids all ship **empty — silent by contract, not
+   broken** — and the suit pips ship as a *marked placeholder*. Uploading before M-14 and M-17 means
+   you judge the real thing rather than placeholders. If a Builder Sans weight is missing, that is a
+   **blocker to raise, not a substitution**: `Enum.Font.Gotham*` was removed from the platform and
+   maps to Montserrat, which would silently change the typeface and invalidate every glyph-width
+   figure in the UI-SPEC.
+
+**Then the desk work.**
+
+3. **M-14 (greyscale, desk, ~15 min).** No phone needed. The automated side already proves all 50
+   identity keys map to 50 distinct drawn assets; what a machine cannot judge is **legibility**.
+   **Expect spade vs club at 16 px to be the hardest pair** — that is the one to look at first. Also
+   check the joker corner star, which ships at `TEXT_SIZE.BODY` (20) rather than the UI-SPEC's 24,
+   because `CardTheme` has no 24 and adding one collides with the geometry scan.
+
+**Then the device work, in one Studio session if you can.**
+
+4. **M-11 — the highest-risk row, and the one most likely to fail. Budget real time.**
+   6 cells (IAS Disabled/Enabled x PC/phone/gamepad) plus 4 separately-recorded cheat-client attempts.
+   **Do not tick on cell (a) `TouchControlsEnabled` alone** — that is a UI toggle, not an exploit. The
+   owning client simulates its own character, so (b) `WalkSpeed`, (c) `Humanoid:Move` and (d) a
+   `CFrame`/`PivotTo` write are the ones that matter. **`Dev*MovementMode = Scriptable` is documented
+   to disable the default control scripts, which is NOT the same as refusing a `Move` call.**
+   **Watch for stuck-touch and held-key bugs on re-enable** — community reports describe exactly that,
+   and it is why the project does not claim the hold "prevents" anything (T-4-107 is
+   `mitigate, UNPROVEN`).
+   **If it fails, three fallbacks are pre-recorded and ordered** (`deferred-items.md`): D-04-10 a
+   next-frame `TouchControlsEnabled` retoggle; D-04-11 gamepad degrading to the Mouse hint set (a
+   one-line data change); D-04-12 `Humanoid.Sit` on converted seat Parts — **which is a Phase 6
+   map-contract change, not a hot fix.** Do not improvise a fourth.
+5. **M-12 (real phone, landscape).** Targets on glass, thumb reach, the notch and top bar, and the
+   strip at `PreferredTextSize = Largest`. Two specific things to look at: the **12 px overhang** of a
+   lifted card is deliberately not hit-tested (tapping it selects the neighbour — accepted, because
+   widening it would drop the neighbour below 48 px), and **whether `readViewport` double-counts
+   insets** under `CoreUISafeInsets` is an open question recorded in the `CardHud` header.
+6. **M-13 (Studio, simulated lag).** 150–300 ms. The automated side proves *convergence*; what you
+   are judging is whether it **feels** immediate, whether a return reads as a return rather than a
+   teleport, and that a rejection is **indistinguishable** from a correction (D-12 — a legitimate
+   player must never be able to tell). This is also where **D-03's accepted residual** is observed: a
+   fumbled fast double-tap **will** send a card, deliberately.
+7. **M-17 (three clients).** The starting gun, and the finisher **running before the flourish ends**.
+   This also supplies the only evidence for **M-07 / V-35** — whether the bot reaction-time model
+   resembles humans — which is the open half of why the 8.0 s deadline was chosen at all (D-39).
+
+**One thing to verify that no section owns**, because it was found at integration and is
+source-checked only: **after a round ends without removing your seat, do your movement controls come
+back?** `endRound` now publishes a `RoundEnd` kind for exactly this, but `CardService` cannot be
+loaded headlessly, so the fix is unproven. On a phone a failure looks like having no movement
+controls at all.
+
+---
+
 ## M-11 (UX-02 / D-29, D-30) Control hide and restore, under both Input Action System settings
 
 **Why manual:** this is the highest-risk row in Phase 4. `require(PlayerScripts.PlayerModule):GetControls()` is
