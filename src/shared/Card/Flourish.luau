@@ -179,6 +179,16 @@ function Flourish.new(deps: Deps): Driver
 		pcall(deps.onViolation, message)
 	end
 
+	-- Runs `fn` protected; returns the error text, or nil on success. (Void functions return one value
+	-- from pcall, which the stricter checker will not destructure into two.)
+	local function attempt(fn: () -> ()): string?
+		local result = table.pack(pcall(fn))
+		if result[1] == false then
+			return tostring(result[2])
+		end
+		return nil
+	end
+
 	local function scanNow(flight: Flight)
 		local ok, found = pcall(surface.scan, flight.root)
 		if not ok then
@@ -210,9 +220,12 @@ function Flourish.new(deps: Deps): Driver
 			flight.cancelScan()
 		end
 		if flight.thread ~= nil then
-			local ok, err = pcall(scheduler.cancel, flight.thread)
-			if not ok then
-				report(`{flight.kind} cancel threw: {tostring(err)}`)
+			local thread = flight.thread
+			local err = attempt(function()
+				scheduler.cancel(thread)
+			end)
+			if err ~= nil then
+				report(`{flight.kind} cancel threw: {err}`)
 			end
 		end
 		-- Surface calls are individually protected so one failure cannot skip destroyRoot.
@@ -229,9 +242,11 @@ function Flourish.new(deps: Deps): Driver
 		if not okEscape then
 			report(`{flight.kind} destroyEscaped threw: {tostring(errEscape)}`)
 		end
-		local okRoot, errRoot = pcall(surface.destroyRoot, flight.root)
-		if not okRoot then
-			report(`{flight.kind} destroyRoot threw: {tostring(errRoot)}`)
+		local errRoot = attempt(function()
+			surface.destroyRoot(flight.root)
+		end)
+		if errRoot ~= nil then
+			report(`{flight.kind} destroyRoot threw: {errRoot}`)
 		end
 		if flights[flight.id] == flight then
 			flights[flight.id] = nil
@@ -273,7 +288,9 @@ function Flourish.new(deps: Deps): Driver
 		local okSnap, snapshot = pcall(surface.snapshot)
 		if not okSnap then
 			report(`{kind} snapshot threw: {tostring(snapshot)}`)
-			pcall(surface.destroyRoot, root)
+			attempt(function()
+				surface.destroyRoot(root)
+			end)
 			return
 		end
 
@@ -311,9 +328,11 @@ function Flourish.new(deps: Deps): Driver
 		}
 		-- 5. only now spawn play, in its own cancellable thread.
 		flight.thread = scheduler.spawn(function()
-			local ok, err = pcall(entry.play, ctx)
-			if not ok then
-				report(`{kind} flourish threw: {tostring(err)}`)
+			local err = attempt(function()
+				entry.play(ctx)
+			end)
+			if err ~= nil then
+				report(`{kind} flourish threw: {err}`)
 			end
 			-- 6. play returned: one scan now.
 			flight.playReturned = true
