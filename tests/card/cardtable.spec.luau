@@ -68,6 +68,7 @@ type FixtureOptions = {
 	autoPassDeci: number?,
 	onCompleted: ((seat: number, playerId: number, rank: number) -> ())?,
 	baseId: number?,
+	startNow: number?, -- the clock value at ctx:start; production is uptime-based, never 0
 }
 
 local function newFixture(o: FixtureOptions?): Fixture
@@ -116,6 +117,7 @@ local function newFixture(o: FixtureOptions?): Fixture
 	for _, id in users do
 		table.insert(specs, { playerId = id, position = POSE, look = LOOK })
 	end
+	now.value = opts.startNow or 0
 	ct:start(specs)
 	return {
 		ct = ct,
@@ -1059,6 +1061,52 @@ return function(t: Test.Runner)
 			t.equal(st.config.ranks, (n - 1) + CardPool.EXTRA_RANKS, `N={n} ranks`)
 			t.equal(st.seatCount, n - 1, `N={n} seatCount`)
 		end
+	end)
+
+	t.test("WR-02: the stall gate holds from a REALISTIC base clock, not only from deci 0", function()
+		-- The detector's own anchor starts at 0 and production nowDeci is uptime-based, so every earlier
+		-- spec (all driven from 0) could not see the 45 s gate being dead. This one starts the round at a
+		-- large clock. The action threshold (96 x 3 = 288) is exceeded within 10 deci, so ONLY the
+		-- minimum-time condition stands between the table and a cue.
+		local BASE = 1234567
+		local function stallCuesFor(stall: StallDetector.StallDetector): (number, number, number)
+			local fx = newFixture({ seekers = 3, stall = stall, startNow = BASE })
+			for _ = 1, 300 do
+				stall:noteApply(3, BASE + 5)
+			end
+			fx.now.value = BASE + 10
+			fx.ct:tick()
+			local early = 0
+			for _, call in fx.rec.callsOfKind("Stall") do
+				if call.payload.active == true then
+					early += 1
+				end
+			end
+			fx.now.value = BASE + 450
+			fx.ct:tick()
+			local late = 0
+			for _, call in fx.rec.callsOfKind("Stall") do
+				if call.payload.active == true then
+					late += 1
+				end
+			end
+			return early, late, stall:actionsSinceProgress()
+		end
+		-- Clean control: the real shell. No cue at +1 s, a cue once 45 s have really passed.
+		local early, late, actions = stallCuesFor(stallDetector())
+		t.equal(early, 0, "a cue fired 1 s into the round on the action count alone")
+		t.equal(late, 1, "no cue once 45 s had passed: the fixture cannot arm the detector")
+		t.equal(actions, 300, "non-vacuity: 300 accepted actions were counted")
+		-- MUTATION (broken dependency): a detector that ignores the shell's anchor, which is what the
+		-- pre-fix shell amounted to. The same helper must see the early cue.
+		local real = stallDetector()
+		local ignoring: StallDetector.StallDetector = table.clone(real)
+		ignoring.noteProgress = function(_self: StallDetector.StallDetector, _now: number) end
+		local mEarly, mLate = stallCuesFor(ignoring)
+		print(
+			`cardtable WR-02: base {BASE}; real early/late cues {early}/{late}, anchor-ignoring mutant {mEarly}/{mLate}, actions {actions}`
+		)
+		t.equal(mEarly, 1, "the unanchored mutant must fire before 45 s, or this gate cannot fail")
 	end)
 
 	t.test("the RoundStart payload carries EXACTLY the published key set and nothing from the map", function()

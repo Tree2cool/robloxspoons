@@ -413,6 +413,10 @@ local function new(deps: Deps): CardTable
 
 			local ctx = newCtx()
 			deps.idle:sync(viewOf(st), ctx.now, nil)
+			-- D-20: anchor the stall detector's no-progress window to THIS round's clock. Its own anchor
+			-- starts at 0 while the production clock is uptime-based, so without this the 45 s minimum-time
+			-- gate is dead until the first Completed/SeatRemoved of the round (WR-02).
+			deps.stall:noteProgress(ctx.now)
 			table.insert(ctx.pending, function()
 				deps.publisher.toSeated("RoundStart", payload)
 			end)
