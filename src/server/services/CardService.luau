@@ -342,6 +342,17 @@ function CardService.new(deps: Deps): CardService
 			releaseAvatar(playerId)
 		end
 		seatHold:releaseAll()
+		-- UX-02 / D-29: the client restores its controls only on its own Completed, SeatRemoved or the next
+		-- RoundStart, none of which an ended round sends. So tell every still-seated client, BEFORE `seated`
+		-- is cleared (toSeated reads it). Contained: a failed publish must not stop the state reset.
+		if cardTable ~= nil then
+			local told = pcall(function()
+				deps.publisher.toSeated("RoundEnd", {})
+			end)
+			if not told then
+				deps.onTelemetry("round_end_publish_failed", {})
+			end
+		end
 		table.clear(seated)
 		cardTable = nil
 		deps.setPhase("Lobby")

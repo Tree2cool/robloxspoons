@@ -158,8 +158,8 @@ return function(t: Test.Runner)
 				end
 			end
 		end
-		t.equal(#CardRouting.KINDS, 6, "6 kinds exercised")
-		t.equal(attempts, 12)
+		t.equal(#CardRouting.KINDS, 7, "7 kinds exercised")
+		t.equal(attempts, 14)
 		t.equal(throwing, 4, "Sync and Notice x toSeated/toAll")
 		print(`netguard case 1: {#CardRouting.KINDS} kinds, {attempts} attempted calls, {throwing} refused`)
 	end)

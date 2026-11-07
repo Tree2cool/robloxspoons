@@ -24,7 +24,13 @@
 --      event stream needs the complete stream from RoundStart, and one gateway reject or resync would
 --      silently desync the counters with nothing to detect it. The `Depths` kind is public ("seated")
 --      and carries counts only; CardTable builds it from the live engine state after each apply.
---   8. No hash, ever, in anything client-bound (Types.luau guarantee 6).
+--   8. ROUND END IS ITS OWN PUBLIC KIND, NO PAYLOAD. The client restores its controls only on the local
+--      seat's Completed, its SeatRemoved or the next RoundStart, and CardService.endRound removes no
+--      seat. Without `RoundEnd` the server releases the avatar hold while the client still has the
+--      touch controls hidden (UX-02 / D-29). Reusing SeatRemoved was rejected: the engine's RemoveCause
+--      is Completed | Disconnected | Benched, none of which means "the round ended", and adding one
+--      touches src/server/engine/. It carries an empty table; there is nothing to leak.
+--   9. No hash, ever, in anything client-bound (Types.luau guarantee 6).
 local Types = require("../engine/Types")
 
 export type Publisher = {
@@ -64,7 +70,7 @@ export type PublicEvent =
 export type DepthsPayload = { depths: { number } }
 export type PrivateNotice = { seat: number, notice: Notice }
 
-local KINDS = { "RoundStart", "Sync", "Notice", "Table", "Stall", "Depths" }
+local KINDS = { "RoundStart", "Sync", "Notice", "Table", "Stall", "Depths", "RoundEnd" }
 table.freeze(KINDS)
 
 local AUDIENCE: { [string]: Audience } = {
@@ -74,6 +80,7 @@ local AUDIENCE: { [string]: Audience } = {
 	Table = "seated",
 	Stall = "seated",
 	Depths = "seated",
+	RoundEnd = "seated",
 }
 table.freeze(AUDIENCE)
 

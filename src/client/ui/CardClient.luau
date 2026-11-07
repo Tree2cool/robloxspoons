@@ -35,8 +35,9 @@
 --     live JOKER_MODE flag is never made to lie to the player (D-23).
 -- 11. KNOWN GAPS, recorded rather than papered over. (a) CLOSED in 04-19: pile depths arrive as their own
 --     public `Depths` message (counts only, built by the server), so the stacks never depend on counting
---     events client-side. (b) There is no round-end message among the five kinds, so
---     the overlay ends on the local seat's removal or the next RoundStart. (c) A keyboard or gamepad send
+--     events client-side. (b) CLOSED in 04-19: a round that ends without removing the local seat now
+--     sends the public `RoundEnd`, which tears the overlay down and restores the controls (UX-02 /
+--     D-29); before it the controls stayed hidden until the next RoundStart. (c) A keyboard or gamepad send
 --     tells the hand through markSent, since it does not pass through a strip. (d) Nothing about feel,
 --     controls or audio on a device is proven here: M-11, M-12, M-13, M-16.
 
@@ -66,6 +67,8 @@ export type Hooks = {
 	onTable: ((events: { any }, depths: { number }, localSeat: number) -> ())?,
 	-- Server-supplied pile depths (CARD-13): one count per seat, seat order, counts only.
 	onDepths: ((depths: { number }, localSeat: number) -> ())?,
+	-- The server ended the round (UX-02 / D-29). Fired after the overlay is gone and the controls are back.
+	onRoundEnd: (() -> ())?,
 	-- Called by Controls.onLocalCompleted LAST, after the overlay is gone and the controls are back.
 	startFlourish: ((completed: any) -> ())?,
 }
@@ -530,6 +533,19 @@ function CardClient.new(): CardClient
 		end
 	end
 
+	-- UX-02 / D-29: the round ended without removing this seat (CardService.endRound removes none), so
+	-- neither Completed nor SeatRemoved will ever come. Without this the server has released the avatar
+	-- while the touch controls stay hidden and the key sink stays bound. teardown is idempotent, so a
+	-- RoundEnd that follows this seat's own Completed does nothing twice.
+	local function onRoundEnd(_payload: any)
+		teardown()
+		round = nil
+		local fn = hooks.onRoundEnd
+		if fn ~= nil then
+			fn()
+		end
+	end
+
 	local function onNotice(payload: any)
 		local r = round
 		if r == nil then
@@ -563,6 +579,7 @@ function CardClient.new(): CardClient
 		Notice = onNotice,
 		Stall = onStall,
 		Depths = onDepths,
+		RoundEnd = onRoundEnd,
 	}
 
 	local function contained(fn: () -> ())

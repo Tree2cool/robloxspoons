@@ -815,4 +815,28 @@ return function(t: Test.Runner)
 		scriptedDeal(rankFx, 4)
 		t.truthy(#(publicWalkProblems(rankFx)) > 0, "case 2's walk also reddens on a rank in Depths")
 	end)
+
+	t.test("RoundEnd is a public kind with no private payload (UX-02 / D-29, wire gap 2)", function()
+		t.equal(CardRouting.audienceOf("RoundEnd"), "seated")
+		t.equal(CardRouting.PRIVATE_KINDS["RoundEnd"], nil, "RoundEnd is not a private kind")
+		CardRouting.assertPublic("RoundEnd")
+		-- The payload the service sends, walked by key count: an empty table has nothing to leak. The same
+		-- check run over a payload carrying a hand must find it (the mutant), and over an empty one must not
+		-- (the twin).
+		local function leakedKeys(payload: any): number
+			local n = 0
+			for _ in payload do
+				n += 1
+			end
+			return n
+		end
+		local rec = RecordingPublisher.new()
+		rec.toSeated("RoundEnd", {})
+		local calls = rec.callsOfKind("RoundEnd")
+		t.equal(#calls, 1, "non-vacuity: one RoundEnd recorded")
+		t.equal(calls[1].method, "toSeated")
+		t.equal(leakedKeys(calls[1].payload), 0, "the real payload carries no key at all")
+		t.equal(leakedKeys({}), 0, "twin: an empty payload is clean")
+		t.truthy(leakedKeys({ hand = { 1, 2 } }) > 0, "mutant: a payload carrying a hand must be flagged")
+	end)
 end
