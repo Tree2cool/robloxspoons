@@ -65,6 +65,10 @@ NetServer.start({
 	onError = function(userId, intent, err)
 		warn(`[Spoons] handler error for {intent} from {userId}: {tostring(err)}`)
 	end,
+	-- Placeholder: no round is seated yet. Plan 04-14's CardService supplies the real roster.
+	seatedUserIds = function()
+		return {}
+	end,
 })
 
 print(`[Spoons] server ready (round driver: {driver ~= nil})`)
