@@ -1,5 +1,53 @@
 # Phase 4 — execution carry-forwards
 
+## TWO WIRE GAPS FOUND AT INTEGRATION (wave 8) — both bear on phase requirements
+
+Found by plan 04-18 and **verified independently by the orchestrator** against the merged tree.
+Both are assigned to plan 04-19 as explicit additional scope.
+
+### Gap 1 — CARD-13's "pile depths of others" has NO data path
+
+**Verified:** `grep -nE "depth|Depth"` over `CardTable.luau` and `CardRouting.luau` returns **one
+hit, and it is the phrase "defence in depth" in a comment.** The `Table` payload is the public event
+list only (`publisher.toSeated("Table", publicList)`). 04-18 therefore passes the reducer its own
+**empty** depth list rather than inventing numbers — the right call, but it means nothing can render
+other seats' stacks.
+
+**CARD-13 and ROADMAP criterion 2 both require it:** "sees their own five cards and **only the pile
+depths of other seats**". So this is a requirement gap, not a polish item.
+
+**Resolution: the server supplies depths; the client does NOT derive them.**
+- Deriving from the event stream is possible in principle (each `Passed` increments the target's
+  inbox, each `Drew` decrements) but fragile: it needs the complete stream from `RoundStart`, and a
+  gateway-level reject or a resync would silently desync the counters with no way to detect it.
+- `CardTable` already knows the true depths, so a server-supplied count is authoritative and cheap.
+- **Privacy is preserved by construction:** depths are **counts only, never card identities**, which
+  is exactly and only what CARD-13 permits. The `privacy.spec` recursive key-name walk must be
+  extended to assert the depth field carries **no** rank or cardId, with a leak mutation.
+
+### Gap 2 — a round can end leaving the client's controls hidden (UX-02 / D-29 defect)
+
+**Verified** at `CardService.luau:339-348`: `endRound` stops the sweep, calls `releaseAvatar` for
+every seated player, calls `seatHold:releaseAll()`, clears state and sets phase `Lobby`. **It
+publishes nothing.**
+
+But the client ends its overlay and restores controls only on the local seat's `Completed`, its
+`SeatRemoved`, or the next `RoundStart`. **None of those is sent by `endRound`.**
+
+**So after a round that ends without removing the local seat, the server releases the avatar hold
+while the client still has `TouchControlsEnabled = false` and its key sinks bound.** The player can
+move physically but has **no visible movement controls on a phone** — indistinguishable from being
+stuck — until the next `RoundStart`. That is a direct UX-02/D-29 violation, and D-29 exists because
+a stuck control costs a finisher score (D-30, find order drives SCORE-01..03).
+
+**Resolution: a round-end signal the client can act on.** Reusing `SeatRemoved` was considered and
+rejected — the engine's `RemoveCause` is `Completed | Disconnected | Benched` and none means "the
+round ended", so it would need an engine change, which is forbidden this phase. **A sixth public
+kind is the clean fix.** It must be added to `KINDS`, routed as public (no private payload), asserted
+in `privacy.spec`, and handled client-side by restoring controls and tearing the overlay down.
+
+---
+
 > Facts discovered by executors mid-phase that later waves need and would otherwise rediscover.
 > Orchestrator-maintained. **Append, never rewrite.**
 
