@@ -347,6 +347,55 @@ return function(t: Test.Runner)
 		end
 	)
 
+	t.test("IN-07: a viewport shorter than the hand zone never yields a negative region size", function()
+		-- Every region whose size derives from handTop. Returns the names of any with a negative extent.
+		local function negatives(sol: Layout.Solution): { string }
+			local out: { string } = {}
+			local regions: { [string]: Layout.Rect } = {
+				tableRegion = sol.tableRegion,
+				handZone = sol.handZone,
+				strip = sol.strip,
+				drain = sol.drain,
+			}
+			for name, r in regions do
+				if r.w < 0 or r.h < 0 then
+					table.insert(out, `{name} {r.w}x{r.h}`)
+				end
+			end
+			table.sort(out)
+			return out
+		end
+		-- Clean control: a normal viewport is untouched.
+		t.deepEqual(negatives(Layout.solve(VIEWPORTS[1].v, 5)), {}, "a normal viewport has no negative region")
+		-- 400 x 100 puts designH at 117.6 against a 144 hand zone (the 0.85 scale floor applies).
+		local shortViews: { Viewport } = {
+			{ width = 400, height = 100, insets = NO_INSETS },
+			{ width = 640, height = 120, insets = NO_INSETS },
+			{ width = 844, height = 140, insets = { top = 10, bottom = 5, left = 47, right = 0 } },
+		}
+		local ran, flagged = 0, 0
+		for _, v in shortViews do
+			for _, h in HANDS do
+				local sol = Layout.solve(v, h)
+				ran += 1
+				t.deepEqual(negatives(sol), {}, `a negative region at {v.width}x{v.height} hand {h}`)
+				-- The degeneracy is still REPORTED, so clamping hides nothing.
+				if hasPrefix(Layout.problems(v, h), "height below guarantee") ~= nil then
+					flagged += 1
+				end
+			end
+		end
+		t.equal(ran, 6, "non-vacuity: six degenerate solves ran")
+		t.equal(flagged, ran, "every degenerate viewport is still flagged by problems")
+		-- MUTATION (broken dependency): the same checker over the unclamped solution the old code built.
+		local real = Layout.solve(shortViews[1], 5)
+		local unclamped: Layout.Solution = deepCopy(real)
+		unclamped.tableRegion = { x = real.tableRegion.x, y = real.tableRegion.y, w = real.tableRegion.w, h = -22.4 }
+		local seen = negatives(unclamped)
+		print(`IN-07: {ran} degenerate solves clean, {flagged} still flagged; unclamped mutant seen as {seen[1]}`)
+		t.equal(#seen, 1, "the checker must see a negative-height table region, or this gate cannot fail")
+	end)
+
 	t.test("solve errors by name on an impossible input", function()
 		local ok: Viewport = VIEWPORTS[1].v
 		t.throws(function()
