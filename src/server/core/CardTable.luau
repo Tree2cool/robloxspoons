@@ -135,7 +135,6 @@ type ApplyOpts = {
 local function new(deps: Deps): CardTable
 	local state: Types.State? = nil
 	local copyOf: { number } = {}
-	local poses: { [Types.SeatId]: { position: Vec3, look: Vec3 } } = {}
 	-- userId -> seat, only while the seat is live. The generic removal deletes the entry.
 	local rosterSeat: { [number]: Types.SeatId } = {}
 	-- Last ackSeq each user sent, so a server-originated Sync carries the last known value.
@@ -383,20 +382,15 @@ local function new(deps: Deps): CardTable
 			table.clear(rosterSeat)
 			table.clear(lastAck)
 			table.clear(lastSig)
-			table.clear(poses)
 			local entries: { RoundStartSeat } = {}
 			for i, spec in seats do
 				rosterSeat[spec.playerId] = i
-				poses[i] = {
-					position = { x = spec.position.x, y = spec.position.y, z = spec.position.z },
-					look = { x = spec.look.x, y = spec.look.y, z = spec.look.z },
-				}
-				-- FIELD BY FIELD from the pose, never a copy of `spec`.
+				-- FIELD BY FIELD from the incoming pose, never a copy of `spec`.
 				entries[i] = {
 					seat = i,
 					playerId = spec.playerId,
-					position = { x = poses[i].position.x, y = poses[i].position.y, z = poses[i].position.z },
-					look = { x = poses[i].look.x, y = poses[i].look.y, z = poses[i].look.z },
+					position = { x = spec.position.x, y = spec.position.y, z = spec.position.z },
+					look = { x = spec.look.x, y = spec.look.y, z = spec.look.z },
 				}
 			end
 			local rankCount = config.ranks
