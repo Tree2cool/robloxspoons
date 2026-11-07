@@ -44,7 +44,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
 local Card = require(ReplicatedStorage.Shared.Config.Card)
-local Round = require(ReplicatedStorage.Shared.Config.Round)
 local Faces = require(ReplicatedStorage.Shared.Card.Faces)
 local Flourish = require(ReplicatedStorage.Shared.Card.Flourish)
 local CardHud = require("./CardHud")
@@ -218,9 +217,10 @@ end
 -- this file (header point 1).
 local function makeScheduler(): Flourish.Scheduler
 	return {
+		-- IN-05: required by the Scheduler type and read by nothing in the driver, so it is deliberately NOT
+		-- a clock. It used to read time(), a second clock expression in a codebase whose rule is one.
 		nowDeci = function(): number
-			-- Display only; the driver never reads it.
-			return math.floor(time() * Round.DECISECONDS_PER_SECOND)
+			return 0
 		end,
 		delay = function(seconds: number, fn: () -> ()): () -> ()
 			local fired = false

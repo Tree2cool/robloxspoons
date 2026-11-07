@@ -612,6 +612,32 @@ return function(t: Test.Runner)
 		print(`  renderer_discipline[4]: {#files} files, {#needles} identifiers, {total} hits`)
 	end)
 
+	t.test("IN-05: the flourish scheduler reads no clock of its own", function()
+		local path = `{UI_DIR}/CardFlourish.luau`
+		local raw = fs.readFile(path)
+		local function clockReads(text: string): number
+			local code = lex.stripComments(text)
+			return countOf(code, "time()") + countOf(code, "os.clock") + countOf(code, "tick()")
+		end
+		t.equal(clockReads("local x = time()"), 1, "negative control: fires on a planted time() read")
+		t.equal(clockReads("-- time() in a comment\nlocal x = 1"), 0, "negative control: a comment does not count")
+		local schedulerAt = string.find(raw, "local function makeScheduler", 1, true)
+		t.truthy(schedulerAt ~= nil, "non-vacuity: makeScheduler was found in the scanned source")
+		t.equal(clockReads(raw), 0, "CardFlourish reads a clock")
+		t.equal(
+			clockReads(
+				replaceOnce(
+					raw,
+					"nowDeci = function(): number\n\t\t\treturn 0\n",
+					"nowDeci = function(): number\n\t\t\treturn math.floor(time() * 10)\n"
+				)
+			),
+			1,
+			"MUTATION: time() back in nowDeci"
+		)
+		print(`  renderer_discipline[IN-05]: {#raw} chars scanned, 0 clock reads, mutant seen`)
+	end)
+
 	t.test("the ScreenInsets string in Layout maps to the enum member the HUD sets", function()
 		-- negative control: a comment must not satisfy the scan, code must.
 		local commentOnly = lex.stripComments("-- ScreenInsets = Enum.ScreenInsets.CoreUISafeInsets\nlocal x = 1")
