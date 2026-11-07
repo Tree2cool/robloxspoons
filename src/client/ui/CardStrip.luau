@@ -36,6 +36,9 @@ export type Strip = {
 	-- A transient message that overrides the hint for `seconds`, then reverts. Used for the strike
 	-- lines, the private forced-pass cue, the stall cue and the right-pile sink hint.
 	setMessage: (self: Strip, text: string, seconds: number) -> (),
+	-- Plan 04-18: drops a transient message early (the stall cue ending, the joker explainer when the
+	-- selection moves off the joker). The hint beneath it returns.
+	clearMessage: (self: Strip) -> (),
 	-- D-16: nothing for the first 6 s of the 8 s window, then the countdown and the drain bar. The
 	-- strip is told the remaining seconds and the warn threshold, and decides nothing else.
 	setCountdown: (self: Strip, owes: "Pass" | "Draw", secondsLeft: number?) -> (),
@@ -129,6 +132,10 @@ function CardStrip.new(parent: Frame, solution: Layout.Solution): Strip
 				messageText = nil
 				render()
 			end)
+			render()
+		end,
+		clearMessage = function(_self: Strip)
+			cancelMessage()
 			render()
 		end,
 		setCountdown = function(_self: Strip, owes: "Pass" | "Draw", secondsLeft: number?)

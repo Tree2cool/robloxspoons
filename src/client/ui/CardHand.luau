@@ -60,6 +60,9 @@ export type Hand = {
 	-- The live joker flag from the round-start payload; forwarded to Faces, which errors by name if a
 	-- joker is drawn without one.
 	setJokerMode: (self: Hand, mode: string?) -> (),
+	-- Plan 04-18: the keyboard and gamepad accelerators send without passing through a strip, so they tell
+	-- the hand a card was sent by this player (otherwise its departure would render as a forced removal).
+	markSent: (self: Hand, cardId: number) -> (),
 	destroy: (self: Hand) -> (),
 }
 
@@ -347,6 +350,10 @@ function CardHand.new(
 
 		setJokerMode = function(_self: Hand, mode: string?)
 			jokerMode = mode
+		end,
+
+		markSent = function(_self: Hand, cardId: number)
+			committed[cardId] = true
 		end,
 
 		destroy = function(_self: Hand)
