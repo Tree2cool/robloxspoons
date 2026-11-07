@@ -19,7 +19,8 @@ local CLIENT_PATH = "src/client/ui/CardClient.luau"
 
 -- The head of the handler. NOT "teardown()\n round = nil": onRoundStart opens with those same two lines, so
 -- an edit keyed on them lands in the wrong function and the mutant is never what it claims to be.
-local ENDER = "local function onRoundEnd(_payload: any)\n\t\tteardown()"
+local ENDER = "local function onRoundEnd(_payload: any)\n\t\tendRoundView()"
+local VIEW_HEAD = "local function endRoundView()\n\t\tteardown()"
 
 local function countOf(text: string, needle: string): number
 	local n = 0
@@ -103,8 +104,16 @@ local function clientProblems(raw: string): ({ string }, number)
 	if countOf(text, "RoundEnd = onRoundEnd") ~= 1 then
 		table.insert(problems, "RoundEnd is not registered in the handler table exactly once")
 	end
-	if string.find(body, "teardown()", 1, true) == nil then
-		table.insert(problems, "onRoundEnd does not call teardown() (controls would stay hidden)")
+	if string.find(body, "endRoundView()", 1, true) == nil then
+		table.insert(problems, "onRoundEnd does not call endRoundView() (controls would stay hidden)")
+	end
+	-- endRoundView is where the controls actually come back: it must call teardown() and drop the place.
+	local view = slice(text, "local function endRoundView", "local function ")
+	if string.find(view, "teardown()", 1, true) == nil then
+		table.insert(problems, "endRoundView does not call teardown() (controls would stay hidden)")
+	end
+	if string.find(view, "destroyPlace()", 1, true) == nil then
+		table.insert(problems, "endRoundView does not call destroyPlace()")
 	end
 	if string.find(body, "round = nil", 1, true) == nil then
 		table.insert(problems, "onRoundEnd does not drop the round")
@@ -162,7 +171,7 @@ return function(t: Test.Runner)
 	t.test("MUTATION: each way of losing the round-end signal turns a gate red", function()
 		-- No-defect twin: the identity edit through the very same mutation plumbing.
 		local twinService = replaceOnce(serviceRaw, 'toSeated("RoundEnd", {})', 'toSeated("RoundEnd", {})')
-		local twinClient = replaceOnce(clientRaw, ENDER, ENDER)
+		local twinClient = replaceOnce(replaceOnce(clientRaw, ENDER, ENDER), VIEW_HEAD, VIEW_HEAD)
 		t.deepEqual((serviceProblems(twinService)), {}, "the no-defect service twin must be green")
 		t.deepEqual((clientProblems(twinClient)), {}, "the no-defect client twin must be green")
 
@@ -198,6 +207,10 @@ return function(t: Test.Runner)
 				problems = (clientProblems(replaceOnce(clientRaw, "RoundEnd = onRoundEnd", "RoundEndX = onRoundEnd"))),
 			},
 			{
+				name = "client: endRoundView does not restore the controls",
+				problems = (clientProblems(replaceOnce(clientRaw, VIEW_HEAD, "local function endRoundView()"))),
+			},
+			{
 				name = "client: handler does not tear down",
 				problems = (clientProblems(replaceOnce(clientRaw, ENDER, "local function onRoundEnd(_payload: any)"))),
 			},
@@ -206,6 +219,6 @@ return function(t: Test.Runner)
 			t.truthy(#m.problems > 0, `{m.name} must turn the gate red`)
 			print(`  round_end mutation ({m.name}): {#m.problems} problem(s), e.g. {m.problems[1]}`)
 		end
-		t.equal(#mutants, 6, "mutation count")
+		t.equal(#mutants, 7, "mutation count")
 	end)
 end
