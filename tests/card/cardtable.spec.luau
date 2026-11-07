@@ -640,7 +640,7 @@ end
 -- Case 9: the RoundStart key set.
 -- ------------------------------------------------------------------------------------------------
 
--- Hand-copied: MapContract.Node is an erased export type and exposes no field list at runtime. These are
+-- Hand-copied: the map Node type is an erased export type and exposes no field list at runtime. These are
 -- its twelve fields minus `position` and `look`, which are legal inside a pose.
 local BANNED_KEYS: { string } = {
 	"name",
@@ -686,7 +686,7 @@ local function keySetProblems(root: any): ({ string }, number, number)
 		end
 		for _, key in keysOf(node) do
 			if not isAllowed[key] then
-				local tag = if BANNED[key] then " (a MapContract.Node field)" else ""
+				local tag = if BANNED[key] then " (a map-node field)" else ""
 				table.insert(problems, `unexpected key {key} at {path}{tag}`)
 			end
 		end
