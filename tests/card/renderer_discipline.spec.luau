@@ -361,6 +361,111 @@ local function surfaceProblems(hand: string, piles: string, face: string): { str
 	return problems
 end
 
+-- ---------------------------------------------------------------------------------------------------------------
+-- Plan 04-18 scanners: the client assembly
+-- ---------------------------------------------------------------------------------------------------------------
+
+local CLIENT_DIR = "src/client"
+local MAIN = `{CLIENT_DIR}/Main.client.luau`
+local CLIENT_NET = `{CLIENT_DIR}/net/ClientNet.luau`
+local CARD_CLIENT = `{UI_DIR}/CardClient.luau`
+
+local function offsetOf(text: string, needle: string): number?
+	local a = string.find(text, needle, 1, true)
+	return a
+end
+
+-- Case 12's predicate. Pitfall 11's defect is an ordering one: the remotes must be resolved before the card
+-- client is built, because WaitForChild is a yield point and a message to an unresolved remote is dropped.
+local function resolveOrderProblems(code: string): { string }
+	local problems: { string } = {}
+	local resolve = offsetOf(code, "ClientNet.resolve(")
+	local build = offsetOf(code, "CardClient.new(")
+	if resolve == nil then
+		table.insert(problems, "ClientNet.resolve( is absent")
+	end
+	if build == nil then
+		table.insert(problems, "CardClient.new( is absent")
+	end
+	if resolve ~= nil and build ~= nil and resolve > build then
+		table.insert(problems, `ClientNet.resolve( at {resolve} is after CardClient.new( at {build}`)
+	end
+	return problems
+end
+
+-- Case 13's predicate: nothing that yields in the card message path.
+local YIELD_NEEDLES = { "task.wait", "WaitForChild", ":Wait(" }
+local function yieldHits(code: string): { string }
+	local hits: { string } = {}
+	for _, needle in YIELD_NEEDLES do
+		for _ = 1, countOf(code, needle) do
+			table.insert(hits, needle)
+		end
+	end
+	return hits
+end
+
+-- Case 14's predicate. ":BindAction" does not match ":UnbindAction", so the two counts are independent.
+local function bindCounts(code: string): (number, number)
+	return countOf(code, ":BindAction"), countOf(code, ":UnbindAction(")
+end
+
+-- Case 15's predicates. `ClientNet.send(` is the call; the definition lives in ClientNet.luau and is excluded
+-- by path. Intent names are read from string-literal first arguments only.
+local function sendSites(code: string): number
+	return countOf(code, "ClientNet.send(")
+end
+
+local function literalIntentNames(code: string): { string }
+	local names: { string } = {}
+	for name in string.gmatch(code, "ClientNet%.send%(%s*[\"']([%w_]+)[\"']") do
+		table.insert(names, name)
+	end
+	return names
+end
+
+local function sendProblems(sources: { [string]: string }): { string }
+	local problems: { string } = {}
+	local siteFiles: { string } = {}
+	for path, code in sources do
+		if path ~= CLIENT_NET and sendSites(code) > 0 then
+			table.insert(siteFiles, path)
+		end
+	end
+	table.sort(siteFiles)
+	if join(siteFiles) ~= join({ MAIN, CARD_CLIENT }) then
+		table.insert(problems, `ClientNet.send( is called from {join(siteFiles)}, expected {MAIN},{CARD_CLIENT}`)
+	end
+	local cardSites = if sources[CARD_CLIENT] ~= nil then sendSites(sources[CARD_CLIENT]) else 0
+	if cardSites ~= 1 then
+		table.insert(problems, `CardClient has {cardSites} send sites, expected exactly 1`)
+	end
+	local mainNames = if sources[MAIN] ~= nil then literalIntentNames(sources[MAIN]) else {}
+	if join(mainNames) ~= "Ping" then
+		table.insert(problems, `Main.client sends {join(mainNames)}, expected only Ping`)
+	end
+	for path, code in sources do
+		if path ~= MAIN and path ~= CLIENT_NET then
+			for _, name in literalIntentNames(code) do
+				if name == "Pass" or name == "Draw" then
+					table.insert(problems, `{path} names the intent {name} as a literal`)
+				end
+			end
+		end
+	end
+	return problems
+end
+
+local function clientSources(): { [string]: string }
+	local files: { string } = {}
+	walk(CLIENT_DIR, files)
+	local sources: { [string]: string } = {}
+	for _, path in files do
+		sources[path] = lex.stripComments(fs.readFile(path))
+	end
+	return sources
+end
+
 return function(t: Test.Runner)
 	t.test("no geometry number from Layout.DESIGN appears as a literal anywhere under src/client/ui", function()
 		-- Whole numbers 0..4 are excluded: grid and index arithmetic (slot 1, a 2-up split, a 4-grid), not geometry.
@@ -390,7 +495,7 @@ return function(t: Test.Runner)
 		)
 
 		local files = uiFiles()
-		t.truthy(#files >= 5, `non-vacuity: scanned {#files} files, at least 5 expected`)
+		t.truthy(#files >= 8, `non-vacuity: scanned {#files} files, at least 8 expected`)
 		print(`  renderer_discipline[1]: {#files} files, {#needles} needles: {join(needles)}`)
 		local total = 0
 		local sawTheme = false
@@ -432,7 +537,7 @@ return function(t: Test.Runner)
 		t.equal(hitsIn(lex.stripComments("local c = Color3.fromRGB(1, 2, 3)")), 1, "negative control: code")
 
 		local files = uiFiles()
-		t.truthy(#files >= 5, `non-vacuity: scanned {#files} files, at least 5 expected`)
+		t.truthy(#files >= 8, `non-vacuity: scanned {#files} files, at least 8 expected`)
 		local withHits: { string } = {}
 		local report: { string } = {}
 		local themeHits = 0
@@ -467,7 +572,7 @@ return function(t: Test.Runner)
 		t.equal(#numberHits(stripCode("-- 0.15\nlocal d = 5"), source, true), 0, "negative control: comment")
 
 		local files = uiFiles()
-		t.truthy(#files >= 5, `non-vacuity: scanned {#files} files, at least 5 expected`)
+		t.truthy(#files >= 8, `non-vacuity: scanned {#files} files, at least 8 expected`)
 		print(`  renderer_discipline[3]: {#files} files, needles: {join(source)}`)
 		for _, path in files do
 			-- CardTheme is NOT exempt here: timings have exactly one home.
@@ -497,7 +602,7 @@ return function(t: Test.Runner)
 		t.equal(hitsIn("local x = node.OnClientEvent"), 1, "negative control: fires on a planted identifier")
 		-- RAW text, comments included: stricter than the guards, and it keeps headers honest.
 		local files = uiFiles()
-		t.truthy(#files >= 5, `non-vacuity: scanned {#files} files, at least 5 expected`)
+		t.truthy(#files >= 8, `non-vacuity: scanned {#files} files, at least 8 expected`)
 		local total = 0
 		for _, path in files do
 			local n = hitsIn(fs.readFile(path))
@@ -612,7 +717,7 @@ return function(t: Test.Runner)
 		)
 
 		local files = uiFiles()
-		t.truthy(#files >= 5, `non-vacuity: scanned {#files} files, at least 5 expected`)
+		t.truthy(#files >= 8, `non-vacuity: scanned {#files} files, at least 8 expected`)
 		local perFile: { string } = {}
 		local sources: { [string]: string } = {}
 		local literals = 0
@@ -673,7 +778,7 @@ return function(t: Test.Runner)
 		t.equal(#modeBranchProblems(lex.stripComments("-- Wild Blocker"), modes), 0, "negative control: comment")
 
 		local files = uiFiles()
-		t.truthy(#files >= 5, `non-vacuity: scanned {#files} files, at least 5 expected`)
+		t.truthy(#files >= 8, `non-vacuity: scanned {#files} files, at least 8 expected`)
 		local sources: { [string]: string } = {}
 		for _, path in files do
 			local code = lex.stripComments(fs.readFile(path))
@@ -771,7 +876,7 @@ return function(t: Test.Runner)
 		t.deepEqual({ connectBalance(lex.stripComments("-- a:Connect(f)")) }, { 0, 0 }, "negative control: comment")
 
 		local files = uiFiles()
-		t.truthy(#files >= 5, `non-vacuity: scanned {#files} files, at least 5 expected`)
+		t.truthy(#files >= 8, `non-vacuity: scanned {#files} files, at least 8 expected`)
 		local report: { string } = {}
 		local creators = 0
 		local sources: { [string]: string } = {}
@@ -858,4 +963,154 @@ return function(t: Test.Runner)
 			)
 		end
 	)
+
+	t.test("ClientNet.resolve is called before any CardClient construction in Main.client", function()
+		local main = lex.stripComments(fs.readFile(MAIN))
+		local resolve = offsetOf(main, "ClientNet.resolve(")
+		local build = offsetOf(main, "CardClient.new(")
+		print(
+			`  renderer_discipline[12]: Main.client offsets: ClientNet.resolve( = {resolve}, CardClient.new( = {build}`
+		)
+		t.truthy(resolve ~= nil and build ~= nil, "non-vacuity: both needles were found in the shipped Main.client")
+		t.deepEqual(resolveOrderProblems(main), {}, "the shipped boot order")
+
+		-- negative controls: a comment does not count, and the wrong order is reported
+		t.truthy(
+			#resolveOrderProblems(lex.stripComments("-- ClientNet.resolve()\nlocal c = CardClient.new()")) > 0,
+			"negative control: a comment naming resolve satisfies nothing"
+		)
+		t.truthy(
+			#resolveOrderProblems("local c = CardClient.new()\nClientNet.resolve()") > 0,
+			"negative control: resolve after construction"
+		)
+		-- twin, then real-source mutations
+		t.deepEqual(
+			resolveOrderProblems(replaceOnce(main, "client:start()", "client:start()")),
+			{},
+			"twin: an identity edit of the real Main.client is clean"
+		)
+		local withoutResolve = replaceOnce(main, "ClientNet.resolve()", "local resolved = true")
+		t.truthy(#resolveOrderProblems(withoutResolve) > 0, "MUTATION: resolve deleted from Main.client")
+		local moved = withoutResolve .. "\nClientNet.resolve()"
+		t.truthy(#resolveOrderProblems(moved) > 0, "MUTATION: resolve moved after the card client is built")
+		local commentOnly = withoutResolve .. "\n-- ClientNet.resolve()"
+		t.truthy(#resolveOrderProblems(lex.stripComments(commentOnly)) > 0, "MUTATION: resolve left only in a comment")
+	end)
+
+	t.test("no file under src/client names a yield inside the card message path", function()
+		-- V-12 guarantees handler START order only, so a yielding handler can be overtaken and the client would
+		-- fold events out of order. CardHud.new does call WaitForChild for the PlayerGui and may wait for a
+		-- camera, but only on objects that already exist at that point, so neither yields in practice; that
+		-- is not asserted here and the scan scope is CardClient, as planned.
+		local code = lex.stripComments(fs.readFile(CARD_CLIENT))
+		local hits = yieldHits(code)
+		print(
+			`  renderer_discipline[13]: CardClient stripped {#code} chars, yield needles {join(YIELD_NEEDLES)}, hits {#hits}`
+		)
+		t.truthy(#code > 2000, "non-vacuity: a real, non-empty CardClient was scanned")
+		t.equal(countOf(code, "ClientNet.onCard("), 1, "non-vacuity: the handler under scan is the onCard one")
+		t.deepEqual(hits, {}, "CardClient yields nowhere")
+
+		t.equal(#yieldHits("task.wait(1) x:WaitForChild('a') y:Wait()"), 3, "negative control: all three kinds")
+		t.equal(#yieldHits(lex.stripComments("-- task.wait(1)\nlocal x = 1")), 0, "negative control: comment")
+		t.deepEqual(yieldHits(replaceOnce(code, "local started = false", "local started = false")), {}, "twin")
+		t.truthy(
+			#yieldHits(replaceOnce(code, "local started = false", "local started = false\ntask.wait(1)")) > 0,
+			"MUTATION: task.wait in CardClient"
+		)
+		t.truthy(
+			#yieldHits(replaceOnce(code, "local started = false", 'local started = false\ngame:WaitForChild("x")')) > 0,
+			"MUTATION: WaitForChild in CardClient"
+		)
+		t.truthy(
+			#yieldHits(replaceOnce(code, "local started = false", "local started = false\nlocal _ = x:Wait()")) > 0,
+			"MUTATION: :Wait() in CardClient"
+		)
+	end)
+
+	t.test("every BindAction has an UnbindAction, per file, and the counts are printed", function()
+		local controls = lex.stripComments(fs.readFile(`{UI_DIR}/CardControls.luau`))
+		local input = lex.stripComments(fs.readFile(`{UI_DIR}/CardInput.luau`))
+		local cb, cu = bindCounts(controls)
+		local ib, iu = bindCounts(input)
+		print(`  renderer_discipline[14]: CardControls bind/unbind {cb}/{cu}, CardInput bind/unbind {ib}/{iu}`)
+		t.truthy(cb >= 1 and ib >= 1, "non-vacuity: both files really bind something")
+		t.truthy(cu >= cb, `CardControls: {cb} bind against {cu} unbind`)
+		t.truthy(iu >= ib, `CardInput: {ib} bind against {iu} unbind`)
+
+		-- negative controls for the counters
+		t.deepEqual({ bindCounts(":BindAction(a) :BindActionAtPriority(b) :UnbindAction(a)") }, { 2, 1 }, "counts")
+		t.deepEqual({ bindCounts(lex.stripComments("-- :BindAction(a)\nlocal x = 1")) }, { 0, 0 }, "comment")
+
+		local function balanced(code: string): boolean
+			local b, u = bindCounts(code)
+			return u >= b
+		end
+		t.truthy(balanced(controls) and balanced(input), "twin: both real files are balanced")
+		t.truthy(
+			not balanced(replaceOnce(controls, ":UnbindAction(", ":Unbound(")),
+			"MUTATION: CardControls no longer unbinds the sink"
+		)
+		t.truthy(
+			not balanced(replaceOnce(input, ":UnbindAction(", ":Unbound(")),
+			"MUTATION: CardInput no longer unbinds its accelerators"
+		)
+		t.truthy(
+			not balanced(input .. "\nCAS:BindActionAtPriority('x', f, false, 1)"),
+			"MUTATION: a second CardInput binding with no unbind"
+		)
+	end)
+
+	t.test("the client never composes an intent payload outside the reducer", function()
+		local sources = clientSources()
+		local names: { string } = {}
+		local hitList: { string } = {}
+		for path, code in sources do
+			table.insert(names, baseName(path))
+			if path ~= CLIENT_NET and sendSites(code) > 0 then
+				table.insert(hitList, `{baseName(path)}={sendSites(code)}`)
+			end
+		end
+		table.sort(names)
+		table.sort(hitList)
+		print(`  renderer_discipline[15]: scanned {#names} client files ({join(names)})`)
+		print(`  renderer_discipline[15]: ClientNet.send( hit list: {join(hitList)}`)
+		t.truthy(#names >= 8, `non-vacuity: {#names} client files, at least 8 expected`)
+		t.truthy(sources[CARD_CLIENT] ~= nil and sources[MAIN] ~= nil, "non-vacuity: both sending files were scanned")
+		t.deepEqual(sendProblems(sources), {}, "exactly one card send path, and it is CardClient")
+
+		-- negative controls
+		t.equal(sendSites(lex.stripComments("-- ClientNet.send('Pass', {})")), 0, "negative control: comment")
+		t.equal(sendSites("ClientNet.send('Pass', {})"), 1, "negative control: code")
+		t.deepEqual(literalIntentNames('ClientNet.send("Draw", p) ClientNet.send(name, p)'), { "Draw" }, "names")
+
+		local function with(path: string, code: string): { [string]: string }
+			local copy = table.clone(sources)
+			copy[path] = code
+			return copy
+		end
+		local card = sources[CARD_CLIENT]
+		t.deepEqual(
+			sendProblems(with(CARD_CLIENT, replaceOnce(card, "local started = false", "local started = false"))),
+			{},
+			"twin: an identity edit of the real CardClient is clean"
+		)
+		local hand = `{UI_DIR}/CardHand.luau`
+		t.truthy(
+			#sendProblems(with(hand, sources[hand] .. '\nClientNet.send("Pass", { cardId = 1 })')) > 0,
+			"MUTATION: a second send path in CardHand"
+		)
+		t.truthy(
+			#sendProblems(with(CARD_CLIENT, card .. '\nClientNet.send("Draw", { seq = 1 })')) > 0,
+			"MUTATION: a second send site inside CardClient"
+		)
+		t.truthy(
+			#sendProblems(with(CARD_CLIENT, replaceOnce(card, "ClientNet.send(", "ClientNet.sent("))) > 0,
+			"MUTATION: CardClient stops sending through ClientNet"
+		)
+		t.truthy(
+			#sendProblems(with(MAIN, sources[MAIN] .. '\nClientNet.send("Pass", { cardId = 1 })')) > 0,
+			"MUTATION: Main.client sends a card intent"
+		)
+	end)
 end

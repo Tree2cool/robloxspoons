@@ -46,6 +46,12 @@ export type Input = {
 	destroy: (self: Input) -> (),
 }
 
+type Binding = {
+	name: string,
+	handler: (name: string, state: Enum.UserInputState, input: InputObject) -> Enum.ContextActionResult,
+	keys: { Enum.KeyCode },
+}
+
 local ACTION_SLOT = "SpoonsSlot"
 local ACTION_COMMIT = "SpoonsCommit"
 local ACTION_STEP = "SpoonsStep"
@@ -164,21 +170,27 @@ function CardInput.new(actions: Actions): Input
 		return Enum.ContextActionResult.Sink
 	end
 
-	-- createTouchButton is false throughout: no on-screen button is created by any of these.
-	ContextActionService:BindActionAtPriority(ACTION_SLOT, onSlot, false, PRIORITY, table.unpack(keysOf(SLOT_KEYS)))
 	local commitInputs: { Enum.KeyCode } = table.clone(COMMIT_KEYS)
 	for _, key in GAMEPAD_COMMIT do
 		table.insert(commitInputs, key)
 	end
-	ContextActionService:BindActionAtPriority(ACTION_COMMIT, onCommit, false, PRIORITY, table.unpack(commitInputs))
-	if next(GAMEPAD_STEPS) ~= nil then
-		ContextActionService:BindActionAtPriority(
-			ACTION_STEP,
-			onStep,
-			false,
-			PRIORITY,
-			table.unpack(keysOf(GAMEPAD_STEPS))
-		)
+	local bindings: { Binding } = {
+		{ name = ACTION_SLOT, handler = onSlot, keys = keysOf(SLOT_KEYS) },
+		{ name = ACTION_COMMIT, handler = onCommit, keys = commitInputs },
+		{ name = ACTION_STEP, handler = onStep, keys = keysOf(GAMEPAD_STEPS) },
+	}
+	-- One bind site and one unbind site, so the balance is checkable by counting. createTouchButton is false
+	-- throughout: no on-screen button is created by any of these.
+	for _, binding in bindings do
+		if #binding.keys > 0 then
+			ContextActionService:BindActionAtPriority(
+				binding.name,
+				binding.handler,
+				false,
+				PRIORITY,
+				table.unpack(binding.keys)
+			)
+		end
 	end
 
 	local input: Input
@@ -196,8 +208,8 @@ function CardInput.new(actions: Actions): Input
 			destroyed = true
 			connection:Disconnect()
 			table.clear(listeners)
-			for _, name in { ACTION_SLOT, ACTION_COMMIT, ACTION_STEP } do
-				ContextActionService:UnbindAction(name)
+			for _, binding in bindings do
+				ContextActionService:UnbindAction(binding.name)
 			end
 		end,
 	}
