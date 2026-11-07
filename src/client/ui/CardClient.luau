@@ -33,37 +33,46 @@
 --     is worse than one visible error.
 -- 10. THE JOKER EXPLAINER is a lookup keyed by the mode from RoundStart, with no branch on its value, so the
 --     live JOKER_MODE flag is never made to lie to the player (D-23).
--- 11. KNOWN GAPS, recorded rather than papered over. (a) The Table payload carries no per-seat depth
---     snapshot, so the depth list handed to the reducer is whatever it already held (empty); plan 04-19's
---     stacks need a server-supplied depth field. (b) There is no round-end message among the five kinds, so
---     the overlay ends on the local seat's removal or the next RoundStart. (c) A keyboard or gamepad send
+-- 11. KNOWN GAPS, recorded rather than papered over. (a) CLOSED in 04-19: pile depths arrive as their own
+--     public `Depths` message (counts only, built by the server), so the stacks never depend on counting
+--     events client-side. (b) CLOSED in 04-19: a round that ends without removing the local seat now
+--     sends the public `RoundEnd`, which tears the overlay down and restores the controls (UX-02 /
+--     D-29); before it the controls stayed hidden until the next RoundStart. (c) A keyboard or gamepad send
 --     tells the hand through markSent, since it does not pass through a strip. (d) Nothing about feel,
 --     controls or audio on a device is proven here: M-11, M-12, M-13, M-16.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local SoundService = game:GetService("SoundService")
 local Workspace = game:GetService("Workspace")
 
 local Card = require(ReplicatedStorage.Shared.Config.Card)
 local Round = require(ReplicatedStorage.Shared.Config.Round)
 local Faces = require(ReplicatedStorage.Shared.Card.Faces)
+local Flourish = require(ReplicatedStorage.Shared.Card.Flourish)
 local Hints = require(ReplicatedStorage.Shared.Card.Hints)
 local Layout = require(ReplicatedStorage.Shared.Card.Layout)
 local Prediction = require(ReplicatedStorage.Shared.Card.Prediction)
 local ClientNet = require("../net/ClientNet")
+local CardAudio = require("./CardAudio")
+local CardCallout = require("./CardCallout")
 local CardControls = require("./CardControls")
+local CardFlourish = require("./CardFlourish")
 local CardHand = require("./CardHand")
 local CardHud = require("./CardHud")
 local CardInput = require("./CardInput")
 local CardPiles = require("./CardPiles")
+local CardSeatsView = require("./CardSeatsView")
 local CardStrip = require("./CardStrip")
 
 export type Hooks = {
 	-- Plan 04-19 parents into these. `payload` is the RoundStart table (seat poses and jokerMode).
 	onRoundStart: ((payload: any, localSeat: number) -> ())?,
 	onTable: ((events: { any }, depths: { number }, localSeat: number) -> ())?,
+	-- Server-supplied pile depths (CARD-13): one count per seat, seat order, counts only.
+	onDepths: ((depths: { number }, localSeat: number) -> ())?,
+	-- The server ended the round (UX-02 / D-29). Fired after the overlay is gone and the controls are back.
+	onRoundEnd: (() -> ())?,
 	-- Called by Controls.onLocalCompleted LAST, after the overlay is gone and the controls are back.
 	startFlourish: ((completed: any) -> ())?,
 }
@@ -86,34 +95,29 @@ type Ui = {
 	explaining: boolean,
 }
 
+-- The table as a place (plan 04-19). None of it is replicated or hidden data: every part is built here from
+-- public RoundStart and Table facts, and it outlives the hand (D-30 destroys the hand at completion).
+type Place = {
+	view: CardSeatsView.TableView,
+	overlay: CardHud.Overlay,
+	callouts: CardCallout.Callout,
+	container: Folder,
+	driver: Flourish.Driver,
+	playerOfSeat: { [number]: number },
+}
+
 type RoundState = {
 	reducer: Prediction.Reducer,
 	localSeat: number,
 	ui: Ui?,
 	completed: any,
+	place: Place?,
 }
 
 local HAND_FULL = 5
 local SINK_STATE: Hints.State = "RightPileSink"
 local HAND_OWES_DRAW = HAND_FULL - 1
 local TWEEN = Card.TWEEN
-
-local soundOf: { [string]: string } = { Draw = Card.AUDIO.DRAW, Pass = Card.AUDIO.PASS }
-
--- D-33. An empty asset id is silent by contract, not an error (M-16 supplies the ids).
-local function playSound(assetId: string)
-	if assetId == "" then
-		return
-	end
-	local sound = Instance.new("Sound")
-	sound.SoundId = assetId
-	sound.Volume = Card.AUDIO.VOLUME
-	sound.Parent = SoundService
-	sound.Ended:Once(function()
-		sound:Destroy()
-	end)
-	sound:Play()
-end
 
 -- One entry per notice code; an unknown code shows nothing rather than an invented line (D-12).
 local noticeCopy: { [string]: (notice: any) -> string } = {
@@ -178,6 +182,8 @@ function CardClient.new(): CardClient
 	local jokerMode: string? = nil
 	local round: RoundState? = nil
 	local clockSeconds = 0
+	-- Plan 04-19. Created once, silent for every empty asset id (D-33, M-16).
+	local audio = CardAudio.new()
 
 	-- Header point 6.
 	local function nowDeci(): number
@@ -207,17 +213,124 @@ function CardClient.new(): CardClient
 		ui.strip:destroy()
 	end
 
+	-- The public ranks of a Completed event's four retired faces. Ranks only, never a card id or a copy.
+	local function ranksOf(event: any): { number }
+		local ranks: { number } = {}
+		if type(event) == "table" and type(event.faces) == "table" then
+			for _, face in event.faces do
+				if type(face) == "table" and type(face.rank) == "number" then
+					table.insert(ranks, face.rank)
+				end
+			end
+		end
+		return ranks
+	end
+
+	-- D-30: this runs LAST in Controls.onLocalCompleted, after the overlay is gone and the controls are
+	-- back, so the flourish can never delay either. The Deal kind is the other one the driver is given:
+	-- played at RoundStart for the LOCAL seat only.
 	startFlourish = function()
-		local fn = hooks.startFlourish
 		local r = round
-		if fn ~= nil and r ~= nil then
+		if r == nil then
+			return
+		end
+		local place = r.place
+		if place ~= nil and type(r.completed) == "table" then
+			place.driver:play("Completion", r.localSeat, true, ranksOf(r.completed))
+		end
+		local fn = hooks.startFlourish
+		if fn ~= nil then
 			fn(r.completed)
 		end
+	end
+
+	-- Everything 04-19 builds that is not the hand. Idempotent; called at round start, round end and destroy.
+	local function destroyPlace()
+		local r = round
+		if r == nil or r.place == nil then
+			return
+		end
+		local place = r.place :: Place
+		r.place = nil
+		-- cancelAll runs each flight's own teardown (scan, diff, destroyRoot) rather than orphaning it.
+		place.driver:cancelAll()
+		place.callouts:destroy()
+		place.overlay:destroy()
+		place.view:destroy()
+		place.container:Destroy()
+	end
+
+	local function buildDealGeometry(hud: CardHud.Hud): CardFlourish.DealGeometry?
+		local solution = hud:solution()
+		if solution == nil then
+			return nil
+		end
+		local safe = solution.safe
+		local function centreOf(rect: Layout.Rect): Vector2
+			return Vector2.new(rect.x + rect.w / 2 - safe.x, rect.y + rect.h / 2 - safe.y)
+		end
+		local targets: { Vector2 } = {}
+		for _, slot in solution.slots do
+			table.insert(targets, centreOf(slot.card))
+		end
+		local first = solution.slots[1].card
+		return { from = centreOf(solution.leftPile), to = targets, size = Vector2.new(first.w, first.h) }
+	end
+
+	local function buildPlace(r: RoundState, payload: any, hud: CardHud.Hud): Place
+		local view = CardSeatsView.new(Workspace)
+		local poses: { CardSeatsView.SeatPose } = {}
+		local playerOfSeat: { [number]: number } = {}
+		for _, entry in payload.seats do
+			playerOfSeat[entry.seat] = entry.playerId
+			table.insert(
+				poses,
+				{ seat = entry.seat, playerId = entry.playerId, position = entry.position, look = entry.look }
+			)
+		end
+		view:setSeats(poses)
+		-- The flourish's Workspace container is ours alone: destroyEscaped may delete anything new in it, so it
+		-- must never be Workspace itself (a respawning character would be deleted).
+		local container = Instance.new("Folder")
+		container.Name = "SpoonsFlourish"
+		container.Parent = Workspace
+		local overlay = CardHud.newOverlay("CardCallouts", Card.FLOURISH_DISPLAY_ORDER)
+		local callouts = CardCallout.new(overlay:region(), overlay:resolve(HAND_OWES_DRAW))
+		local stage: CardFlourish.Stage = {
+			seatPosition = function(seat: number): Vector3?
+				return view:seatPosition(seat)
+			end,
+			centre = function(): Vector3?
+				return view:centre()
+			end,
+			deal = function(): CardFlourish.DealGeometry?
+				return buildDealGeometry(hud)
+			end,
+		}
+		hud:onViewportChanged(function()
+			if r.place ~= nil then
+				callouts:relayout(overlay:resolve(HAND_OWES_DRAW))
+			end
+		end)
+		return {
+			view = view,
+			overlay = overlay,
+			callouts = callouts,
+			container = container,
+			driver = CardFlourish.makeDriver(hud, container, stage),
+			playerOfSeat = playerOfSeat,
+		}
 	end
 
 	local function teardown()
 		destroyUi()
 		controls:restore()
+	end
+
+	-- A round is over for this client: the hand, the controls and the place all go (UX-02 / D-29).
+	local function endRoundView()
+		teardown()
+		destroyPlace()
 	end
 
 	local function relayoutAll(ui: Ui, solution: Layout.Solution)
@@ -285,7 +398,12 @@ function CardClient.new(): CardClient
 
 	local function send(emit: Prediction.Emit)
 		ClientNet.send(emit.name, emit.payload)
-		playSound(soundOf[emit.name] or "")
+		-- D-33: own draw and own pass only, on the predicted local action. Nothing for another seat's pass.
+		if emit.name == "Draw" then
+			audio:ownDraw()
+		else
+			audio:ownPass()
+		end
 	end
 
 	local function onTapSlot(cardId: number?)
@@ -440,7 +558,7 @@ function CardClient.new(): CardClient
 	end
 
 	local function onRoundStart(payload: any)
-		teardown()
+		endRoundView()
 		round = nil
 		local localPlayer = Players.LocalPlayer
 		if type(payload) ~= "table" or type(payload.seats) ~= "table" or localPlayer == nil then
@@ -463,11 +581,22 @@ function CardClient.new(): CardClient
 			localSeat = seat :: number,
 			ui = nil,
 			completed = nil,
+			place = nil,
 		}
 		round = r
 		r.ui = buildUi(r)
 		controls:hide()
 		refresh({})
+		local ui = r.ui :: Ui
+		-- Contained: a failure in the table cosmetics must not take the hand with it.
+		local placeOk, placeErr = pcall(function()
+			local place = buildPlace(r, payload, ui.hud)
+			r.place = place
+			place.driver:play("Deal", r.localSeat, true, {})
+		end)
+		if not placeOk then
+			warn("CardClient", tostring(placeErr))
+		end
 		local fn = hooks.onRoundStart
 		if fn ~= nil then
 			fn(payload, r.localSeat)
@@ -490,12 +619,36 @@ function CardClient.new(): CardClient
 		local depths = r.reducer:depths()
 		r.reducer:onTable(events, depths)
 		for _, event in events do
-			if type(event) == "table" and event.seat == r.localSeat then
+			if type(event) == "table" then
+				local place = r.place
+				if event.kind == "Passed" and place ~= nil then
+					-- A public Passed: the card is face-down, there is no rank to show and none is inferred.
+					place.view:hop(event.seat, event.to)
+				end
+				local isLocal = event.seat == r.localSeat
 				if event.kind == "Completed" then
-					r.completed = event
-					controls:onLocalCompleted()
-					playSound(Card.AUDIO.STING)
-				elseif event.kind == "SeatRemoved" then
+					if isLocal then
+						r.completed = event
+						controls:onLocalCompleted()
+					elseif place ~= nil then
+						place.driver:play("Completion", event.seat, false, ranksOf(event))
+					end
+					-- D-33: the starting gun, the same for everyone, once, after the finisher has control.
+					audio:sting()
+					-- D-31: the table is told who went. The self callout survives the hand's destruction
+					-- because it lives on its own overlay.
+					if place ~= nil then
+						if isLocal then
+							place.callouts:show(nil, true)
+						else
+							local userId = place.playerOfSeat[event.seat]
+							local player = if userId ~= nil then Players:GetPlayerByUserId(userId) else nil
+							if player ~= nil then
+								place.callouts:show(player.DisplayName, false)
+							end
+						end
+					end
+				elseif event.kind == "SeatRemoved" and isLocal then
 					teardown()
 				end
 			end
@@ -503,6 +656,44 @@ function CardClient.new(): CardClient
 		local fn = hooks.onTable
 		if fn ~= nil then
 			fn(events, depths, r.localSeat)
+		end
+	end
+
+	-- CARD-13: the server's pile depths. Validated as plain finite non-negative counts; anything else is
+	-- ignored (D-12), never repaired, so a malformed message cannot put an invented number on a stack.
+	local function onDepths(payload: any)
+		local r = round
+		if r == nil or type(payload) ~= "table" or type(payload.depths) ~= "table" then
+			return
+		end
+		local list: { number } = {}
+		for i = 1, #payload.depths do
+			local v = payload.depths[i]
+			if type(v) ~= "number" or v ~= v or v < 0 or v == math.huge then
+				return
+			end
+			list[i] = v
+		end
+		r.reducer:onTable({}, list)
+		if r.place ~= nil then
+			(r.place :: Place).view:setDepths(list)
+		end
+		local fn = hooks.onDepths
+		if fn ~= nil then
+			fn(list, r.localSeat)
+		end
+	end
+
+	-- UX-02 / D-29: the round ended without removing this seat (CardService.endRound removes none), so
+	-- neither Completed nor SeatRemoved will ever come. Without this the server has released the avatar
+	-- while the touch controls stay hidden and the key sink stays bound. teardown is idempotent, so a
+	-- RoundEnd that follows this seat's own Completed does nothing twice.
+	local function onRoundEnd(_payload: any)
+		endRoundView()
+		round = nil
+		local fn = hooks.onRoundEnd
+		if fn ~= nil then
+			fn()
 		end
 	end
 
@@ -538,6 +729,8 @@ function CardClient.new(): CardClient
 		Table = onTable,
 		Notice = onNotice,
 		Stall = onStall,
+		Depths = onDepths,
+		RoundEnd = onRoundEnd,
 	}
 
 	local function contained(fn: () -> ())
@@ -598,8 +791,9 @@ function CardClient.new(): CardClient
 				c:Disconnect()
 			end
 			table.clear(conns)
-			teardown()
+			endRoundView()
 			round = nil
+			audio:destroy()
 			if rotate ~= nil then
 				rotate:destroy()
 				rotate = nil

@@ -59,6 +59,16 @@ export type Hud = {
 
 export type RotatePrompt = { destroy: (self: RotatePrompt) -> () }
 
+-- A second, NON-interactive layer that is not the hand: it outlives the hand's destruction at the local
+-- completion (D-30), which is what lets a who-went callout still show to the player who just went. Its
+-- `region` is placed exactly where the hand's TableRegion is, so Layout's callout rects apply unchanged.
+export type Overlay = {
+	region: (self: Overlay) -> Frame,
+	-- Re-solves from the live camera and positions the region; returns the solution for the callout rects.
+	resolve: (self: Overlay, handSize: number) -> Layout.Solution,
+	destroy: (self: Overlay) -> (),
+}
+
 -- The one mapping from the pure string to the engine enum (header point 1).
 local INSETS_BY_NAME: { [string]: Enum.ScreenInsets } = {
 	CoreUISafeInsets = Enum.ScreenInsets.CoreUISafeInsets,
@@ -107,6 +117,60 @@ local function container(name: string, parent: Instance): Frame
 	frame.Active = false
 	frame.Parent = parent
 	return frame
+end
+
+-- An unparented ScreenGui with the explicit insets and no reset on spawn. Every ScreenGui this client
+-- creates comes from here, so the insets are assigned in one place (UX-03).
+function CardHud.newGui(name: string, displayOrder: number): ScreenGui
+	local gui = Instance.new("ScreenGui")
+	gui.Name = name
+	applyInsets(gui)
+	gui.DisplayOrder = displayOrder
+	gui.ResetOnSpawn = false
+	return gui
+end
+
+-- Parents a fully built gui to the local PlayerGui, last (header point 6).
+function CardHud.mount(gui: ScreenGui)
+	gui.Parent = playerGui()
+end
+
+function CardHud.newOverlay(name: string, displayOrder: number): Overlay
+	local cam = camera()
+	local gui = CardHud.newGui(name, displayOrder)
+	local root = container("Root", gui)
+	local uiScale = Instance.new("UIScale")
+	uiScale.Parent = root
+	local region = container("TableRegion", root)
+	local destroyed = false
+	local overlay: Overlay
+	overlay = {
+		region = function(_self: Overlay): Frame
+			return region
+		end,
+		resolve = function(_self: Overlay, handSize: number): Layout.Solution
+			local s = Layout.solve(readViewport(cam), handSize)
+			uiScale.Scale = s.scale
+			root.Position = UDim2.fromOffset(0, 0)
+			root.Size = UDim2.fromOffset(math.round(s.designW), math.round(s.designH))
+			region.Position = UDim2.fromOffset(
+				math.round((s.tableRegion.x - s.safe.x) / s.scale),
+				math.round((s.tableRegion.y - s.safe.y) / s.scale)
+			)
+			region.Size = UDim2.fromOffset(math.round(s.tableRegion.w / s.scale), math.round(s.tableRegion.h / s.scale))
+			return s
+		end,
+		destroy = function(_self: Overlay)
+			if destroyed then
+				return
+			end
+			destroyed = true
+			gui:Destroy()
+		end,
+	}
+	-- Last, per header point 6.
+	CardHud.mount(gui)
+	return overlay
 end
 
 function CardHud.new(handSize: number): Hud

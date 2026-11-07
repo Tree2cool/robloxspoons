@@ -186,6 +186,17 @@ local function new(deps: Deps): CardTable
 		return if nextSeat ~= nil then #nextSeat.inbox else 0
 	end
 
+	-- CARD-13: the pile depth of every seat, as COUNTS ONLY (never a card id or a rank). Built at apply
+	-- time, from the live state, so a later command in the same sweep cannot change what this batch says.
+	local function depthsPayload(st: Types.State): CardRouting.DepthsPayload
+		local depths: { number } = {}
+		for id = 1, st.seatCount do
+			local seat = st.seats[id]
+			depths[id] = if seat ~= nil and seat.live then #seat.inbox else 0
+		end
+		return { depths = depths }
+	end
+
 	-- What the seat's owner was last shown. Hand ORDER is part of it (arrival order is displayed).
 	local function signatureOf(st: Types.State, seatId: Types.SeatId): string
 		local seat = st.seats[seatId]
@@ -290,6 +301,10 @@ local function new(deps: Deps): CardTable
 		if #events > 0 then
 			table.insert(ctx.pending, function()
 				CardRouting.publish(deps.publisher, events, copyOf, userIdOfSeat)
+			end)
+			local depths = depthsPayload(st)
+			table.insert(ctx.pending, function()
+				deps.publisher.toSeated("Depths", depths)
 			end)
 		end
 		for id, seat in st.seats do
@@ -400,6 +415,10 @@ local function new(deps: Deps): CardTable
 			deps.idle:sync(viewOf(st), ctx.now, nil)
 			table.insert(ctx.pending, function()
 				deps.publisher.toSeated("RoundStart", payload)
+			end)
+			local depths = depthsPayload(st)
+			table.insert(ctx.pending, function()
+				deps.publisher.toSeated("Depths", depths)
 			end)
 			for i = 1, #seats do
 				queueSync(ctx, seats[i].playerId, syncFor(i, 0, ctx.now))
