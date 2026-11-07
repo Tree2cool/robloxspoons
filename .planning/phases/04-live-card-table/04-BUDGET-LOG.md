@@ -48,6 +48,22 @@ worktree at the earlier commit makes this exact.
 
 **+1.24 s against the +3.0 s allowance. The budget holds with 1.76 s of headroom.**
 
+### Re-measured after the code-review fixes, on a quieter machine
+
+| | Commit | Cases | Min of 2 |
+|---|--------|-------|----------|
+| Pre-phase | `ae376d6` | 657 | **20.91 s** |
+| Post-fixes | HEAD | 871 | **21.90 s** |
+| **FINAL PHASE COST** | | **+214 cases** | **+0.99 s** |
+
+**+0.99 s against the +3.0 s allowance — 2.01 s of headroom**, including the 13 cases the
+code-review fixes added (5 Warning gates plus 5 Info gates and a new `service_wiring.spec`).
+
+Both readings used the same method, and they agree to within 0.25 s on the *cost* (+1.24 s vs
++0.99 s) while the absolute wall clock moved by ~3 s between them (23.65 s vs 20.91 s for the
+identical 657-case commit). **That is the case for the pre/post method in one line: the absolute
+numbers drift with the container, the delta does not.**
+
 ### Why this differs from the sum of the per-wave deltas (~2.20 s)
 
 **Summing per-wave deltas accumulates measurement noise; a single phase-wide pre/post does not.**
