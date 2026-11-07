@@ -255,7 +255,8 @@ function CardService.new(deps: Deps): CardService
 	)
 	local cardTable: CardTable.CardTable? = nil
 	local sweepConnection: RBXScriptConnection? = nil
-	-- Player ids currently seated, in seat order. NetServer.toSeated reads this as its audience.
+	-- Player ids dealt into this round, in seat order. NetServer.toSeated reads this as its audience. A seat
+	-- that finishes or is benched stays here until the round ends (WR-05); only a leaver is removed.
 	local seated: { number } = {}
 
 	local function unseat(playerId: number)
@@ -330,8 +331,12 @@ function CardService.new(deps: Deps): CardService
 					releaseAvatar(playerId)
 					deps.onCompleted(seat, playerId, rank)
 				end,
+				-- WR-05: a removed seat STAYS in `seated` until the round ends. `seated` is the audience for
+				-- the public kinds, and the client keeps its place (seat stacks, flourish container, callout
+				-- overlay) after its own hand is gone, so it must still receive Table, Depths and RoundEnd or
+				-- that place leaks and the later "X is out" callouts never reach it. Only the avatar goes.
+				-- A player who actually LEAVES is dropped by removePlayer.
 				onSeatRemoved = function(_seat, playerId, _cause)
-					unseat(playerId)
 					releaseAvatar(playerId)
 				end,
 				onTelemetry = deps.onTelemetry,

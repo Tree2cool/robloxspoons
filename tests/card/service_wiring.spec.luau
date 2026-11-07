@@ -99,6 +99,31 @@ local function atomicProblems(raw: string): ({ string }, number, number)
 	return problems, #start, #abort
 end
 
+-- WR-05. The audience list must outlive a seat's removal: only removePlayer (a real leaver) may unseat.
+local function audienceProblems(raw: string): ({ string }, number, number)
+	local text = lex.stripComments(raw)
+	local problems: { string } = {}
+	local removed = slice(text, "onSeatRemoved = function", "onTelemetry = deps.onTelemetry")
+	local completed = slice(text, "onCompleted = function", "onSeatRemoved = function")
+	local leaver = slice(text, "local function removePlayer", "local function seatedUserIds")
+	if removed == "" or completed == "" or leaver == "" then
+		return { "onSeatRemoved, onCompleted or removePlayer body not found" }, #removed, #leaver
+	end
+	if at(removed, "unseat(") ~= nil then
+		table.insert(problems, "onSeatRemoved unseats: a removed seat would miss RoundEnd, Depths and later Table")
+	end
+	if at(completed, "unseat(") ~= nil then
+		table.insert(problems, "onCompleted unseats: a finisher would miss RoundEnd, Depths and later Table")
+	end
+	if at(removed, "releaseAvatar(playerId)") == nil then
+		table.insert(problems, "onSeatRemoved no longer releases the avatar")
+	end
+	if at(leaver, "unseat(userId)") == nil then
+		table.insert(problems, "removePlayer no longer drops a real leaver from the audience")
+	end
+	return problems, #removed, #leaver
+end
+
 return function(t: Test.Runner)
 	local raw = fs.readFile(SERVICE_PATH)
 
@@ -166,5 +191,48 @@ return function(t: Test.Runner)
 		end
 		t.equal(seen, #mutants, "every mutant seen")
 		print(`service_wiring WR-03: {seen}/{#mutants} mutants seen, twin green`)
+	end)
+
+	t.test("WR-05: a removed seat stays in the audience, a leaver does not", function()
+		local problems, removedSize, leaverSize = audienceProblems(raw)
+		t.deepEqual(problems, {}, "clean path")
+		t.truthy(removedSize > 60 and leaverSize > 100, `non-vacuity: bodies {removedSize}/{leaverSize} chars`)
+		print(`service_wiring WR-05: onSeatRemoved {removedSize} chars, removePlayer {leaverSize} chars, 0 problems`)
+	end)
+
+	t.test("WR-05 MUTATION: each way of unseating a finisher turns the gate red", function()
+		local removedTail = "releaseAvatar(playerId)\n\t\t\t\tend,\n\t\t\t\tonTelemetry"
+		local twin = replaceOnce(raw, removedTail, removedTail)
+		t.deepEqual((audienceProblems(twin)), {}, "the no-defect twin must be green")
+		local removedHead = "onSeatRemoved = function(_seat, playerId, _cause)\n"
+		local completedHead = "onCompleted = function(seat, playerId, rank)\n"
+		local mutants: { { name: string, edited: string } } = {
+			{
+				name = "onSeatRemoved unseats (the reviewed defect)",
+				edited = replaceOnce(raw, removedHead, removedHead .. "\t\t\t\t\tunseat(playerId)\n"),
+			},
+			{
+				name = "onCompleted unseats",
+				edited = replaceOnce(raw, completedHead, completedHead .. "\t\t\t\t\tunseat(playerId)\n"),
+			},
+			{
+				name = "onSeatRemoved stops releasing the avatar",
+				edited = replaceOnce(raw, removedTail, "end,\n\t\t\t\tonTelemetry"),
+			},
+			{
+				name = "a real leaver is never dropped",
+				edited = replaceOnce(raw, "\t\tunseat(userId)\n", "\t\tlocal _ = userId\n"),
+			},
+		}
+		local seen = 0
+		for _, mutant in mutants do
+			local problems = audienceProblems(mutant.edited)
+			t.truthy(#problems >= 1, `mutant "{mutant.name}" was not seen`)
+			if #problems >= 1 then
+				seen += 1
+			end
+		end
+		t.equal(seen, #mutants, "every mutant seen")
+		print(`service_wiring WR-05: {seen}/{#mutants} mutants seen, twin green`)
 	end)
 end
