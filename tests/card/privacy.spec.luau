@@ -41,7 +41,7 @@ local POSE: CardTable.Vec3 = { x = 0, y = 0, z = 0 }
 -- Three seated seekers: Pool.poolConfig(4, 3, 1, "Wild").
 local function newFixture(opts: Options?): Fixture
 	local o: Options = opts or {}
-	local users = o.userIds or { 101, 102, 103 }
+	local users: { number } = o.userIds or { 101, 102, 103 }
 	local rec = RecordingPublisher.new({ leak = o.leak })
 	local ct: CardTable.CardTable
 	local publisher: CardRouting.Publisher = rec
@@ -356,7 +356,7 @@ local function wrapRankOnTable(base: Rec): CardRouting.Publisher
 		toPlayer = base.toPlayer,
 		toSeated = function(kind: string, payload: unknown)
 			if kind == "Table" then
-				local events = table.clone(payload :: any)
+				local events: { any } = table.clone(payload :: any)
 				for i, event in events do
 					if event.kind == "Drew" then
 						local leaked = table.clone(event)
