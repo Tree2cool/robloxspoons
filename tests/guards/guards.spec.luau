@@ -230,7 +230,7 @@ return function(t: Test.Runner)
 	t.test("--print-zones prints the pure zones space-separated and exits 0", function()
 		local r = guard({ "--print-zones" })
 		t.equal(r.code, 0, r.stdout .. r.stderr)
-		t.equal(r.stdout, "src/server/engine src/server/core src/shared/Net\n")
+		t.equal(r.stdout, "src/server/engine src/server/core src/shared/Net src/shared/Card\n")
 	end)
 
 	t.test("an unknown argument is rejected, not ignored", function()
