@@ -9,7 +9,7 @@ Format follows Phase 2's `deferred-items.md`. Ids are `D-04-NN`. Each entry has 
 
 - **A. Decided deferrals** from `04-CONTEXT.md` § Deferred Ideas (D-04-01 .. D-04-08).
 - **B. Recorded fallbacks, deliberately not implemented** (D-04-09 .. D-04-12).
-- **C. The AFK window — an open owner decision** (D-04-13).
+- **C. The AFK window — RESOLVED by owner decision D-39, 2026-11-07** (was D-04-13).
 - **D. Accepted residuals and recorded gate weaknesses** (D-04-14 .. D-04-30), gathered from the
   plan 01-19 summaries and `04-EXEC-NOTES.md`.
 
@@ -93,7 +93,18 @@ specific M-row failure and **must not be built speculatively**.
 
 ## C. The AFK window — an open owner decision
 
-### D-04-13 — The realised AFK window is (7.9, 8.1] s against CARD-16's "must not exceed 8.0 s"
+### D-04-13 — RESOLVED 2026-11-07 by owner decision D-39
+
+**The owner kept 80 deci and restated CARD-16's bound as applying to the CONFIGURED value.** No code,
+test or config change. `AUTO_PASS_DECI` remains 80, which *is* exactly 8.0 s as configured and is the
+value every Gate G1 cell ran at. `REQUIREMENTS.md`'s CARD-16 entry carries the new wording. See
+`04-CONTEXT.md` D-39 for the full reasoning and the measured window.
+
+**What remains carried into Phase 8:** `79` deci is still the one-line fix if a real playtest ever
+shows the realised `(7.9, 8.1]` s window matters, and it travels with **V-35 / M-07** — whether the
+bot reaction-time model resembles humans — which is the open half of why 8.0 s was chosen at all.
+
+*Original text, kept for the record:* The realised AFK window is (7.9, 8.1] s against CARD-16's "must not exceed 8.0 s"
 - **Status: OPEN — awaiting the owner's choice** (keep-80 / set-79 / widen-the-requirement). The
   choice and its reason are to be recorded here when made. Nothing has been changed.
 - **The arithmetic, derived rather than estimated.** `nowDeci = floor(10 * clock)`. An arming at real

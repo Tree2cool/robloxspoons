@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 4 implementation COMPLETE (20/20 plans, 858 tests); NOT closed - M-11..M-17 unsigned, 2 owner decisions open
+stopped_at: Phase 4 reviewed + verified (20/20 plans, 871 tests, status human_needed); NOT closed - M-11..M-17 unsigned; AFK settled by D-39; WR-05/D-31 callout scope open
 last_updated: "2026-11-07T00:00:00.000Z"
 last_activity: 2026-11-07
 progress:

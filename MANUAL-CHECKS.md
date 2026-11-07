@@ -23,7 +23,7 @@ would mean for the requirement it carries:
 
 | Row | Blocking | Carries | A failure means |
 |-----|----------|---------|-----------------|
-| M-11 | yes (highest risk) | UX-02, D-29, D-30 | controls do not hide, or do not come back, or the avatar hold holds nothing: a finisher is held still and loses find-order score, or a seated player can walk away. Fallbacks D-04-10, D-04-11, D-04-12 only |
+| M-11 | yes (highest risk) | UX-02, **UX-04**, D-29, D-30 | controls do not hide, or do not come back, or the avatar hold holds nothing: a finisher is held still and loses find-order score, or a seated player can walk away. Fallbacks D-04-10, D-04-11, D-04-12 only |
 | M-12 | yes | UX-01, UX-03, D-36, CARD-13 | targets are not 48 px on glass, are unreachable by a thumb, sit under the notch or top bar, the strip wraps at Largest text, or a second client can see a hand that is not its own |
 | M-13 | yes | CARD-14, CARD-02, CARD-15 | the card is not visibly gone within a frame at 150-300 ms, a return reads as a teleport, or a rejection is distinguishable from a correction |
 | M-14 | yes | CARD-19, D-24 | spade and club (or any pair) are not reliably distinguishable in greyscale: the colour-blind half of CARD-19 is unmet. Enlarge the pip or thicken the silhouette, never lean on colour |
@@ -595,6 +595,31 @@ acceptable.
 6. Record which mechanism passed, so the rejected list in `CardService.luau`'s header can be narrowed.
 
 Observed:
+
+### M-11 step 7 — UX-04: hints follow the LAST INPUT ACTUALLY USED (added 2026-11-07)
+
+**Why this step exists:** the Phase 4 verifier found UX-04 had **no human path at all**.
+`04-VALIDATION.md` assigned its human half to "the M-11 gamepad column, V-27", but M-11's procedure
+only ever covered control hiding and the avatar hold — **nothing here tested hints**. `hints.spec`
+proves the copy table and the input map are complete; it cannot prove the strip follows
+`UserInputService.LastInputTypeChanged` on a real device. **The owner cannot sign a check that was
+never written**, so this is it.
+
+On **one** device that has more than one input available (a touchscreen laptop, or a phone with a
+paired mouse or controller), while seated at the card table:
+
+1. Use **touch**, then confirm the strip's hint wording is the touch form ("Tap...").
+2. Use a **mouse**, then confirm it switches to the mouse form ("Click...") **without a reload**.
+3. Use the **keyboard**, then confirm it switches to the keyboard form.
+4. Use a **gamepad**, then confirm either the gamepad form appears **or** it degrades to the Mouse
+   hint set — **D-04-11 records that degradation as an accepted fallback** if V-27 cannot be
+   confirmed. Record which happened.
+5. Confirm the switch is driven by **the last input actually used**, not by device type at join
+   (D-09): a phone with a paired mouse must show mouse wording once the mouse is used.
+
+**Fail means:** UX-04 is unmet — a player sees instructions for an input they are not using.
+
+- [ ] M-11 step 7 (UX-04 hint switching) observed: <name> <date>
 
 - [ ] M-11 signed off: <name> <date>
 
