@@ -412,6 +412,35 @@ I added after pattern mapping were wrong. I verified its findings myself before 
   alongside **V-35** (whether the bot reaction-time model represents humans), which is the open half
   of why 8.0 s was chosen at all.
 
+### Owner decision 2026-11-07 (second)
+
+- **D-40: a seat that has left the card phase STILL receives the public round traffic, so a finisher
+  keeps seeing later "X is out" callouts.** Confirms the shipped behaviour; **no revert.**
+
+  **What this settles.** The WR-05 code-review fix made `onSeatRemoved` stop calling `unseat`, so
+  `seated` now means "dealt into this round" rather than "still holding cards". A seat removed for
+  **any** cause — `Completed`, `Benched` or `Disconnected` — stays in the audience until `endRound`
+  and therefore continues to receive `RoundEnd`, `Depths` and later `Table` batches. **D-31 is read
+  as covering every seat dealt into the round**, not only seats still at the table.
+
+  **Why it is the right reading.** A finisher is out in the map hunting while the table plays on, and
+  "someone else just left the table" is live competitive information to them — there are two fewer
+  spoons than players, so every departure shortens their odds. D-31's callout exists to carry exactly
+  that pressure. It also matches the client, which is **built to keep its place after its hand is
+  gone** (D-30): the server unseating a finisher contradicted the client's own design and leaked their
+  `place` (Workspace stacks, flourish container, callout GUI) until a `RoundStart` they might never
+  receive.
+
+  **Privacy is unaffected.** `Table`, `Depths` and `Stall` are **public** kinds — depths are counts,
+  never identities (CARD-13). A removed seat gains no private data by staying in the audience; the
+  per-player `Sync` and `Notice` remain owner-only.
+
+  **Consequence to watch at M-17:** a finisher's HUD now receives traffic after their hand is gone,
+  so the callout overlay must outlive the hand's destruction — which is why `CardHud` grew
+  `newOverlay` (04-17). **IN-04 is the known rough edge there:** the overlay loses its relayout once
+  the HUD is destroyed at completion. Still deferred, and now the clearest candidate to fix, because
+  D-40 makes that path ordinary rather than rare.
+
 ### Claude's Discretion
 
 - The exact `Draw` / `Pass` intent payload shapes and their `Validate` schemas (within rule 7:

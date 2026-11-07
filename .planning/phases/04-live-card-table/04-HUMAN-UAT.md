@@ -90,13 +90,19 @@ why 8.0 s was chosen, and it travels with owner decision **D-39** (80 deci kept;
 one-line fix if the realised `(7.9, 8.1]` s window turns out to matter). Phase 6/8.
 result: [pending]
 
-## Open owner question — not a test
+## Owner questions — all settled
 
-**WR-05 / D-31 callout scope.** The code-review fix keeps removed seats in the audience until
-`endRound`, so a finisher still receives `RoundEnd`, `Depths` and later `Table` batches — and
-therefore still sees later "X is out" callouts. The fixer read D-31 as covering **every seat dealt
-into the round**. If you meant callouts only for seats still **in the card phase**, it is a one-line
-revert. Nothing private is exposed either way: `Table`, `Depths` and `Stall` are all public kinds.
+**WR-05 / D-31 callout scope: SETTLED 2026-11-07 as D-40 — confirmed as shipped, no revert.** A seat
+that has left the card phase still receives the public round traffic, so a finisher keeps seeing
+later "X is out" callouts. The reasoning: a finisher is out hunting while the table plays on, and
+every further departure shortens their odds, which is exactly the pressure D-31's callout exists to
+carry. Privacy is unaffected — `Table`, `Depths` and `Stall` are public kinds and depths are counts,
+never identities.
+
+**Watch at item 7 (M-17):** a finisher's HUD now receives traffic after their hand is gone, so the
+callout overlay must outlive the hand's destruction. **IN-04 is the known rough edge** — the overlay
+loses its relayout once the HUD is destroyed at completion. D-40 makes that path ordinary rather than
+rare, so if it looks wrong on device, that deferred item is the cause.
 
 **Also still deferred:** IN-02 (a capped `task.delay` can cut a later sound short) and IN-04 (the
 callout overlay loses its relayout once the HUD is destroyed at completion). Both need a behaviour
