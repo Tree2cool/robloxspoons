@@ -346,6 +346,38 @@ no executed test**. Plus M-12 (`NetServer` mapping `toPlayer` to `FireClient(pla
 observation that parenting remotes after connecting avoids a dropped-message window, and M-17 (a live
 three-player deal/pass/strike/bench). **The avatar hold is a no-op until plan 04-15.**
 
+## A technique worth copying in 04-17/18/19: assert a no-defect TWIN of the mutant harness
+
+04-15 added a control nobody asked for and it is the right idea. Its four named mutants are
+**alternate implementations driven through the same injected effects**, not patches of the real file
+— and it additionally asserts that a **no-defect twin** of that mutant harness runs **green**. That
+rules out the failure mode where mutants go red because the harness itself is broken, which would
+make every "mutation caught" claim worthless while looking perfect.
+
+It then separately ran a **real-source mutation** (swapping the two release lines in
+`CardSeatHold.luau`) to confirm the real module is what gets judged: `FAIL release restores
+capability before control (D-30)` plus `FAIL MUTATION`, 152 passed / 2 failed, back to 154 on
+restore. **Alternate-implementation mutants prove the scenario discriminates; a real-source mutation
+proves the shipped code is under test. Do both.**
+
+Its non-vacuity assertion also caught the executor's **own** miscount: the first draft asserted "at
+least 6 checks", failed, and the real number was 5. That is the fourth distinct thing the
+non-vacuity requirement has caught in this phase that nothing else would have.
+
+## Gap recorded by 04-15 for the code review (it declined to fix it on budget grounds)
+
+**No spec asserts the `CardService` wiring beyond the pure core.** `CardService` cannot load in Lune,
+so it is covered only by the roblox-platform typecheck and by review. 04-15 judged a source-scan gate
+for the call sites a reasonable follow-up and skipped it to protect the runtime budget — a defensible
+trade, but it means the **release-before-flourish ordering is proven in the pure core and only
+reviewed in the service**. Same shape as 04-14's recorded gap for Main's wiring, the Heartbeat
+accumulator and the reject sink. **Candidate for the code-review step: one source-scan gate covering
+all of those call sites at once.**
+
+Confirmed working in 04-15: release is first in `onCompleted`, **before** `deps.onCompleted` and
+therefore before the flourish (D-30), and is also called from `onSeatRemoved`, `removePlayer` and
+`endRound` via `releaseAll`. Restore targets are captured from `StarterPlayer` once at boot.
+
 ## Bookkeeping the orchestrator owns
 
 **Do not run `requirements.mark-complete` from an executor.** Plans 04-01 and 04-02 each ran it
