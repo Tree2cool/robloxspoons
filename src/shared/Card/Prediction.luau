@@ -23,9 +23,11 @@
 --    slots under a thumb. An optional sort is a Phase 8 candidate.
 -- 9. OPEN QUESTION 5, DECIDED: `tickWatchdog` rolls back LOCALLY and there is no `Resync` intent.
 --    A gateway-level rejection (RateLimited, WrongPhase, a validation failure) never reaches the card
---    core, so its seq is never acked individually. The PRIMARY fix is a server push: the existing
---    `onReject` sink also sends that player a `Sync` carrying the current `ackSeq`, which resolves the
---    pending entry cumulatively. This watchdog is the BACKSTOP for a message genuinely lost. When a
+--    core, so its seq is never acked by the engine path. The PRIMARY fix is a server push: the
+--    `onReject` sink acks the rejected seq (read from the raw payload, validated by the card core) and
+--    sends that player a `Sync` at that ack, which resolves the pending entry cumulatively (WR-04: an
+--    earlier version pushed at the OLD ack, which resolved nothing). The push is throttled per user, so
+--    a throttled rejection and a lost message fall to this watchdog, the BACKSTOP. When a
 --    pending entry is older than the timeout the reducer drops it and re-folds, emitting `Returned`
 --    for a Pass and a `Removed` (with no id) for the placeholder of a Draw. The rejected alternatives
 --    were a `Resync{seq}` intent (a new manifest row, a new bucket and a new client-driven path a

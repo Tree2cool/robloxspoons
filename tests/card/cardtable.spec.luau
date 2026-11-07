@@ -18,6 +18,7 @@ local Engine = require("../../src/server/engine/Engine")
 local IdleClock = require("../../src/server/core/IdleClock")
 local Invariants = require("../../src/server/engine/Invariants")
 local Pool = require("../../src/server/engine/Pool")
+local Prediction = require("../../src/shared/Card/Prediction")
 local RecordingPublisher = require("../harness/RecordingPublisher")
 local Rng = require("../../src/server/engine/Rng")
 local Round = require("../../src/shared/Config/Round")
@@ -1061,6 +1062,68 @@ return function(t: Test.Runner)
 			t.equal(st.config.ranks, (n - 1) + CardPool.EXTRA_RANKS, `N={n} ranks`)
 			t.equal(st.seatCount, n - 1, `N={n} seatCount`)
 		end
+	end)
+
+	t.test("WR-04: a gateway-reject Sync reconciles the display, and is throttled by the caller", function()
+		local function lastSyncTo(rec: Rec, userId: number): any
+			local found: any = nil
+			for _, call in rec.callsOfKind("Sync") do
+				if call.userId == userId then
+					found = call.payload
+				end
+			end
+			return found
+		end
+		-- Drives the REAL shell and the REAL client reducer: the dealer taps its left pile (a predicted
+		-- Draw, display hand 5), the gateway rejects that Draw before the card core sees it, and the
+		-- reject path runs. `dropPayload` is the MUTATION (a broken dependency): the call the shell used
+		-- to receive, with no payload, so nothing can be acked.
+		local function reject(dropPayload: boolean): (number, number, number)
+			local fx = newFixture({ seekers = 3 })
+			local user = fx.users[1]
+			local reducer = Prediction.new(10)
+			reducer:onSync(lastSyncTo(fx.rec, user))
+			local emit = reducer:tapLeftPile(0)
+			t.truthy(emit ~= nil and emit.payload.seq == 1, "non-vacuity: the predicted Draw left with seq 1")
+			local before = #reducer:display().hand
+			fx.rec.reset()
+			fx.ct:onGatewayReject(user, "Draw", "RateLimited", if dropPayload then nil else { seq = 1 }, true)
+			local sync = lastSyncTo(fx.rec, user)
+			t.truthy(sync ~= nil, "the push produced a Sync")
+			reducer:onSync(sync)
+			return before, #reducer:display().hand, reducer:pendingCount()
+		end
+		local before, after, pending = reject(false)
+		t.equal(before, 5, "non-vacuity: the display showed the predicted card")
+		t.equal(after, 4, "the rejected Draw's placeholder was not removed by the push")
+		t.equal(pending, 0, "the rejected entry is still pending after the push")
+		local mBefore, mAfter, mPending = reject(true)
+		print(
+			`cardtable WR-04: real hand {before}->{after} pending {pending}; payload-dropping mutant {mBefore}->{mAfter} pending {mPending}`
+		)
+		t.equal(mAfter, 5, "the payload-dropping mutant must leave the placeholder, or this gate cannot fail")
+		t.equal(mPending, 1, "the mutant must leave the entry pending")
+
+		-- The ack is raise-only, validated, and recorded even when the push is throttled off.
+		local fx = newFixture({ seekers = 3 })
+		local user = fx.users[1]
+		local bad: { unknown } = { 0 / 0, -1, 1.5, 2 ^ 31 + 2, "7", {}, math.huge }
+		for _, junk in bad do
+			fx.rec.reset()
+			fx.ct:onGatewayReject(user, "Draw", "Malformed", { seq = junk }, true)
+			t.equal(lastSyncTo(fx.rec, user).ackSeq, 0, "an invalid seq hint moved the ack")
+		end
+		fx.rec.reset()
+		fx.ct:onGatewayReject(user, "Draw", "RateLimited", { seq = 7 }, false)
+		t.equal(#fx.rec.calls(), 0, "a throttled-off reject still sent something")
+		fx.ct:onGatewayReject(user, "Draw", "RateLimited", { seq = 3 }, false)
+		fx.now.value = 80
+		fx.ct:tick() -- the WR-01 strike Sync carries lastAck
+		t.equal(lastSyncTo(fx.rec, user).ackSeq, 7, "the throttled ack was lost, or a lower hint lowered it")
+		fx.rec.reset()
+		fx.ct:onGatewayReject(999, "Draw", "WrongPhase", { seq = 5 }, true)
+		t.equal(lastSyncTo(fx.rec, 999).seat, 0, "a seatless user gets the seat-0 shape")
+		print(`cardtable WR-04: {#bad} invalid hints rejected, throttled-off push sent 0 calls, ack kept at 7`)
 	end)
 
 	t.test("WR-01: a Draw-owed strike carries the re-armed deadline to the struck seat", function()

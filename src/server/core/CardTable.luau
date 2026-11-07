@@ -88,9 +88,19 @@ export type CardTable = {
 	start: (self: CardTable, seats: { SeatSpec }) -> (),
 	-- The gateway's dispatch target. `payload` is the CLEAN copy Gateway produced.
 	onIntent: (self: CardTable, userId: number, intentName: string, payload: unknown) -> (),
-	-- A gateway-level rejection never reached this file, so the client's seq was never acked. Pushes
-	-- that player a Sync at the current ackSeq (plan 04-09's primary resync mechanism).
-	onGatewayReject: (self: CardTable, userId: number, intentName: unknown, code: string) -> (),
+	-- A gateway-level rejection never reached this file, so the client's seq was never acked. The raw
+	-- payload is the client's own, UNVALIDATED: only a `seq` that is a finite integer in the manifest's
+	-- range is read from it, and only to raise this user's ack so the Sync resolves the rejected entry
+	-- cumulatively (WR-04). `push` is the caller's throttle verdict: false records the ack but sends
+	-- nothing, so a rejection flood is not amplified into outbound Syncs.
+	onGatewayReject: (
+		self: CardTable,
+		userId: number,
+		intentName: unknown,
+		code: string,
+		rawPayload: unknown,
+		push: boolean
+	) -> (),
 	-- The 10 Hz sweep. Drains IdleClock and StallDetector commands, applies and bookkeeps each OUTSIDE
 	-- any other apply, then publishes (rule 6).
 	tick: (self: CardTable) -> (),
@@ -371,6 +381,21 @@ local function new(deps: Deps): CardTable
 		return lastAck[userId] or 0
 	end
 
+	-- The manifest's bound on `seq` (Validate.integer max). Duplicated rather than required: this is a
+	-- pure zone and a gateway-rejected payload was never validated.
+	local MAX_SEQ = 2 ^ 31
+
+	-- The `seq` of an UNVALIDATED client payload, or nil. Reads one key; trusts nothing else in it.
+	local function rawSeqOf(payload: unknown): number?
+		if type(payload) == "table" then
+			local seq = (payload :: { [string]: unknown }).seq
+			if type(seq) == "number" and seq == seq and seq >= 0 and seq <= MAX_SEQ and seq % 1 == 0 then
+				return seq
+			end
+		end
+		return nil
+	end
+
 	local function cardIdOf(payload: unknown): number?
 		if type(payload) == "table" then
 			local cardId = (payload :: { [string]: unknown }).cardId
@@ -467,10 +492,28 @@ local function new(deps: Deps): CardTable
 			flush(ctx)
 		end,
 
-		onGatewayReject = function(_self: CardTable, userId: number, _intentName: unknown, _code: string)
+		onGatewayReject = function(
+			_self: CardTable,
+			userId: number,
+			_intentName: unknown,
+			_code: string,
+			rawPayload: unknown,
+			push: boolean
+		)
+			local seat = rosterSeat[userId]
+			-- The rejected seq is never acked by the engine path, so the Sync below would sit BELOW it and
+			-- the client's fold would keep the card gone until the 1.0 s watchdog. Acking it here is what
+			-- makes this push reconcile. Raise-only: a lower hint must never lower the ack, because the
+			-- client ignores a Sync whose ack is below what it already holds.
+			local hint = rawSeqOf(rawPayload)
+			if seat ~= nil and hint ~= nil and hint > (lastAck[userId] or 0) then
+				lastAck[userId] = hint
+			end
+			if not push then
+				return
+			end
 			local ctx = newCtx()
 			local ack = lastAck[userId] or 0
-			local seat = rosterSeat[userId]
 			if seat ~= nil then
 				queueSync(ctx, userId, syncFor(seat, ack, ctx.now))
 			else

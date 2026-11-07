@@ -96,7 +96,14 @@ export type CardService = {
 	startRound: (self: CardService) -> boolean,
 	endRound: (self: CardService) -> (),
 	onIntent: (self: CardService, userId: number, intentName: string, payload: unknown) -> (),
-	onGatewayReject: (self: CardService, userId: number, intentName: unknown, code: string) -> (),
+	onGatewayReject: (
+		self: CardService,
+		userId: number,
+		intentName: unknown,
+		code: string,
+		rawPayload: unknown,
+		push: boolean
+	) -> (),
 	removePlayer: (self: CardService, userId: number) -> (),
 	seatedUserIds: (self: CardService) -> { number },
 	destroy: (self: CardService) -> (),
@@ -364,9 +371,16 @@ function CardService.new(deps: Deps): CardService
 		end
 	end
 
-	local function onGatewayReject(_self: CardService, userId: number, intentName: unknown, code: string)
+	local function onGatewayReject(
+		_self: CardService,
+		userId: number,
+		intentName: unknown,
+		code: string,
+		rawPayload: unknown,
+		push: boolean
+	)
 		if cardTable ~= nil then
-			cardTable:onGatewayReject(userId, intentName, code)
+			cardTable:onGatewayReject(userId, intentName, code, rawPayload, push)
 		end
 	end
 
