@@ -65,4 +65,16 @@ runs itself.
 CARD-19's human half remains open under M-14 and M-16 (distinguishable pixels at 16 px, Builder Sans
 glyph coverage). Not ticked. STATE/ROADMAP/REQUIREMENTS untouched per orchestrator instruction.
 
+## Addendum: case 8 strengthened (coordinator request)
+Case 8 (`colour is not part of any identity key`) now also asserts `Faces.faceOf(r, c).key` equals the
+independently rebuilt `(glyph, silhouette)` key for all 48 faces, so both public key paths are checked.
+Source mutations, restored afterwards:
+- `keyOf` folds tint: red, `a tint flip changed a key (expected A/spadeb, got A/spade)`. The original
+  case 8 already caught this, because its reference was rebuilt independently.
+- `faceOf` key folds tint: red with the new assertion, `faceOf key differs from the (glyph, silhouette)
+  rule (expected A/spade, got A/spadeb)`. The original case 8 would NOT have caught this; that was the gap.
+Recorded limit: `audit` never calls `keyOf`/`faceOf` (it rebuilds keys itself), so a tint-folding bug in
+those two is caught only by case 8, not by the audit.
+Suite after: 687 passed, 0 failed, 0 todo in 23.73s.
+
 ## Self-Check: PASSED

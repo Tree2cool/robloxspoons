@@ -195,6 +195,8 @@ return function(t: Test.Runner)
 				local suit = flipped.suitOfCopy[c]
 				local key = `{flipped.ladder[r]}/{flipped.pip[suit].silhouette}`
 				t.equal(key, before[compared + 1], "a tint flip changed a key")
+				-- The independent rule above is the reference: both public key paths must equal it.
+				t.equal(Faces.faceOf(r, c).key, key, "faceOf key differs from the (glyph, silhouette) rule")
 				compared += 1
 			end
 		end
