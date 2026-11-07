@@ -21,7 +21,16 @@ worktree at the earlier commit makes this exact.
 |------|-----------------|-----------|------------|-----------|-------|------|
 | 1 | `ae376d6` | 26.88 s (657) | 27.98 s (677) | **+1.10 s** | +20 | Measured back to back. Includes the four guard fixture roots (~0.9 s of subprocess work), which was the single largest named cost in the allocation table and is now **spent** — later waves are in-process pure specs and should be far cheaper. |
 
-**Running total against the +3.0 s allowance: 1.10 s used, 1.90 s remaining.**
+| 2 | `64cae6e` | 24.33 s (677) | 24.15 s (733) | **~0.00 s** (-0.18 s, i.e. within noise) | +56 | Measured back to back. Includes the `src/shared/Card` pure zone's extra selene subprocess, which plan 04-04 had budgeted at ~0.4 s — **it is below run-to-run noise at this scale.** 56 new cases for no measurable wall-clock cost, because they are all in-process pure specs. |
+
+**Running total against the +3.0 s allowance: ~1.10 s used, ~1.90 s remaining** (wave 1 1.10 s,
+wave 2 ~0.00 s), for **+76 cases** so far.
+
+**Note on how the two waves differ.** Wave 1's 1.10 s was almost entirely the four guard **fixture
+roots** — subprocess work, the single largest named cost in the allocation table, and now spent.
+Wave 2's 56 pure in-process cases cost nothing measurable. That is the shape the allocation table
+predicted, and it means the remaining waves (also pure specs, plus renderer specs) should stay cheap.
+**The thing to watch is any NEW subprocess gate, not the case count.**
 
 ## What this means for 04-20's checkpoint
 
