@@ -415,6 +415,56 @@ state** so it cannot accidentally reintroduce a second meaning.
 **double-counts** under `CoreUISafeInsets` is unverified and recorded in the `CardHud` header.
 **Review-only:** the strip's `task.delay` cancellation has no executed test.
 
+## WIRING CONTRACT for plan 04-18, from 04-17 (ordering matters; two of these fail silently)
+
+1. **Parent all three of `CardHand`, `CardPiles`, `CardStrip` to `Hud:handZone()`.**
+2. **Call `hand:relayout(Layout.solve(..., newHandSize))` BEFORE the `apply` that changes the hand
+   size** — not after.
+3. **Call `hand:setJokerMode` before the first `apply` that can contain a joker.**
+4. **04-18 must supply `Removed{cardId}` for a commit and `Added{}` for a draw**, because
+   `Prediction.tapSlot` and `tapLeftPile` return only an `Emit`. The renderer cannot infer them.
+5. **Build a FRESH reducer per round** (04-09): `ackSeq` is not reset within a round.
+6. **The client reads `STALL_CUE_SECONDS` itself** (04-12): the `Stall` payload is `{ active }` only.
+7. **`ClientNet.onCard` ERRORS if `resolve` has not run.** `resolve` is idempotent; call it first.
+
+**The inference 04-17 had to make, which the plan did not specify:** `Removed{cardId}` **cannot say
+whether a card left because the player sent it or because the valve forced it out.** So the hand
+records its own tap on the selected card at hand 5 and treats **any other removal as `ForcedOut`**.
+04-18 must keep that distinction intact when it drives the hand.
+
+**The forced-pass pair is now rendered** (the handoff 04-16 deferred and 04-09 discovered): a
+`Returned` arriving in the same batch as an id'd `Removed` **stays at its slot for hit-testing but is
+held invisible for `TWEEN.SEND`, then flies back**; a `Removed` with **no** id is a face-down
+placeholder flying back to the left pile. `apply` never throws on a hand-size mismatch (D-12) — it
+clamps to the last slot.
+
+**Contract extras 04-17 added:** `CardFace` gained `setSolution`, `placeAt(centre, shrunk)` and
+`setVisible`; `setFace` takes an optional third `mode`; `Hand` gained `setJokerMode`; `CardFace`
+exports `centreOf`, `zoneRect`, `PILE_ART_Y` and `pileArtCentre`.
+
+## 04-17's own gates caught three defects in its own work
+
+- **`deci_lock` forbade `os.clock` in `CardPiles`** — the pulse now accumulates `RenderStepped`'s
+  `dt` instead. A gate written in wave 5 caught a wave 7 mistake.
+- **A `0.2` literal collided with `TWEEN.CALLOUT_FADE`** and was caught by the timing scan.
+- **Its first body-finder regex captured `y` from `apply` and found ZERO bodies** — caught by the
+  "found N layout-path functions" non-vacuity assertion, now printing `apply(107), relayout(15)`.
+  **Sixth time** in this phase that printing the non-vacuity data exposed an error nothing else would.
+
+**Weakness it flagged (M6):** the dedicated "`CardPiles` has N `Active` sinks" problem is **not** what
+fires first when the right panel's sink is removed — the non-vacuity assertion combines the `Active`
+count with another condition. Its in-spec mutants for a lost right sink and a lost left sink do catch
+it with the proper message, but the dedicated path is weaker than it looks.
+
+## Two deliberate UI-SPEC deviations for the phase gate to note
+
+- **The joker corner star uses `TEXT_SIZE.BODY` (20), not the UI-SPEC's 24.** `CardTheme` has no 24,
+  and adding one collides with `DESIGN` under renderer-discipline case 1. Routed to **M-14** for a
+  human look.
+- **The backdrop is parented to the Hud's Root, not `HandZone`**, at `ZIndex 0`, per the UI-SPEC's
+  "HandZone + TableRegion" wording — so it **also sinks touches over the table region**. That is
+  **M-12/M-13** territory (camera-drag interference).
+
 ## Bookkeeping the orchestrator owns
 
 **Do not run `requirements.mark-complete` from an executor.** Plans 04-01 and 04-02 each ran it

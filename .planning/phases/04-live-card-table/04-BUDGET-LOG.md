@@ -31,6 +31,8 @@ worktree at the earlier commit makes this exact.
 
 | 6 | `0c37c63` | 24.44 s (816) | 24.72 s (832) | **+0.28 s** | +16 | Two plans. `renderer_discipline` scans comment-stripped source in process, so no subprocess cost. |
 
+| 7 | `61658c1` | 25.39 s (832) | 25.20 s (837) | **~0.00 s** (-0.19 s, within noise) | +5 | One plan. Executor measured its own spec at +0.01-0.03 s and cut nothing. |
+
 **Running total against the +3.0 s allowance: ~2.20 s used, ~0.80 s remaining**
 
 **Watch item for waves 7-9.** Three renderer plans and the gate plan remain, with **0.80 s** left.
@@ -38,7 +40,7 @@ worktree at the earlier commit makes this exact.
 scan over a growing `src/client/ui`. If a per-plan spec threatens the remaining budget, **cut sample
 sizes — never a mutation, a non-vacuity assertion or a clean control** (04-20's rule). A genuine
 overrun is an owner decision at 04-20's checkpoint, not something to absorb silently. (wave 1 1.10 s, wave 2 ~0.00 s,
-wave 3 0.59 s, wave 4 ~0.00 s, wave 5 0.23 s, wave 6 0.28 s), for **+175 cases** across 16 of 20 plans.
+wave 3 0.59 s, wave 4 ~0.00 s, wave 5 0.23 s, wave 6 0.28 s, wave 7 ~0.00 s), for **+180 cases** across 17 of 20 plans.
 
 **Note on how the two waves differ.** Wave 1's 1.10 s was almost entirely the four guard **fixture
 roots** — subprocess work, the single largest named cost in the allocation table, and now spent.
