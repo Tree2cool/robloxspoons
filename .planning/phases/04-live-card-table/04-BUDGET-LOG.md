@@ -27,8 +27,10 @@ worktree at the earlier commit makes this exact.
 
 | 4 | `da7e7dd` | 24.91 s (792) | 24.53 s (812) | **~0.00 s** (-0.38 s, within noise) | +20 | Two plans, both pure in-process specs. |
 
-**Running total against the +3.0 s allowance: ~1.69 s used, ~1.31 s remaining** (wave 1 1.10 s, wave 2 ~0.00 s,
-wave 3 0.59 s, wave 4 ~0.00 s), for **+155 cases** so far across 13 of 20 plans.
+| 5 | `72db3ef` | 24.88 s (812) | 25.11 s (816) | **+0.23 s** | +4 | One plan. `deci_lock` scans 51 files through `lex.stripComments`, which is the cost here rather than the 4 cases. |
+
+**Running total against the +3.0 s allowance: ~1.92 s used, ~1.08 s remaining** (wave 1 1.10 s, wave 2 ~0.00 s,
+wave 3 0.59 s, wave 4 ~0.00 s, wave 5 0.23 s), for **+159 cases** across 14 of 20 plans.
 
 **Note on how the two waves differ.** Wave 1's 1.10 s was almost entirely the four guard **fixture
 roots** — subprocess work, the single largest named cost in the allocation table, and now spent.

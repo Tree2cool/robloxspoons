@@ -299,6 +299,53 @@ than spelling `GetControls` / `PlayerModule`, because the `src/`-wide forbidden-
 **reads comments too**. A header that named the identifiers would have failed the very scan it
 documents. 50 files walked, 0 hits, negative control fires exactly once.
 
+## The 80-deci chain is now closed end to end, and two mutations are worth naming
+
+Checker finding B8 was that the shipped 80-decisecond value "is tested by nothing real" — editing it
+turned nothing red. 04-14's gate closes it, and two of its mutations are the ones that matter:
+
+- **M3 — the constant computed but never read.** Injecting `autoPassDeci = 80` as a literal into
+  `IdleClock.new` (so `AUTO_PASS_DECI` is still computed correctly, just unused) fails with
+  **"AUTO_PASS_DECI is read exactly once (expected 1, got 0)"**. This is the precise hole flag W4
+  named: an earlier gate proved the value was computed right and said nothing about whether anything
+  read it, so the constant and the clock could have been independently correct and **unconnected**.
+- **M4 — the comment attack.** Leaving the call only in a comment while code uses a literal 80 fails
+  with "exactly one file calls `CardTiming.autoPassDeci` … got {}". This is the comment-defeat class
+  that bit this project **four times in Phase 3**, now explicitly defeated by running every scan
+  through `lex.stripComments` with a working negative control (marker in a line comment -> 0 hits,
+  in a block comment -> 0, in code -> 1).
+
+M1 (`autoPassDeci + 1`) reddens **five** cases across **three** plans, so the chain is genuinely
+joined up: config -> conversion -> `IdleClock` -> expiry.
+
+**Printed realised window: `(7.9, 8.1]`** — matching the corrected one-sided-short derivation.
+
+## A SYSTEMATIC plan error, not a one-off: the naive-conversion float example
+
+**Two plans independently shipped the same wrong example.** Both 04-01 and 04-14 claimed
+`convertNaively(0.7, 10) == 8`; it is **false**, because `0.7 * 10` is **exactly 7.0** in IEEE double
+(and `2.9 * 10` likewise). Each executor found it the same way — the gate failed its own non-vacuity
+assertion — and each fixed it with `(0.07, 100)`, which really is `7.000000000000001`.
+
+That it appeared twice means it was a **planning-level** mistake propagated into two plans, not an
+executor slip. **I repeated it myself in the brief to 04-01.** Any future float-precision gate in
+this project should verify the example separates real from naive *before* relying on it; the
+non-vacuity assertion is what catches it when nobody does.
+
+## A sixth confirmation on `verify.luau`, and this one defeats a cast
+
+04-14: `CardPool.JOKER_MODE` widens to `string`, and **even an explicit `::` cast still failed
+`verify.luau`** while the suite was green. The fix was narrowing with an if-expression plus an
+assert. Six independent confirmations now (04-06, 04-08, 04-10, 04-12, 04-13, 04-14).
+
+## What 04-14 explicitly does NOT prove
+
+`CardService` **cannot be loaded in Lune** (it requires Roblox services), so Main's wiring, the
+Heartbeat accumulator, the reject sink and the `PlayerRemoving` paths are **source-checked only, with
+no executed test**. Plus M-12 (`NetServer` mapping `toPlayer` to `FireClient(player)`), the Studio
+observation that parenting remotes after connecting avoids a dropped-message window, and M-17 (a live
+three-player deal/pass/strike/bench). **The avatar hold is a no-op until plan 04-15.**
+
 ## Bookkeeping the orchestrator owns
 
 **Do not run `requirements.mark-complete` from an executor.** Plans 04-01 and 04-02 each ran it
