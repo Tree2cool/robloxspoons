@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 4 context gathered (04-CONTEXT.md); ready to plan Phase 4 or 5
-last_updated: "2026-11-05T00:52:19.294Z"
-last_activity: 2026-11-05
+stopped_at: Phase 4 implementation COMPLETE (20/20 plans, 858 tests); NOT closed - M-11..M-17 unsigned, 2 owner decisions open
+last_updated: "2026-11-07T00:00:00.000Z"
+last_activity: 2026-11-07
 progress:
   total_phases: 8
   completed_phases: 3
@@ -392,6 +392,62 @@ orientation in the place settings, which is a Creator Dashboard step. It is reco
 `01-CONTEXT.md` (the gateway's phase-gate-before-token-bucket order, flagged in Phase 1 for revisit
 in Phase 4 or Phase 8) and the rate limits for the new `Draw` / `Pass` intents (the current default
 burst 4 / refill 4 per second predates any card traffic; V-34 marks the numbers LOW confidence).
+
+## Phase 4 (Live Card Table) — implementation COMPLETE, phase NOT closed
+
+**20/20 plans executed in 10 waves. 858 tests pass, 0 failed, 0 todo. `verify.luau` 14/14.
+`check-guards: ok (145 files, 436 requires, 36 guarded roots)`. Test-suite cost +1.24 s against a
++3.0 s allowance for +201 cases.**
+
+**PHASE 4 IS NOT COMPLETE.** It closes only when a human signs **M-11, M-12, M-13, M-14, M-15 and
+M-17** in `MANUAL-CHECKS.md`. **Nothing is ticked, and `requirements.mark-complete` was never run** —
+ten executors independently found it falsely ticks requirements complete off work that does not
+deliver them. **UX-01, UX-02, UX-03 and UX-04 are met by NO plan.** Of the five ROADMAP criteria only
+#4 (auto-pass and bench) is essentially machine-closed; #3 is entirely human-gated; #1, #2 and #5
+each have a device half.
+
+### Carried into Phases 5-8 — do not rediscover
+
+- **Gates never written (5), recorded rather than hidden.** The most actionable is **one source-scan
+  gate covering the service-layer call sites** — `CardService`, `Main.server` and `CardSeatHold`
+  cannot load in Lune, so Main's wiring, the Heartbeat accumulator, the reject sink, `PlayerRemoving`
+  and the release-before-flourish ordering are **source-checked but never executed**. Build it on the
+  `round_end.spec` pattern. Also unwritten: sinks-after-publish ordering; the per-message `Depths`
+  truth check (only the final message is compared); review-only timer/tween paths; and the literal
+  bench-`Completed` mutant, which is a **type error to write** (`ShellRemoveCause` excludes it) and
+  reachable only by monkeypatching the unfrozen `Engine`, declined for cross-test leakage.
+- **Three gates are live but structurally incapable of firing.** (I1) `privacy.spec`'s RoundEnd
+  "payload carries no key" check and its mutant both run over literals the test writes itself —
+  `round_end.spec` is what really covers it. (I2) the D-20 healthy control cannot distinguish a
+  threshold of 96 from 48. (I3) 04-16's "no string literal except empty" actually asserts "no literal
+  containing a space".
+- **Five stated counts are wrong, reported not patched.** The worst: **04-08's
+  `grep -q 'assert 8'` is satisfied by the assertion's own message string, so it can never fail**, and
+  its counter is unconditional. 04-06's "at least 5" grep fails as written (4 `MUTATION:` cases, 7
+  in-spec mutants, so the property holds but the check does not). 04-12 states "fourteen" and "all
+  nine" in the same plan; the real figures at its close were 11 in-spec and 10 source-edit.
+- **Four gates were structurally incapable AS PLANNED and fixed before shipping:** D-35's
+  `AutoDraw`, the 8.0 s tautology, the unreachable NetServer guard, and the `(0.7, 10)` float example
+  that **two plans independently shipped** (`0.7 * 10` is exactly 7.0).
+- **`GetControls()` / `PlayerModule` remain undocumented and slated for removal.** The Input Action
+  System default flips **early 2027**, legacy scripts removed **mid-2027**. Any phase that hides or
+  restores controls must go through the `Controls.hide/restore` seam; none of the replacement is
+  proven under IAS, and there are community reports of stuck-touch and held-key bugs on re-enable.
+- **Two wire additions Phase 5+ inherits:** a public **`Depths`** kind (counts per seat only — the
+  privacy walk bans rank, cardId, copy, hand, inbox, faces, card, cards and fifth) and a public
+  **`RoundEnd`** kind, which must be published **before `table.clear(seated)`** or it reaches nobody.
+  Kinds are now seven.
+- **`check-guards` matches `guardedNamePrefixes` by FILE-NAME PREFIX.** A renderer named
+  `CardTableView.luau` became a FOUND-05 guarded root and failed R3 (`os.` is banned in guarded
+  roots, and `pos.X` contains it). It is now `CardSeatsView.luau`. **Do not name a client renderer
+  with a guarded prefix** — and do not add `Card` to that list, because **Phase 7 requires the card
+  UI to import cosmetic data** (deck skins, deal animations, CARD-18).
+- **Measurement lesson:** take **one** controlled pre/post across a whole phase in a worktree at the
+  pre-phase commit. Summing per-wave deltas inflates the total with noise — mine summed to ~2.20 s
+  against a true +1.24 s, and five of nine waves measured at or below zero, which is impossible for a
+  real cost.
+- **`tests/run.luau` does NOT catch what CI catches.** Seven independent confirmations this phase;
+  run `scripts/verify.luau`. An explicit `::` cast was insufficient in one case.
 
 **Carried into Phase 4/5/6 — do not rediscover:**
 - **`PlayerModule` / `GetControls()` IS NOT DOCUMENTED AND IS BEING REMOVED** (Phase 4 research,

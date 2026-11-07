@@ -172,7 +172,7 @@ Plans:
 - [ ] 04-16-PLAN.md — CardTheme, CardHud and CardStrip: the ScreenGui with CoreUISafeInsets, the UITextSizeConstraint, and the no-magic-number gate (wave 6)
 - [ ] 04-17-PLAN.md — CardFace, CardHand and CardPiles: the fan, the hit strips and both pile panels (wave 7)
 - [ ] 04-18-PLAN.md — CardControls, CardInput and CardClient: the control effects, the input layer and the one wiring file (wave 8)
-- [ ] 04-19-PLAN.md — CardTableView, CardCallout, CardFlourish and CardAudio: travelling cards, the who-went banner, the flourish surface and the sting (wave 9)
+- [ ] 04-19-PLAN.md — CardSeatsView, CardCallout, CardFlourish and CardAudio: travelling cards, the who-went banner, the flourish surface and the sting (wave 9)
 - [ ] 04-20-PLAN.md — the phase gate: the runtime budget decision, the mutation ledger, the honest requirement split, and the device matrix checkpoint (wave 10, not autonomous)
 **UI hint**: yes
 **Research**: Light. Re-check V-12, V-13, V-24, V-25, V-26, V-27 (remote ordering, control disable, ScreenInsets). Open Question 4 (AFK thresholds) tuned here and in Phase 6. Test on a real phone early. The basic deal hook is built here; the deck-skin flourish content lands in Phase 7 (CARD-18).
