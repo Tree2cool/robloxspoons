@@ -52,6 +52,37 @@
   stays *green* on it (descending is still a valid permutation); only the
   compare-against-production assertion catches it. That assertion is load-bearing.
 
+## 04-09 found a real forced-pass / prediction interaction the plan did not anticipate
+
+This is the valve showing up where nobody looked for it. `ValveForcedPass` fires in roughly **1 round
+in 12** at a full roster, so this is an ordinary race, not a corner case.
+
+**The race:** a forced pass lands while the player's own `Pass` is still in flight. Naively folding
+both would put the display at **3 cards**, breaking the plan's own "hand is 4 or 5" invariant.
+
+**What 04-09 did:** the fold now **skips a predicted action the server is certain to reject** — a
+`Pass` unless the display hand is 5, a `Draw` unless it is 4 with a non-empty inbox. In that race the
+forced card is reported `Removed` and the pending entry is left untouched until its ack.
+
+**The consequence the plan did not foresee, now asserted in case 11:** the player's own doomed `Pass`
+**also returns as `Returned`** when the forced-pass `Sync` lands. So a single forced pass can produce
+*two* visible changes — a card leaving that the player did not choose, and their own in-flight card
+coming back. **Plans 04-16/17/18 must render that pair coherently**, or it will read as the UI
+glitching precisely in the ~8% of rounds the valve touches.
+
+## Three concrete notes for the client waves (04-16, 04-17, 04-18)
+
+1. **`Change.Removed.cardId` is `number?`.** A rolled-back `Draw` placeholder has no id, because the
+   client never learned it (draw intents carry no card — rule 7). **Treat a `Removed` with no id as
+   "a face-down placeholder leaves".** Do not assume an id is present.
+2. **Build a fresh reducer per round (04-18).** `ackSeq` is not reset within a round, so reusing a
+   reducer across rounds would carry a stale high-water mark.
+3. **What case 8 actually proves.** The "correction" is a hand-crafted `onSync`, because the stub
+   server has no correcting path of its own. What it establishes is that the reducer's change list
+   for a **correction** is byte-identical to a **rejection's** and to a **lost message's** — which is
+   exactly D-11/D-12's requirement that all three look the same to the player. It does not prove a
+   real server correction, which is M-13.
+
 ## HARD DEPENDENCY: plan 04-19 must implement `Surface` or F8's protection is incomplete
 
 Plan 04-10 added **`Surface.destroyOffenders(root) -> number`** as a Rule-2 deviation, and the reason
