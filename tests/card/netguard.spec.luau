@@ -284,6 +284,34 @@ return function(t: Test.Runner)
 		)
 	end)
 
+	t.test("WR-04: the raw payload reaches the reject sink, and the push is gated by the log throttle", function()
+		local function carries(netServer: string, main: string): (boolean, boolean, boolean)
+			local n = lex.stripComments(netServer)
+			local m = lex.stripComments(main)
+			return string.find(n, "deps.onReject(userId, intent, code, inFlightPayload)", 1, true) ~= nil,
+				string.find(n, "inFlightPayload = payload", 1, true) ~= nil,
+				string.find(
+					m,
+					"cardService:onGatewayReject(userId, intent, tostring(code), rawPayload, decision.log)",
+					1,
+					true
+				) ~= nil
+		end
+		local netRaw = fs.readFile("src/server/services/NetServer.luau")
+		local mainRaw = fs.readFile("src/server/Main.server.luau")
+		local a, b, c = carries(netRaw, mainRaw)
+		t.truthy(a, "NetServer hands the in-flight payload to the reject sink")
+		t.truthy(b, "NetServer records the payload before gateway:handle")
+		t.truthy(c, "Main passes the payload and the throttle verdict to the card service")
+		-- MUTATIONS on the same scan: each broken source must be seen.
+		local ma, mb = carries((netRaw:gsub("inFlightPayload%)", "nil)")), mainRaw)
+		t.falsy(ma, "a NetServer that drops the payload must be seen")
+		t.truthy(mb, "control: the other probes are unaffected by that mutation")
+		local _, _, mc = carries(netRaw, (mainRaw:gsub("rawPayload, decision%.log%)", "rawPayload, true)")))
+		t.falsy(mc, "an unthrottled push (always true) must be seen")
+		print("netguard WR-04: 3 source probes clean, 2 mutants seen")
+	end)
+
 	-- NOT covered here, and where it is covered instead:
 	--  * that fireToPlayer really reaches the right client is a one-line adapter proven by guard R4 plus the
 	--    Studio multi-client observation folded into M-12 ("two real clients, one sees only its own hand");

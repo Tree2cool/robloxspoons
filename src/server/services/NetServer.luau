@@ -29,7 +29,9 @@ local RateLimits = require(ReplicatedStorage.Shared.Config.RateLimits)
 export type Deps = {
 	getPhase: () -> Gateway.RoundPhase,
 	dispatch: (userId: number, intent: string, payload: unknown) -> (),
-	onReject: (userId: number, intent: unknown, code: Gateway.Code) -> (),
+	-- `rawPayload` is the client's UNVALIDATED payload for the message being rejected (nil when the
+	-- rejection is not tied to one). Only a consumer that validates it itself may read it (WR-04).
+	onReject: (userId: number, intent: unknown, code: Gateway.Code, rawPayload: unknown) -> (),
 	onError: (userId: number, intent: string, err: unknown) -> (),
 	-- Which userIds are currently seated, so toSeated has an audience. Supplied by CardService from the
 	-- CardTable roster; an empty list means "no round" and toSeated is then a no-op, not an error.
@@ -69,20 +71,29 @@ function NetServer.start(deps: Deps): NetServer
 		},
 	})
 
+	-- The payload of the message `gateway:handle` is currently working on. Gateway.onReject has no
+	-- payload parameter and Gateway.luau is frozen, so it is carried here. It is set and cleared around
+	-- the one synchronous handle call; the card dispatch path never yields.
+	local inFlightPayload: unknown = nil
+
 	local gateway = Gateway.new({
 		manifest = Manifest,
 		bucket = bucket,
 		rateFor = RateLimits.forIntent,
 		getPhase = deps.getPhase,
 		dispatch = deps.dispatch,
-		onReject = deps.onReject,
+		onReject = function(userId: number, intent: unknown, code: Gateway.Code)
+			deps.onReject(userId, intent, code, inFlightPayload)
+		end,
 		onError = deps.onError,
 	})
 
 	-- Connect BEFORE parenting. Messages that arrive while no handler is connected sit in a bounded queue
 	-- and are then dropped with an error, so the connection has to exist before clients can see the remote.
 	local connection = remote.OnServerEvent:Connect(function(player: Player, intentName: unknown, payload: unknown)
+		inFlightPayload = payload
 		gateway:handle(player.UserId, intentName, payload)
+		inFlightPayload = nil
 	end)
 
 	-- Frees per-player bucket state; without this it leaks for the life of the server.

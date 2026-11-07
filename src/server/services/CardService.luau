@@ -96,7 +96,14 @@ export type CardService = {
 	startRound: (self: CardService) -> boolean,
 	endRound: (self: CardService) -> (),
 	onIntent: (self: CardService, userId: number, intentName: string, payload: unknown) -> (),
-	onGatewayReject: (self: CardService, userId: number, intentName: unknown, code: string) -> (),
+	onGatewayReject: (
+		self: CardService,
+		userId: number,
+		intentName: unknown,
+		code: string,
+		rawPayload: unknown,
+		push: boolean
+	) -> (),
 	removePlayer: (self: CardService, userId: number) -> (),
 	seatedUserIds: (self: CardService) -> { number },
 	destroy: (self: CardService) -> (),
@@ -248,7 +255,8 @@ function CardService.new(deps: Deps): CardService
 	)
 	local cardTable: CardTable.CardTable? = nil
 	local sweepConnection: RBXScriptConnection? = nil
-	-- Player ids currently seated, in seat order. NetServer.toSeated reads this as its audience.
+	-- Player ids dealt into this round, in seat order. NetServer.toSeated reads this as its audience. A seat
+	-- that finishes or is benched stays here until the round ends (WR-05); only a leaver is removed.
 	local seated: { number } = {}
 
 	local function unseat(playerId: number)
@@ -265,6 +273,30 @@ function CardService.new(deps: Deps): CardService
 		end
 	end
 
+	-- WR-03: everything startRound does once it has decided to start is ATOMIC. A throw between
+	-- assigning `cardTable` and the sweep connecting used to leave `cardTable ~= nil` (every retry
+	-- returned false), the avatars held in Scriptable mode and no sweep, so nothing could ever recover.
+	-- Roll back to exactly the pre-call state: sweep off, holds released, audience empty, no table, Lobby.
+	-- If the table had already announced the round, tell the clients it is over, or their place and
+	-- hidden controls would leak (the same hazard endRound's RoundEnd exists for).
+	local function abortStart(announced: boolean)
+		stopSweep()
+		pcall(function()
+			seatHold:releaseAll()
+		end)
+		if announced then
+			pcall(function()
+				deps.publisher.toSeated("RoundEnd", {})
+			end)
+		end
+		table.clear(seated)
+		cardTable = nil
+		pcall(function()
+			deps.setPhase("Lobby")
+		end)
+		deps.onTelemetry("start_round_failed", {})
+	end
+
 	local function startRound(_self: CardService): boolean
 		if cardTable ~= nil then
 			return false
@@ -279,60 +311,74 @@ function CardService.new(deps: Deps): CardService
 			return false
 		end
 
-		local idle, stall = buildCores(deps.onTelemetry)
-		-- The config table widens its string literal to `string`; the engine takes the literal union.
-		local jokerMode: Types.JokerMode = if CardPool.JOKER_MODE == "Blocker" then "Blocker" else "Wild"
-		assert(CardPool.JOKER_MODE == jokerMode, "CardPool.JOKER_MODE is not a known joker mode")
-		local table_ = CardTable.new({
-			publisher = deps.publisher,
-			nowDeci = nowDeci,
-			rng = Rng.new(freshSeed()),
-			extraRanks = CardPool.EXTRA_RANKS,
-			jokers = CardPool.JOKERS,
-			jokerMode = jokerMode,
-			idle = idle,
-			stall = stall,
-			unixDeadlineFor = unixDeadlineFor,
-			onCompleted = function(seat, playerId, rank)
-				releaseAvatar(playerId)
-				deps.onCompleted(seat, playerId, rank)
-			end,
-			onSeatRemoved = function(_seat, playerId, _cause)
-				unseat(playerId)
-				releaseAvatar(playerId)
-			end,
-			onTelemetry = deps.onTelemetry,
-		})
-		cardTable = table_
+		local announced = false
+		local started = pcall(function()
+			local idle, stall = buildCores(deps.onTelemetry)
+			-- The config table widens its string literal to `string`; the engine takes the literal union.
+			local jokerMode: Types.JokerMode = if CardPool.JOKER_MODE == "Blocker" then "Blocker" else "Wild"
+			assert(CardPool.JOKER_MODE == jokerMode, "CardPool.JOKER_MODE is not a known joker mode")
+			local table_ = CardTable.new({
+				publisher = deps.publisher,
+				nowDeci = nowDeci,
+				rng = Rng.new(freshSeed()),
+				extraRanks = CardPool.EXTRA_RANKS,
+				jokers = CardPool.JOKERS,
+				jokerMode = jokerMode,
+				idle = idle,
+				stall = stall,
+				unixDeadlineFor = unixDeadlineFor,
+				onCompleted = function(seat, playerId, rank)
+					releaseAvatar(playerId)
+					deps.onCompleted(seat, playerId, rank)
+				end,
+				-- WR-05: a removed seat STAYS in `seated` until the round ends. `seated` is the audience for
+				-- the public kinds, and the client keeps its place (seat stacks, flourish container, callout
+				-- overlay) after its own hand is gone, so it must still receive Table, Depths and RoundEnd or
+				-- that place leaks and the later "X is out" callouts never reach it. Only the avatar goes.
+				-- A player who actually LEAVES is dropped by removePlayer.
+				onSeatRemoved = function(_seat, playerId, _cause)
+					releaseAvatar(playerId)
+				end,
+				onTelemetry = deps.onTelemetry,
+			})
+			cardTable = table_
 
-		-- Structs built field by field from plain pose data: no map node is ever in scope.
-		local specs: { CardTable.SeatSpec } = {}
-		table.clear(seated)
-		for i = 2, #players do
-			local pose = poses[i - 1]
-			local spec: CardTable.SeatSpec = {
-				playerId = players[i].UserId,
-				position = { x = pose.position.x, y = pose.position.y, z = pose.position.z },
-				look = { x = pose.look.x, y = pose.look.y, z = pose.look.z },
-			}
-			table.insert(specs, spec)
-			table.insert(seated, spec.playerId)
-			holdAvatar(spec.playerId, pose)
-		end
-
-		deps.setPhase("Round")
-		table_:start(specs)
-
-		-- ONE accumulator, subtract (do not reset) so the sweep does not drift. No per-seat timers.
-		local interval = 1 / CardConfig.SWEEP_HZ
-		local accumulator = 0
-		sweepConnection = RunService.Heartbeat:Connect(function(dt: number)
-			accumulator += dt
-			if accumulator >= interval then
-				accumulator -= interval
-				table_:tick()
+			-- Structs built field by field from plain pose data: no map node is ever in scope.
+			local specs: { CardTable.SeatSpec } = {}
+			table.clear(seated)
+			for i = 2, #players do
+				local pose = poses[i - 1]
+				local spec: CardTable.SeatSpec = {
+					playerId = players[i].UserId,
+					position = { x = pose.position.x, y = pose.position.y, z = pose.position.z },
+					look = { x = pose.look.x, y = pose.look.y, z = pose.look.z },
+				}
+				table.insert(specs, spec)
+				table.insert(seated, spec.playerId)
+				holdAvatar(spec.playerId, pose)
 			end
+
+			deps.setPhase("Round")
+			table_:start(specs)
+			announced = true
+
+			-- ONE accumulator, subtract (do not reset) so the sweep does not drift. No per-seat timers.
+			local interval = 1 / CardConfig.SWEEP_HZ
+			local accumulator = 0
+			sweepConnection = RunService.Heartbeat:Connect(function(dt: number)
+				accumulator += dt
+				if accumulator >= interval then
+					-- IN-03: subtracted (no drift) and clamped to one interval, so a long hitch leaves a
+					-- backlog of at most one extra tick, never a run of catch-up ticks every frame.
+					accumulator = math.min(accumulator - interval, interval)
+					table_:tick()
+				end
+			end)
 		end)
+		if not started then
+			abortStart(announced)
+			return false
+		end
 		return true
 	end
 
@@ -364,9 +410,16 @@ function CardService.new(deps: Deps): CardService
 		end
 	end
 
-	local function onGatewayReject(_self: CardService, userId: number, intentName: unknown, code: string)
+	local function onGatewayReject(
+		_self: CardService,
+		userId: number,
+		intentName: unknown,
+		code: string,
+		rawPayload: unknown,
+		push: boolean
+	)
 		if cardTable ~= nil then
-			cardTable:onGatewayReject(userId, intentName, code)
+			cardTable:onGatewayReject(userId, intentName, code, rawPayload, push)
 		end
 	end
 

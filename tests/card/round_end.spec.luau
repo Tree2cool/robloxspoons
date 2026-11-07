@@ -62,8 +62,17 @@ local function serviceProblems(raw: string): ({ string }, number)
 	if body == "" then
 		return { "endRound body not found" }, 0
 	end
-	if countOf(text, '"RoundEnd"') ~= 1 then
-		table.insert(problems, `RoundEnd named {countOf(text, '"RoundEnd"')} times in CardService, expected 1`)
+	-- Two publish sites, each pinned to its own body: endRound's (checked below) and abortStart's, the
+	-- rollback of a failed start that had already announced the round (WR-03, gated in service_wiring).
+	if countOf(body, '"RoundEnd"') ~= 1 then
+		table.insert(problems, `RoundEnd named {countOf(body, '"RoundEnd"')} times in endRound, expected 1`)
+	end
+	local abortBody = slice(text, "local function abortStart", "local function startRound")
+	if countOf(abortBody, '"RoundEnd"') ~= 1 or countOf(text, '"RoundEnd"') ~= 2 then
+		table.insert(
+			problems,
+			`RoundEnd named {countOf(text, '"RoundEnd"')} times in CardService, expected 2 (endRound, abortStart)`
+		)
 	end
 	local send = string.find(body, 'toSeated("RoundEnd", {})', 1, true)
 	if send == nil then
@@ -189,18 +198,17 @@ return function(t: Test.Runner)
 			{
 				name = "service: seated cleared before the send",
 				problems = (
-					serviceProblems(
-						replaceOnce(
-							serviceRaw,
-							"seatHold:releaseAll()",
-							"seatHold:releaseAll()\n\t\ttable.clear(seated)"
-						)
-					)
+					serviceProblems(replaceOnce(
+						serviceRaw,
+						-- keyed on endRound's own call (two tabs); abortStart's sits one level deeper
+						"\n\t\tseatHold:releaseAll()",
+						"\n\t\tseatHold:releaseAll()\n\t\ttable.clear(seated)"
+					))
 				),
 			},
 			{
 				name = "service: released only after the send",
-				problems = (serviceProblems(replaceOnce(serviceRaw, "seatHold:releaseAll()", "(nil)"))),
+				problems = (serviceProblems(replaceOnce(serviceRaw, "\n\t\tseatHold:releaseAll()", "\n\t\t(nil)"))),
 			},
 			{
 				name = "client: handler not registered",

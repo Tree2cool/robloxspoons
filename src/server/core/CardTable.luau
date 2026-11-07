@@ -88,9 +88,19 @@ export type CardTable = {
 	start: (self: CardTable, seats: { SeatSpec }) -> (),
 	-- The gateway's dispatch target. `payload` is the CLEAN copy Gateway produced.
 	onIntent: (self: CardTable, userId: number, intentName: string, payload: unknown) -> (),
-	-- A gateway-level rejection never reached this file, so the client's seq was never acked. Pushes
-	-- that player a Sync at the current ackSeq (plan 04-09's primary resync mechanism).
-	onGatewayReject: (self: CardTable, userId: number, intentName: unknown, code: string) -> (),
+	-- A gateway-level rejection never reached this file, so the client's seq was never acked. The raw
+	-- payload is the client's own, UNVALIDATED: only a `seq` that is a finite integer in the manifest's
+	-- range is read from it, and only to raise this user's ack so the Sync resolves the rejected entry
+	-- cumulatively (WR-04). `push` is the caller's throttle verdict: false records the ack but sends
+	-- nothing, so a rejection flood is not amplified into outbound Syncs.
+	onGatewayReject: (
+		self: CardTable,
+		userId: number,
+		intentName: unknown,
+		code: string,
+		rawPayload: unknown,
+		push: boolean
+	) -> (),
 	-- The 10 Hz sweep. Drains IdleClock and StallDetector commands, applies and bookkeeps each OUTSIDE
 	-- any other apply, then publishes (rule 6).
 	tick: (self: CardTable) -> (),
@@ -371,6 +381,21 @@ local function new(deps: Deps): CardTable
 		return lastAck[userId] or 0
 	end
 
+	-- The manifest's bound on `seq` (Validate.integer max). Duplicated rather than required: this is a
+	-- pure zone and a gateway-rejected payload was never validated.
+	local MAX_SEQ = 2 ^ 31
+
+	-- The `seq` of an UNVALIDATED client payload, or nil. Reads one key; trusts nothing else in it.
+	local function rawSeqOf(payload: unknown): number?
+		if type(payload) == "table" then
+			local seq = (payload :: { [string]: unknown }).seq
+			if type(seq) == "number" and seq == seq and seq >= 0 and seq <= MAX_SEQ and seq % 1 == 0 then
+				return seq
+			end
+		end
+		return nil
+	end
+
 	local function cardIdOf(payload: unknown): number?
 		if type(payload) == "table" then
 			local cardId = (payload :: { [string]: unknown }).cardId
@@ -413,6 +438,10 @@ local function new(deps: Deps): CardTable
 
 			local ctx = newCtx()
 			deps.idle:sync(viewOf(st), ctx.now, nil)
+			-- D-20: anchor the stall detector's no-progress window to THIS round's clock. Its own anchor
+			-- starts at 0 while the production clock is uptime-based, so without this the 45 s minimum-time
+			-- gate is dead until the first Completed/SeatRemoved of the round (WR-02).
+			deps.stall:noteProgress(ctx.now)
 			table.insert(ctx.pending, function()
 				deps.publisher.toSeated("RoundStart", payload)
 			end)
@@ -463,10 +492,28 @@ local function new(deps: Deps): CardTable
 			flush(ctx)
 		end,
 
-		onGatewayReject = function(_self: CardTable, userId: number, _intentName: unknown, _code: string)
+		onGatewayReject = function(
+			_self: CardTable,
+			userId: number,
+			_intentName: unknown,
+			_code: string,
+			rawPayload: unknown,
+			push: boolean
+		)
+			local seat = rosterSeat[userId]
+			-- The rejected seq is never acked by the engine path, so the Sync below would sit BELOW it and
+			-- the client's fold would keep the card gone until the 1.0 s watchdog. Acking it here is what
+			-- makes this push reconcile. Raise-only: a lower hint must never lower the ack, because the
+			-- client ignores a Sync whose ack is below what it already holds.
+			local hint = rawSeqOf(rawPayload)
+			if seat ~= nil and hint ~= nil and hint > (lastAck[userId] or 0) then
+				lastAck[userId] = hint
+			end
+			if not push then
+				return
+			end
 			local ctx = newCtx()
 			local ack = lastAck[userId] or 0
-			local seat = rosterSeat[userId]
 			if seat ~= nil then
 				queueSync(ctx, userId, syncFor(seat, ack, ctx.now))
 			else
@@ -539,7 +586,14 @@ local function new(deps: Deps): CardTable
 								owes = command.owes,
 								cardId = if autoSeat == seatId then autoCard else nil,
 							}
-							queueNotice(ctx, st.seats[seatId].playerId, notice)
+							local struckUserId = st.seats[seatId].playerId
+							queueNotice(ctx, struckUserId, notice)
+							-- IdleClock re-armed this seat's window, but a Draw-owed strike applies nothing, so
+							-- no Sync carries the fresh deadline and the client would count down to a stale one
+							-- (WR-01). A Pass-owed strike already queued one via its AutoPass.
+							if autoSeat ~= seatId and st.seats[seatId].live then
+								queueSync(ctx, struckUserId, syncFor(seatId, lastAck[struckUserId] or 0, ctx.now))
+							end
 						else
 							-- The ONE generic removal (rule 8), with the shell's own narrowed cause.
 							local cause: ShellRemoveCause = "Benched"

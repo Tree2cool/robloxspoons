@@ -175,7 +175,10 @@ function Layout.solve(viewport: Viewport, handSize: number, d: Design?): Solutio
 		return { x = safe.x + dx * scale, y = safe.y + dy * scale, w = dw * scale, h = dh * scale }
 	end
 
-	local handTop = designH - design.HANDZONE_H
+	-- IN-07: on a viewport shorter than the hand zone this went negative and handed a negative-height
+	-- table region to the renderer. Clamped so every region size stays >= 0; `problems` still reports the
+	-- overflow (outside the safe rect, height below guarantee), so the degenerate case is flagged, not hidden.
+	local handTop = math.max(0, designH - design.HANDZONE_H)
 	local handZone = phys(0, handTop, designW, design.HANDZONE_H)
 	local tableRegion = phys(0, 0, designW, handTop)
 	local stripW = designW - 2 * design.STRIP_MARGIN

@@ -514,15 +514,30 @@ function CardClient.new(): CardClient
 
 	local function buildUi(r: RoundState): Ui
 		local hud = CardHud.new(HAND_OWES_DRAW)
+		-- IN-01: every piece is registered here the moment it exists, so a throw part-way through can undo
+		-- exactly what was built (CardPiles holds a RenderStepped connection, CardInput three bound actions).
+		local cleanups: { () -> () } = {}
 		local ok, built = pcall(function(): Ui
 			local solution = hud:resolve(HAND_OWES_DRAW)
 			local zone = hud:handZone() -- wiring contract 1: all three parent here
 			local hand = CardHand.new(zone, solution, { tapSlot = onTapSlot, tapOff = onTapOff })
+			table.insert(cleanups, function()
+				hand:destroy()
+			end)
 			-- Wiring contract 3: before the first apply that can contain a joker.
 			hand:setJokerMode(jokerMode)
 			local piles = CardPiles.new(zone, solution, { tapLeft = onTapLeft, tapRight = onTapRight })
+			table.insert(cleanups, function()
+				piles:destroy()
+			end)
 			local strip = CardStrip.new(zone, solution)
+			table.insert(cleanups, function()
+				strip:destroy()
+			end)
 			local input = CardInput.new({ selectSlot = selectSlot, commit = commit, moveSelection = moveSelection })
+			table.insert(cleanups, function()
+				input:destroy()
+			end)
 			local ui: Ui = {
 				hud = hud,
 				hand = hand,
@@ -551,6 +566,10 @@ function CardClient.new(): CardClient
 		end)
 		if not ok then
 			-- A half-built overlay would leave a hit-testing backdrop on screen with the controls untouched.
+			-- Pieces are undone newest first, each contained so one failing destroy cannot strand the rest.
+			for i = #cleanups, 1, -1 do
+				pcall(cleanups[i])
+			end
 			hud:destroy()
 			error(built, 0)
 		end

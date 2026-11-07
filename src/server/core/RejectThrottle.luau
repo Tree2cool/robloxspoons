@@ -28,8 +28,9 @@
 -- mutation for exactly that "improvement".
 --
 -- CARD-14 consequence: a gateway-level rejection never reaches the card core, so its `seq` is never
--- acked. Whatever `note` returns, the caller still pushes a Sync so the client's pending entry
--- resolves; this module only decides what gets LOGGED.
+-- acked. The caller gates that resync push on `Decision.log` too (WR-04): an ungated push would turn
+-- a rejection flood into one outbound Sync per message. A rejection whose push is suppressed is
+-- resolved by the next Sync or by the client's age watchdog.
 export type Decision = {
 	log: boolean, -- write the individual warn line
 	summary: number?, -- non-nil when a window just closed with this many suppressed rejections

@@ -85,7 +85,7 @@ local netServer = NetServer.start({
 		end
 		handler(userId, payload)
 	end,
-	onReject = function(userId, intent, code)
+	onReject = function(userId, intent, code, rawPayload)
 		-- 01-CONTEXT.md D-22, reviewed in Phase 4 (see src/server/core/RejectThrottle.luau's header for
 		-- the full record): the Gateway's check order is KEPT and a wrong-phase message charges no token.
 		-- The real exposure was this warn firing once per rejection, which made a WrongPhase flood a
@@ -97,11 +97,14 @@ local netServer = NetServer.start({
 		if decision.summary ~= nil then
 			warn(`[Spoons] suppressed {decision.summary} further rejections from {userId} in the last window`)
 		end
-		-- CARD-14, the PRIMARY resync mechanism: a gateway-level rejection never reaches the card core,
-		-- so the client's seq was never acked. Without this push a rate-limited tap leaves a card
-		-- visibly gone until plan 04-09's watchdog rolls it back.
+		-- CARD-14 resync: a gateway-level rejection never reaches the card core, so the client's seq was
+		-- never acked. The card core acks the rejected seq (read from the raw payload) and pushes a Sync
+		-- at that ack, which resolves the client's pending entry cumulatively. WR-04: the push is gated
+		-- by the SAME per-user throttle as the log line, so a rate-limit flood is not amplified into
+		-- one outbound Sync per message; a throttled rejection is resolved by the next Sync or, failing
+		-- that, by plan 04-09's age watchdog, which stays the backstop.
 		if cardService ~= nil then
-			cardService:onGatewayReject(userId, intent, tostring(code))
+			cardService:onGatewayReject(userId, intent, tostring(code), rawPayload, decision.log)
 		end
 	end,
 	onError = function(userId, intent, err)
