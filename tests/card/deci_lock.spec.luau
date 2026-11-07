@@ -222,7 +222,11 @@ return function(t: Test.Runner)
 			"src/server/services/NetServer.luau",
 			"src/server/services/RoundDriver.luau",
 		}, "os.clock files")
+		-- Plan 04-18 added the client countdown, which is the one client read of server time: it only decides
+		-- whether to SHOW a number (idleDeadlineUnix is already a server unix time), is never sent and nothing
+		-- a score depends on reads it. The allowance names exactly that file, so a second client reader fails.
 		t.deepEqual(serverTime, {
+			"src/client/ui/CardClient.luau",
 			"src/server/services/CardService.luau",
 			"src/server/services/RoundDriver.luau",
 		}, "GetServerTimeNow files")
