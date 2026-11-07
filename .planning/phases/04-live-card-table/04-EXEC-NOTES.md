@@ -52,6 +52,26 @@
   stays *green* on it (descending is still a valid permutation); only the
   compare-against-production assertion catches it. That assertion is load-bearing.
 
+## Findings from executors that are NOT defects, and must not be "fixed"
+
+- **The D-20 stall threshold's healthy control cannot distinguish 96 from 48** (plan 04-07, reported
+  as a finding exactly as instructed, rather than adjusting the number). Measured: max
+  `actionsSinceProgress` = 70 against `96 x liveSeats` = 288, a **4.1x margin**, worst case at 3 live
+  seats. But a threshold halved to **48** per seat — the valve's own value — would still give ~2.05x
+  and still pass the `margin >= 2` assertion.
+  **So the case for 96 rests on `Types.VALVE_ARM_ACTIONS_PER_SEAT` (asserted in the spec), not on
+  this control.** The 380-action healthy script is an approximation of measured pacing, not a
+  measurement. **Phase 8 should tune this on the `stall_armed` / `stall_cleared` telemetry.** Do not
+  treat the 4.1x margin as evidence that 96 is right; treat it as evidence that 96 is not obviously
+  wrong.
+  *Stuck-scenario control, for contrast:* 3000 actions with **zero** valve firings produced 8 cues,
+  first at deci 864, repeats exactly 300 deci apart — so the detector does fire precisely where the
+  valve is blind, which is the property D-20 exists for.
+
+- **The arming boundary is exact:** `tick(449)` does not arm, `tick(450)` does, once the action
+  condition is met. Both the action count AND wall time are required; removing either turns the gate
+  red (4 failures and 1 failure respectively).
+
 ## Bookkeeping the orchestrator owns
 
 **Do not run `requirements.mark-complete` from an executor.** Plans 04-01 and 04-02 each ran it
