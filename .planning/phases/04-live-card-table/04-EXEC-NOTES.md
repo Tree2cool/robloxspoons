@@ -378,6 +378,43 @@ Confirmed working in 04-15: release is first in `onCompleted`, **before** `deps.
 therefore before the flourish (D-30), and is also called from `onSeatRemoved`, `removePlayer` and
 `endRound` via `releaseAll`. Restore targets are captured from `StarterPlayer` once at boot.
 
+## 04-16 found a plan instruction that could not be built, and the two-constants trap paid off
+
+**Plan defect:** 04-16's plan said the `ScreenInsets` value should be "composed by concatenation".
+**An enum member cannot be made from a string by concatenation**, and that wording also contradicted
+the plan's own `Enum.ScreenInsets.CoreUISafeInsets` grep and its "exactly once" assertion. 04-16 took
+the plan's other stated route — a one-entry `INSETS_BY_NAME[Layout.SCREEN_INSETS]` table shared by
+both `ScreenGui`s — and its gate now asserts four things: the member appears exactly once, it equals
+`Layout.SCREEN_INSETS`, the assignment appears exactly once, and the assignment reads through the
+map. A one-sided change to either side fails (M2, M10, M16).
+
+**The two-constants trap caught something real.** M13 (a geometry number in `CardTheme`) and M15
+(`DESIGN.PILE_W = 88` plus a literal 88 in the HUD) both go red, and M15 specifically proves the
+needle list **follows `Layout.DESIGN`** rather than being a hard-coded copy of it.
+
+**A needed, narrow allowance, recorded rather than smuggled:** `CardTheme` legitimately collides with
+geometry numbers (16 is `LIFT`, 28 is `STRIP_H`, 8 is `STRIP_MARGIN`, 0.85 is `SCALE_MIN`), and colour
+channels collide too. So case 1 blanks `Color3.fromRGB(...)` arguments and allows exactly
+`{8, 16, 28, 0.85}` **in `CardTheme` only** — with M13 proving any *other* geometry number there is
+still caught. Plate transparency is stored as `PLATE_OPACITY = 0.85` and used as `1 - PLATE_OPACITY`,
+because a literal `0.15` equals `TWEEN.DRAW` and case 3 forbids that anywhere in the folder.
+
+**Its printed needle list caught its own bug** — the first filter silently dropped `0.58`, `0.85` and
+`1.5`; it was fixed before any commit. Fifth time in this phase that printing the non-vacuity data
+has exposed an error nothing else would have.
+
+**Weak check it flagged:** the "no string literal except empty" rule actually asserts no string
+literal *containing a space*. M14 exercises it, but that is the real strength of the check.
+
+**Hand-4 pulse decision (the UI-SPEC "Minor" FLAG), now settled in code:** at hand 4 the AFK cue
+pulses **nothing**. The countdown text and drain bar carry it, and the left-pile ring keeps its single
+meaning, "you can draw". Recorded in the `CardStrip` header, and **04-17 is told nothing about the AFK
+state** so it cannot accidentally reintroduce a second meaning.
+
+**New M-12 observation raised by 04-16:** whether `readViewport` (camera size plus `GetGuiInset`)
+**double-counts** under `CoreUISafeInsets` is unverified and recorded in the `CardHud` header.
+**Review-only:** the strip's `task.delay` cancellation has no executed test.
+
 ## Bookkeeping the orchestrator owns
 
 **Do not run `requirements.mark-complete` from an executor.** Plans 04-01 and 04-02 each ran it
