@@ -53,7 +53,7 @@ function NetServer.start(deps: Deps): NetServer
 	cardRemote.Name = "Card"
 
 	-- userId -> Player, so the pure routing layer can name a user and this file can find the Instance.
-	local roster: { [number]: Player } = {}
+	local roster: { [number]: Player? } = {}
 	for _, player in Players:GetPlayers() do
 		roster[player.UserId] = player
 	end
