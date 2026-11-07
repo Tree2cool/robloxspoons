@@ -72,6 +72,41 @@
   condition is met. Both the action count AND wall time are required; removing either turns the gate
   red (4 failures and 1 failure respectively).
 
+## Two reusable lessons from 04-08's rect arithmetic — read before writing any further rect gate
+
+Plans 04-16, 04-17 and 04-19 all do geometry checks. Both of these are mutation-killing traps that
+04-08 hit and fixed, not hypotheticals.
+
+1. **A boundary mutation that lands EXACTLY on the boundary needs the check to treat *touching* as a
+   violation.** The `LIFT = 20` mutation (checker FLAG F1, a live contradiction in the UI-SPEC) puts
+   the lifted card's top at exactly the strip's bottom edge — **gap 0, not overlap**. A strict
+   intersection test (`a.bottom > b.top`) would have left that mutation **green**. 04-08's lift check
+   treats a zero gap as a violation, and the mutation is 8/8 red as a result. Any further
+   "X must not cover Y" assertion in this phase must decide, explicitly, whether touching is a
+   violation — and for every clearance in the UI-SPEC it is, because the spec states clearances as
+   "4 px clear", not "not intersecting".
+
+2. **One mutation does not necessarily reach the gate you think it does, if two constants encode the
+   same intent.** `STEP = 44` alone did **not** trip the `below touch floor:` assertion, because the
+   hit-strip width `HIT_W` is a **separate constant** — so shrinking the step left the floor check
+   happily passing. 04-08 added a `hit overlap:` check, which is 8/8 red. **Before trusting a
+   mutation, confirm which assertion it actually reaches**, and add the missing one when a second
+   constant can independently satisfy the first.
+
+Also recorded by 04-08, as honest narrowing rather than defects: `SCALE_MIN = 0.7` only trips the
+step *relation* on the reference viewports (none is small enough to clamp to 0.7), so the physical
+form was proved on a contrived 500x250 viewport; and `HIT_W = 48` is red only where scale < 1, which
+is correct — at scale >= 1 a 48-wide strip really is >= 48 physical px.
+
+**Measured geometry, for the renderer plans to build against:** tightest TableRegion fractions are
+**59.08%** (phone notched) and **59.14%** (phone large) against the 58% threshold; the 0.85 floor
+case (600x300) measures a **51 px** hit strip; the spec's worked examples reproduce (750x369 ->
+scale 0.987, fraction 0.615; 1920x1080 -> scale 1.5, fraction 0.800).
+
+**`verify.luau` caught a second type error `tests/run.luau` missed** — iterating a literal
+`{ leftPile = ..., rightPile = ... }` types as `unknown` under the roblox-platform analyze. That is
+now two independent confirmations; the rule stands for every remaining wave.
+
 ## Bookkeeping the orchestrator owns
 
 **Do not run `requirements.mark-complete` from an executor.** Plans 04-01 and 04-02 each ran it
