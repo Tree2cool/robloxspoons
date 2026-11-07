@@ -29,10 +29,10 @@
 --  8. D-12: A HARD REJECTION SAYS NOTHING. No reject code reaches this file and none is shown. A rejected
 --     card simply returns, identically to a correction.
 --  9. CONTAINED DISPATCH. Every handler runs inside xpcall and reports through warn, so a renderer error
---     cannot kill the only handler the client has. A dead handler silently stops every later message, which
+--     does not kill the only handler the client has. A dead handler silently stops every later message, which
 --     is worse than one visible error.
 -- 10. THE JOKER EXPLAINER is a lookup keyed by the mode from RoundStart, with no branch on its value, so the
---     live JOKER_MODE flag cannot be made to lie to the player (D-23).
+--     live JOKER_MODE flag is never made to lie to the player (D-23).
 -- 11. KNOWN GAPS, recorded rather than papered over. (a) The Table payload carries no per-seat depth
 --     snapshot, so the depth list handed to the reducer is whatever it already held (empty); plan 04-19's
 --     stacks need a server-supplied depth field. (b) There is no round-end message among the five kinds, so
