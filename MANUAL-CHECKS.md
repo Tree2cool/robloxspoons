@@ -484,7 +484,10 @@ the traps that are easy to hit. Owner decision 2026-11-07: the owner signs these
 
 **Then the desk work.**
 
-3. **M-14 (greyscale, desk, ~15 min).** No phone needed. The automated side already proves all 50
+3. **M-14 (greyscale, desk half, ~15 min).** ~~No phone needed.~~ **Corrected 2026-11-08:** M-14's own
+   steps say "at the reference viewport **and** on a real phone" and its Expected says "on both
+   surfaces", so the desk half is only half of it. Do the desk half here; **the phone half rides along
+   with M-12** and M-14 is not signed until both are done. The automated side already proves all 50
    identity keys map to 50 distinct drawn assets; what a machine cannot judge is **legibility**.
    **Expect spade vs club at 16 px to be the hardest pair** — that is the one to look at first. Also
    check the joker corner star, which ships at `TEXT_SIZE.BODY` (20) rather than the UI-SPEC's 24,
@@ -694,6 +697,198 @@ to 20 or thicken the club silhouette. Never lean on colour.
 **Expected:** all 50 faces named correctly in greyscale by someone who did not build them, on both surfaces.
 
 **Blocking: yes for Phase 4's close.**
+
+**HOW TO DO IT (added 2026-11-08; the steps above are unchanged).**
+
+**This row has a desk half and a phone half**, and the steps say so: "at the reference viewport **and**
+on a real phone", "on both surfaces". An earlier session plan in this file called M-14 "desk, no phone
+needed", which was wrong. Do the desk half now; **the phone half rides along with M-12**, in the same
+device session, and M-14 is not signed until both are done.
+
+**The luma-contrast step is already done, by machine.** `tests/card/renderer_discipline.spec.luau`
+now parses the three colours out of `CardTheme.luau` and asserts both pips clear 4.5:1 against the
+card face, in colour and in greyscale. Measured:
+
+| | colour | greyscale |
+|---|---|---|
+| black pip on face | 15.53:1 | 15.53:1 |
+| **red pip on face** | **4.78:1** | 7.36:1 |
+
+The UI-SPEC estimated "~5:1 — measure, don't trust this estimate". Measured, the estimate was high:
+red clears the floor by **0.28**, so a plausible tweak to either colour drops it under. That is why it
+is a standing gate rather than a number in a document. Red gets *better* in greyscale (7.36:1), which
+is worth knowing: greyscale is not the hard case for contrast. It is the hard case for **shape**,
+which is the whole of what you are judging below. Nothing here is left for a human to measure.
+
+**The grid.** Paste into the Studio **command bar**, press **Play (F5)**, look, press **Stop**, then
+**delete `StarterGui.M14Probe`** (`default.project.json` does not mount `StarterGui`, so Rojo will not
+clean it up). Maximise the window first: the grid is 1056 x 684 px.
+
+```lua
+-- M-14 probe. Set to false to see the same grid in shipped colour.
+local GREYSCALE = true
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local StarterPlayer = game:GetService("StarterPlayer")
+local Layout = require(ReplicatedStorage.Shared.Card.Layout)
+local Faces = require(ReplicatedStorage.Shared.Card.Faces)
+local CardTheme = require(StarterPlayer.StarterPlayerScripts.Client.ui.CardTheme)
+local CardFace = require(StarterPlayer.StarterPlayerScripts.Client.ui.CardFace)
+
+local D = Layout.DESIGN
+-- 760 x 350 with no insets is exactly scale 1.0, so a card is its design 72 x 92.
+local sol =
+	Layout.solve({ width = D.REF_W, height = D.REF_H, insets = { left = 0, right = 0, top = 0, bottom = 0 } }, 4)
+assert(sol.scale == 1, `expected scale 1, got {sol.scale}`)
+
+local old = game.StarterGui:FindFirstChild("M14Probe")
+if old then
+	old:Destroy()
+end
+local gui = Instance.new("ScreenGui")
+gui.Name = "M14Probe"
+gui.IgnoreGuiInset = true
+gui.Parent = game.StarterGui
+local bg = Instance.new("Frame")
+bg.Size = UDim2.fromScale(1, 1)
+bg.BackgroundColor3 = Color3.fromRGB(20, 24, 36)
+bg.BorderSizePixel = 0
+bg.Parent = gui
+
+local GAP_X, GAP_Y, X0, Y0 = 12, 12, 24, 24
+local function place(rank: number, copy: number?, mode: string?, col: number, row: number)
+	local card = CardFace.new(bg, sol)
+	card:setFace(rank, copy, mode)
+	local inst = card:instance()
+	inst.Position = UDim2.fromOffset(
+		X0 + (col - 1) * (D.CARD_W + GAP_X) + D.CARD_W / 2,
+		Y0 + (row - 1) * (D.CARD_H + GAP_Y) + D.CARD_H / 2
+	)
+	return inst
+end
+
+-- 48 naturals: one column per rank, one row per copy. NO labels: a label is something to read
+-- instead of the card, which is the one thing this check must not allow.
+for copy = 1, 4 do
+	for rank = 1, Faces.MAX_RANKS do
+		place(rank, copy, nil, rank, copy)
+	end
+end
+for i, mode in Faces.JOKER_MODES do
+	place(Faces.JOKER_RANK, nil, mode, i, 5)
+end
+
+-- The overlapped case: under a right neighbour only the 60-wide strip shows, and the corner index is
+-- all of it. Four copies of one rank, which is the four-of-a-kind the game is played for.
+local stripY = Y0 + 5 * (D.CARD_H + GAP_Y) + 24
+for copy = 1, 4 do
+	local inst = place(1, copy, nil, 1, 1)
+	inst.Position = UDim2.fromOffset(X0 + (copy - 1) * D.STEP + D.CARD_W / 2, stripY + D.CARD_H / 2)
+	inst.ZIndex = 10 + copy
+end
+
+-- Greyscale is COMPUTED here, not post-processed. ColorCorrectionEffect is a 3D-scene effect and
+-- whether it touches a ScreenGui at all is unverified (create.roblox.com is DNS-blocked; see the
+-- Verification Debt table). Rec. 709 luma is what a saturation filter converges on anyway, and this
+-- way the result is deterministic and survives a screenshot.
+local function luma(c: Color3): Color3
+	local y = 0.2126 * c.R + 0.7152 * c.G + 0.0722 * c.B
+	return Color3.new(y, y, y)
+end
+if GREYSCALE then
+	bg.BackgroundColor3 = luma(bg.BackgroundColor3)
+	for _, d in gui:GetDescendants() do
+		if d:IsA("GuiObject") then
+			d.BackgroundColor3 = luma(d.BackgroundColor3)
+		end
+		if d:IsA("TextLabel") then
+			d.TextColor3 = luma(d.TextColor3)
+		end
+		if d:IsA("ImageLabel") then
+			d.ImageColor3 = luma(d.ImageColor3)
+		end
+		if d:IsA("UIStroke") then
+			d.Color = luma(d.Color)
+		end
+	end
+end
+
+-- M-14 also asks for measured glyph-versus-face luma contrast. WCAG relative luminance.
+local function relLum(c: Color3): number
+	local function lin(v: number): number
+		return if v <= 0.03928 then v / 12.92 else ((v + 0.055) / 1.055) ^ 2.4
+	end
+	return 0.2126 * lin(c.R) + 0.7152 * lin(c.G) + 0.0722 * lin(c.B)
+end
+local function contrast(a: Color3, b: Color3): number
+	local la, lb = relLum(a), relLum(b)
+	if la < lb then
+		la, lb = lb, la
+	end
+	return (la + 0.05) / (lb + 0.05)
+end
+local face, red, black = CardTheme.COLOR.CARD_FACE, CardTheme.COLOR.SUIT_RED, CardTheme.COLOR.SUIT_BLACK
+local function b255(c: Color3): number
+	return math.round(luma(c).R * 255)
+end
+print(
+	string.format(
+		"black pip on face : %.2f:1  (greyscale %.2f:1)",
+		contrast(black, face),
+		contrast(luma(black), luma(face))
+	)
+)
+print(
+	string.format(
+		"red   pip on face : %.2f:1  (greyscale %.2f:1)   <- the tight one, floor is 4.5:1",
+		contrast(red, face),
+		contrast(luma(red), luma(face))
+	)
+)
+print(string.format("as grey bytes: face %d, red %d, black %d", b255(face), b255(red), b255(black)))
+
+-- The answer key, printed rather than drawn. Name the faces off the screen FIRST, then scroll up.
+print("\n--- M14 ANSWER KEY (read the grid before this) ---")
+print("12 columns = ranks left to right, 4 rows = copies top to bottom. Row 5: the two jokers.")
+for copy = 1, 4 do
+	print(string.format("row %d = %-7s : %s", copy, Faces.SUIT_OF_COPY[copy], table.concat(Faces.RANK_LADDER, " ")))
+end
+print(string.format("row 5 = jokers : %s", table.concat(Faces.JOKER_MODES, " then ")))
+print("bottom strip = rank " .. Faces.RANK_LADDER[1] .. ", all four copies, overlapped as they sit in a real fan")
+print(
+	string.format(
+		"\nM14Probe added under StarterGui (GREYSCALE = %s). Press Play (F5), then DELETE it.",
+		tostring(GREYSCALE)
+	)
+)
+```
+
+**It uses the real `CardFace` renderer**, not a redrawing of the faces, so what you judge is what
+ships. It asserts `scale == 1` up front, so a card is exactly its design 72 x 92.
+
+**Greyscale is computed in the probe, not post-processed.** The steps above say
+`ColorCorrectionEffect.Saturation = -1`, but that is a 3D-scene effect and **whether it touches a
+`ScreenGui` at all is unverified** -- `create.roblox.com` is DNS-blocked, so the claim could not be
+checked against primary docs (Verification Debt). Rec. 709 luma is what a saturation filter converges
+on anyway, so the probe applies it directly: deterministic, and it survives a screenshot.
+
+**How to judge it, in order:**
+
+1. **Name the faces off the screen first.** The grid is deliberately **unlabelled** -- a label is
+   something to read *instead of* the card, which is the one thing this check must not allow. 12
+   columns are ranks, 4 rows are copies, row 5 is the two jokers.
+2. **Then scroll up in Output for the answer key** and count your misses. The Expected is "all 50
+   named correctly **by someone who did not build them**" -- so if you can get someone else to read
+   the grid, that is a materially stronger pass than reading it yourself.
+3. **Spade versus club is the expected failure**, at the 16 px index pip. Look there first.
+4. **The bottom strip row is the real worst case**, and the grid is not: four copies of one rank
+   overlapped as they sit in a live fan, where only the 60-wide strip of each shows and the corner
+   index is the whole of what a player sees. A pair that is tellable in the grid and not in the strip
+   **fails**, because the strip is the normal viewing condition.
+
+**If a pair fails:** enlarge the pip to 20 or thicken the club's lobed silhouette. **Never lean on
+colour** -- the grey bytes the probe prints (face 240, red 78, black 24) are exactly why that would
+not be a fix.
 
 Observed:
 

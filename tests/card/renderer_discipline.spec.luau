@@ -1243,4 +1243,86 @@ return function(t: Test.Runner)
 			"MUTATION: Main.client sends a card intent"
 		)
 	end)
+
+	-- UI-SPEC "Luma contrast": glyph vs face >= 4.5:1 for BOTH the black and the red pip, with the
+	-- explicit instruction "red 200,45,40 on cream is ~5:1 -- measure, don't trust this estimate".
+	-- Measured 2026-11-08 while building the M-14 probe: the estimate was high. Red is 4.78:1, a margin
+	-- of 0.28 over the floor, so a plausible future tweak to either colour drops it under without anyone
+	-- noticing -- the exact condition a standing gate is for. CardTheme cannot be loaded here (it names
+	-- Color3 and Font), so this parses the triples out of its source, which is this file's whole method.
+	t.test("both pip colours clear 4.5:1 against the card face, in colour and in greyscale", function()
+		local function lin(v: number): number
+			return if v <= 0.03928 then v / 12.92 else ((v + 0.055) / 1.055) ^ 2.4
+		end
+		local function relLum(c: { number }): number
+			return 0.2126 * lin(c[1] / 255) + 0.7152 * lin(c[2] / 255) + 0.0722 * lin(c[3] / 255)
+		end
+		local function contrast(a: { number }, b: { number }): number
+			local la, lb = relLum(a), relLum(b)
+			if la < lb then
+				la, lb = lb, la
+			end
+			return (la + 0.05) / (lb + 0.05)
+		end
+		-- What a saturation filter converges on: Rec. 709 luma, applied to the same 0..255 channels.
+		local function grey(c: { number }): { number }
+			local y = 0.2126 * c[1] + 0.7152 * c[2] + 0.0722 * c[3]
+			return { y, y, y }
+		end
+
+		local src = lex.stripComments(fs.readFile(`{UI_DIR}/{THEME}`))
+		local function rgbOf(name: string): { number }
+			local r, g, b = string.match(src, `{name}%s*=%s*Color3%.fromRGB%((%d+),%s*(%d+),%s*(%d+)%)`)
+			t.truthy(r ~= nil, `{name} not found in {THEME}: the scan, not the colour, is what broke`)
+			return { tonumber(r) :: number, tonumber(g) :: number, tonumber(b) :: number }
+		end
+		local face, red, black = rgbOf("CARD_FACE"), rgbOf("SUIT_RED"), rgbOf("SUIT_BLACK")
+		-- Non-vacuity: three DISTINCT colours actually parsed, not three nils or three copies of one.
+		t.falsy(
+			face[1] == red[1] and red[1] == black[1],
+			`non-vacuity: parsed three identical reds, so the pattern matched the wrong thing`
+		)
+		print(
+			string.format(
+				"  renderer_discipline[luma]: face %d,%d,%d  red %d,%d,%d  black %d,%d,%d",
+				face[1],
+				face[2],
+				face[3],
+				red[1],
+				red[2],
+				red[3],
+				black[1],
+				black[2],
+				black[3]
+			)
+		)
+
+		local FLOOR = 4.5
+		for _, case in
+			{
+				{ name = "black on face", fg = black },
+				{ name = "red on face", fg = red },
+			}
+		do
+			local inColour = contrast(case.fg, face)
+			local inGrey = contrast(grey(case.fg), grey(face))
+			print(
+				string.format(
+					"  renderer_discipline[luma]: %-14s %.2f:1 colour, %.2f:1 greyscale",
+					case.name,
+					inColour,
+					inGrey
+				)
+			)
+			t.truthy(inColour >= FLOOR, `{case.name} is {inColour}:1 in colour, under the {FLOOR}:1 floor`)
+			t.truthy(inGrey >= FLOOR, `{case.name} is {inGrey}:1 in greyscale, under the {FLOOR}:1 floor`)
+		end
+
+		-- MUTATION: a red that reads fine to a sighted eye on cream but fails the floor. If this passes,
+		-- the arithmetic above is not measuring anything.
+		local weak = { 235, 150, 145 }
+		t.truthy(contrast(weak, face) < FLOOR, `MUTATION: {weak[1]},{weak[2]},{weak[3]} on cream must fail the floor`)
+		-- Twin with no defect: the shipped red, through the same call, passes.
+		t.truthy(contrast(red, face) >= FLOOR, "twin: the shipped red through the same call passes")
+	end)
 end
