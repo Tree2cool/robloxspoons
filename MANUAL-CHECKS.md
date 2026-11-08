@@ -702,13 +702,36 @@ dangerous one: left at `Default`, the player scripts flip underneath the project
 
 Steps:
 
-1. Creator Dashboard: set the supported orientation to **landscape only**, on **both** places (dev and production).
-2. Place settings: set `Workspace.PlayerScriptsUseInputActionSystem` **explicitly** to `Disabled` for Phase 4
-   verification (not left at `Default`), and re-run M-11 under `Enabled` before launch.
-3. Record whether Rojo 7.7.1 can set the property via `$properties`. Research assumes it cannot, because the property
-   is newer than the pinned reflection database. If it can, the pin becomes code instead of a human gate.
+**CORRECTED 2026-11-08.** The original wording sent you to the Creator Dashboard for orientation and to
+"both places". Both were wrong. Orientation is a **DataModel property set in Studio**, not a Dashboard
+setting — verified against primary docs (`StarterGui.ScreenOrientation`, `ScreenOrientation.md`,
+`last_updated 2026-11-06`). The Dashboard has **Supported Devices** (which device *classes* may play),
+which is a different setting that **Phase 8 owns** under UX-06. And production must **not** be touched
+now: `servePlaceIds` is pinned to the dev place (D-23) so Rojo cannot reach production, prod still runs
+Phase 1-3 code with no card UI to orient, and setting it would mean publishing Phase 4 over the live
+place — which D-23 already declined once as not worth a production publish.
 
-**Expected:** both places landscape-locked; the flag explicitly `Disabled`; the Rojo question answered either way.
+**Do all of this on `Spoons Dev` only (PlaceId 120922388251092). Production's settings belong to Phase 8.**
+
+Steps, in Studio, both in the Properties panel:
+
+1. Select **`StarterGui`** in the Explorer and set **`ScreenOrientation` = `LandscapeSensor`** (landscape
+   with either side up). The default is `Sensor`, which follows the device freely — so leaving it alone
+   is **actively wrong** for this layout, not merely unset.
+2. Select **`Workspace`** and set **`PlayerScriptsUseInputActionSystem` explicitly to `Disabled`** — not
+   left at `Default`. This is the dangerous one: at `Default` the player scripts flip underneath the
+   project in **early 2027** with no commit to blame. Re-run M-11 under `Enabled` before launch.
+3. **Save and publish to `Spoons Dev`.** These are place properties: they travel with the published
+   place, not with your Studio session.
+4. Record whether Rojo 7.7.1 can set each via `$properties`. **`StarterGui.ScreenOrientation` is an
+   ordinary DataModel property, so it probably CAN** — in which case step 1 becomes code and stops
+   being a human gate. The IAS flag probably cannot: it is newer than Rojo 7.7.1's pinned reflection
+   database. Answer both either way.
+
+**Leave the Studio API access toggles alone:** ON for `Spoons Dev`, OFF for `SPOONS [BETA]`. That is
+FOUND-07's primary isolation control, and Phase 1 found it set the wrong way on production and fixed it.
+
+**Expected:** `Spoons Dev` landscape-locked via `StarterGui.ScreenOrientation = LandscapeSensor`; the IAS flag explicitly `Disabled`; both published to dev; the Rojo `$properties` question answered for each. Production untouched until Phase 8.
 
 **Blocking: yes for Phase 4's close.**
 
