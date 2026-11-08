@@ -911,11 +911,19 @@ device-dependent by nature. A desktop pass therefore does not license the phone 
 now carries that re-check**, because M-12 is the only row that puts the real UI on real glass. If the
 pips fail there, the sprite escalation is live and M-14 was judged against glyphs that do not ship.
 
-**Step 1 (audio) is the only part of M-16 still open.** All three ids remain `""`, which is a passing
-state under this row's own Expected ("ids supplied **or deliberately left silent**") -- but it has to
-be a decision, not an oversight, so this box stays unticked until it is made.
+**Step 1 (audio): DEFERRED TO PRE-LAUNCH by owner decision, 2026-11-08.** All three ids ship `""`,
+which is the passing state this row's own Expected names ("ids supplied **or deliberately left
+silent**"). This is the deliberate half of that, not an oversight: `CardAudio.makeSound` returns
+before constructing a `Sound` for an empty id, so no instance exists and the play call returns at
+once. The game ships Phase 4 **silent on purpose**.
 
-- [ ] M-16 signed off: <name> <date>
+Carried as **D-04-31** in `deferred-items.md` (section E, the pre-launch carry-list), owner **Phase
+8**. Whoever picks it up should know: uploads are private to the uploader, so they must come from the
+account or group owning universe `10774461969`; moderation delay after upload is indistinguishable
+from an empty id at the UI; and `DRAW`/`PASS` are cut at `OWN_CAP_SECONDS = 0.12` while `STING` is
+uncapped, so pick assets to match.
+
+- [x] M-16 signed off: alejandrog_m 2026-11-08
 
 ---
 

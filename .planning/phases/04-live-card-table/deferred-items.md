@@ -12,6 +12,8 @@ Format follows Phase 2's `deferred-items.md`. Ids are `D-04-NN`. Each entry has 
 - **C. The AFK window — RESOLVED by owner decision D-39, 2026-11-07** (was D-04-13).
 - **D. Accepted residuals and recorded gate weaknesses** (D-04-14 .. D-04-30), gathered from the
   plan 01-19 summaries and `04-EXEC-NOTES.md`.
+- **E. Pre-launch carry-list** (D-04-31 .. D-04-33) — what Phase 4 deliberately left for Phase 8,
+  indexed in one place because "before launch" scattered through plan prose is how a carry gets lost.
 
 ---
 
@@ -31,8 +33,11 @@ Format follows Phase 2's `deferred-items.md`. Ids are `D-04-NN`. Each entry has 
 
 ### D-04-03 — Portrait support
 - **Reason:** rejected (D-28). It is a whole second layout, not a variant of the first.
-- **Revisit when:** telemetry shows portrait attempts are common. Landscape lock itself is a
-  Creator Dashboard setting and is human-only (M-15).
+- **Revisit when:** telemetry shows portrait attempts are common. ~~Landscape lock itself is a
+  Creator Dashboard setting and is human-only (M-15).~~ **Corrected 2026-11-08:** landscape lock is
+  `StarterGui.ScreenOrientation`, an ordinary DataModel property, and Rojo 7.7.1 **can** set it via
+  `$properties` (measured), so it is not human-only. The Dashboard's **Supported Devices** is a
+  different setting and belongs to Phase 8 / UX-06 (D-04-33).
 - **Owner:** Phase 8.
 
 ### D-04-04 — Ending a stalled round early
@@ -263,3 +268,49 @@ bot reaction-time model resembles humans — which is the open half of why 8.0 s
 - **What:** 04-12 states "fourteen" and "all nine" mutations; 04-06 requires `grep -c 'MUTATION:'`
   >= 5 and the file has 4. Recorded as findings in `04-VALIDATION.md` and **not** edited away.
 - **Owner:** none; a record, so the next phase's planner does not copy the pattern.
+
+---
+
+## E. Pre-launch carry-list
+
+Items Phase 4 deliberately left for pre-launch. They were scattered across plan prose and
+`MANUAL-CHECKS.md` as the words "before launch", which is how a carry gets lost; this is the index.
+**Owner for all three: Phase 8 (Parity, Hardening and Soft Launch).**
+
+### D-04-31 — The three audio asset ids
+- **What:** `Config.Card.AUDIO.STING`, `.DRAW` and `.PASS` ship `""`. Phase 4 is **silent on
+  purpose**, not silent by omission: `CardAudio.makeSound` returns before constructing a `Sound` for
+  an empty id, so no instance exists under `SoundService` and every play call returns immediately.
+  M-16's Expected names this as a pass ("ids supplied **or deliberately left silent**").
+- **Reason:** owner decision 2026-11-08, deferring to pre-launch. Uploading now would mean judging
+  M-14 and M-17 against assets chosen before the game had been played.
+- **Picking it up:** uploaded audio is **private to the uploader**, so it must come from the account
+  or group that owns universe `10774461969` or it will not play in `Spoons Dev`. Audio is
+  **moderated after upload**, and a pending id is indistinguishable from an empty one at the UI.
+  `DRAW` and `PASS` are cut at `AUDIO.OWN_CAP_SECONDS = 0.12` so they cannot smear into the next
+  action; `STING` is **not** capped. Volume is `AUDIO.VOLUME = 0.3`. Changing any id is a one-line
+  edit to `src/shared/Config/Card.luau` and needs no code change.
+- **Owner:** Phase 8.
+
+### D-04-32 — Re-run the M-11 matrix under `PlayerScriptsUseInputActionSystem = Enabled`
+- **What:** M-15 pinned the flag to `Disabled` so Phase 4's control-hide matrix had one fewer
+  variable. The platform default flips to the Input Action System in **early 2027**, under the
+  project, with no commit to blame.
+- **Why it is a real risk and not paperwork:** D-29 and D-30 (controls hide while seated, control
+  returns instantly) are verified only under `Disabled`. If IAS changes how
+  `PlayerModule:GetControls():Disable()` behaves, a seated player could walk away from the table or a
+  finisher could be held still and lose find-order score -- and the flip arrives without a deploy.
+- **Owner:** Phase 8. Already written at `MANUAL-CHECKS.md` M-11 and `04-RESEARCH.md` (V-26).
+
+### D-04-33 — Production place settings
+- **What:** `SPOONS [BETA]` (place `123236339661606`) has had **nothing** set by M-15.
+  `StarterGui.ScreenOrientation` and `PlayerScriptsUseInputActionSystem` were set on `Spoons Dev`
+  only, and the Creator Dashboard's **Supported Devices** was not touched on either.
+- **Reason:** D-23 pins `servePlaceIds` to the dev place, so Rojo cannot reach production; production
+  still runs Phase 1-3 code with no card UI to orient; and setting it would mean publishing Phase 4
+  over the live place, which D-23 already declined once as not worth a production publish.
+- **Note:** Rojo 7.7.1 **can** set both properties via `$properties` (measured 2026-11-08, see M-15),
+  so the orientation half can be code rather than a human step whenever production is next published.
+  Supported Devices stays a Dashboard setting and belongs to **UX-06**.
+- **Owner:** Phase 8 (UX-06: "supported devices and orientation are set explicitly with console and
+  VR disabled").
