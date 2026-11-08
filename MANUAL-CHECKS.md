@@ -737,6 +737,32 @@ FOUND-07's primary isolation control, and Phase 1 found it set the wrong way on 
 
 Observed:
 
+**Steps 1 and 2 done on `Spoons Dev` 2026-11-08.** `game.StarterGui.ScreenOrientation` reads
+`Enum.ScreenOrientation.LandscapeSensor` from the command bar.
+`Workspace.PlayerScriptsUseInputActionSystem` reads **`Disabled`** in the Properties panel — the
+command bar cannot print it (`lacking capability RobloxScript`), because the property is
+`RobloxScriptSecurity` *to scripts*. That is a script-security level, not a Studio-editor
+restriction: the IAS rollout guide itself says to set it from the Properties window, which is what
+was done. **Read this one in the Properties panel, never by printing it.**
+
+**Step 4 answered 2026-11-08 — Rojo 7.7.1 can set BOTH.** Measured, not assumed: built a throwaway Rojo
+project per property and read the bytes out of the resulting `.rbxl`.
+
+| Property | Rojo `$properties` | Written value in the built place |
+|----------|--------------------|----------------------------------|
+| `StarterGui.ScreenOrientation` | **yes** | `ScreenOrientation">2` (= `LandscapeSensor`) |
+| `Workspace.PlayerScriptsUseInputActionSystem` | **yes** | `PlayerScriptsUseInputActionSystem">1` (= `Disabled`) |
+
+So the prediction in step 4 was half wrong: the IAS flag is *not* missing from Rojo 7.7.1's
+reflection database. A deliberately bogus property name made the same build **exit 1 with a stack
+trace**, which proves Rojo validates names against that database rather than silently dropping an
+unknown one — so the two successes above are real writes, not no-ops.
+
+Caveat, untested: `rojo build` writing a property is not the same as `rojo serve`'s plugin applying
+it to a live session. The plugin runs under plugin security, so the IAS flag may fail to apply live
+even though the built file carries it correctly. If step 1-2 are ever moved into
+`default.project.json`, verify by checking the Properties panel after a sync, not by assuming.
+
 - [ ] M-15 signed off: <name> <date>
 
 ---
