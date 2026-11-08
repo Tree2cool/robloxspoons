@@ -763,7 +763,7 @@ it to a live session. The plugin runs under plugin security, so the IAS flag may
 even though the built file carries it correctly. If step 1-2 are ever moved into
 `default.project.json`, verify by checking the Properties panel after a sync, not by assuming.
 
-- [ ] M-15 signed off: <name> <date>
+- [x] M-15 signed off: alejandrog_m 2026-11-08
 
 ---
 
@@ -785,6 +785,104 @@ Steps:
 
 **Blocking: no.** A missing audio id is silent by contract and the suit pips ship with a marked placeholder. A missing
 font weight is the exception: raise it as a blocker.
+
+**HOW TO DO IT (added 2026-11-08; the steps above are unchanged).**
+
+**Do step 3 before step 2.** Step 3 gates step 2: if a Builder Sans weight is missing, every glyph
+judgement is being made in the wrong typeface. And step 3 is the only part of M-16 that can produce a
+blocker.
+
+Steps 2 and 3 are one look. Paste this into the Studio **command bar** (View -> Command Bar) on
+`Spoons Dev`, press **Play (F5)**, look, press **Stop**, then **delete `StarterGui.M16Probe`**.
+`default.project.json` does not mount `StarterGui`, so Rojo will neither manage nor remove the probe
+and it would otherwise ship with the next publish.
+
+```lua
+local old = game.StarterGui:FindFirstChild("M16Probe")
+if old then old:Destroy() end
+local gui = Instance.new("ScreenGui")
+gui.Name = "M16Probe"
+gui.IgnoreGuiInset = true
+gui.Parent = game.StarterGui
+local bg = Instance.new("Frame")
+bg.Size = UDim2.fromScale(1, 1)
+bg.BackgroundColor3 = Color3.fromRGB(245, 240, 225)
+bg.Parent = gui
+local suits = utf8.char(0x2660) .. " " .. utf8.char(0x2665) .. " " .. utf8.char(0x2663) .. " " .. utf8.char(0x2666)
+local y = 24
+for _, weight in { Enum.FontWeight.Regular, Enum.FontWeight.Bold } do
+	for _, size in { 16, 20, 28 } do
+		local label = Instance.new("TextLabel")
+		label.BackgroundTransparency = 1
+		label.Position = UDim2.fromOffset(24, y)
+		label.Size = UDim2.fromOffset(820, size + 8)
+		label.TextXAlignment = Enum.TextXAlignment.Left
+		label.TextSize = size
+		label.TextColor3 = Color3.fromRGB(24, 24, 30)
+		label.FontFace = Font.new("rbxasset://fonts/families/BuilderSans.json", weight)
+		label.Text = `{weight.Name} {size}px   {suits}   A K Q J 10 7 4 2 5 3 9 8`
+		label.Parent = bg
+		y += size + 14
+	end
+end
+print("M16Probe added under StarterGui. Press Play (F5) to view it, then DELETE it.")
+```
+
+The six rows are the two weights at the three sizes `CardTheme.TEXT_SIZE` actually defines
+(`LABEL = 16`, `BODY = 20`, `HEADING = 28`), on the cream face colour, with the four suit codepoints
+and the full `RANK_LADDER` from `Faces.luau`. Read it as:
+
+| What to look for | Verdict |
+|------------------|---------|
+| Bold rows visibly heavier than Regular rows | **step 3 passes.** Identical weight means one fell back: **raise it as a blocker**, do not substitute a font |
+| All four suit symbols appear as suit shapes | **step 2 passes** on presence |
+| Blank gaps or `.notdef` boxes where a suit should be | the glyph path is unusable: upload the sprite sheet (below) |
+| Spade vs club tellable apart on the 16px row | the pair M-14 flags as hardest. If not, M-14's remedy applies: enlarge the pip or thicken the club silhouette, **never lean on colour** |
+
+**Step 2's escalation, if the glyphs fail.** This is already built; it is two one-line edits, not new
+code. `CardFace.luau` creates both a glyph `TextLabel` and a sprite `ImageLabel` for every pip and
+shows exactly one, chosen by `Faces.PIP_SOURCE`:
+
+1. Upload a **1x4 sprite sheet, 256x64, cells 64x64** in the order **spade, heart, club, diamond** —
+   that order and geometry are what `Faces.makePip` already computes
+   (`sprite = { x = (index - 1) * 64, y = 0, w = 64, h = 64 }`), so a sheet in a different order
+   silently mislabels every card.
+2. Set `SPRITE_SHEET` in `src/client/ui/CardFace.luau:75` to the `rbxassetid://` id.
+3. Set the single `PIP_SOURCE` local in `src/shared/Card/Faces.luau` (declared just above
+   `RANK_LADDER`) from `"glyph"` to `"sprite"`. That one local feeds both the renderer's
+   `Faces.PIP_SOURCE` and the audited `Faces.TABLES.pipSource`.
+4. Re-run `lune run tests/run.luau`. It must stay green: the escalation is a supported state, not a
+   change the suite resists.
+
+While `SPRITE_SHEET` is `""` the sprite path draws a **visible box** in `CARD_BACK_PATTERN`, not
+nothing, so a forgotten upload cannot pass as a rendered pip. The greyscale distinctness gate reads
+whichever path `PIP_SOURCE` selects, so flipping to `"sprite"` makes the automated suite assert the
+four `ImageRectOffset`/`ImageRectSize` pairs instead of the four codepoints -- it does not go
+unchecked.
+
+**Two defects on this escalation path were fixed on 2026-11-08, before anyone walked it.** Both were
+found by walking it rather than by reading it. (1) `PIP_SOURCE` and `TABLES.pipSource` were two
+separate `"glyph"` literals, so flipping one left the renderer drawing sprites while the greyscale
+gate went on asserting the distinctness of four codepoints -- green over an unchecked renderer. They
+are now one local, with a drift test. (2) The `MUTATION: pointing two pip ids at the same drawn asset`
+test inherited the shipped value instead of stating which source each arm was about, so the flip this
+step asks for turned it red for no real reason -- a false blocker sitting directly in step 2's path.
+Each arm now sets `pipSource` explicitly. Verified by mutation in both directions: splitting the
+literals again fires the new gate alone, a real glyph collision in the source still fires the old
+ones, and the suite is green under `"glyph"` and `"sprite"` alike.
+
+**Step 1's audio.** The three ids in `Config.Card.AUDIO` (`STING`, `DRAW`, `PASS`) are `""`, and
+`CardAudio.makeSound` returns before constructing a `Sound` for an empty id, so **no Sound instance
+exists and the play call returns immediately**: silence is the designed state, not a defect. Two
+platform facts worth knowing before uploading:
+
+- Uploaded audio is **private to the uploader by default**. Upload from whichever account or group
+  owns universe `10774461969`, or the Sound will not play in `Spoons Dev`.
+- Audio goes through **moderation** after upload, so an id can be valid and still silent for a while.
+  That is indistinguishable from an empty id at the UI, which is the reason this row is non-blocking.
+
+Own-action sounds are capped at `AUDIO.OWN_CAP_SECONDS = 0.12` so a long asset cannot smear into the
+next action, and `AUDIO.VOLUME = 0.3`. Pick short assets: a 2-second sting will be cut to 0.12s.
 
 Observed:
 

@@ -75,6 +75,25 @@ return function(t: Test.Runner)
 		t.equal(pairsVisited, 68, "non-vacuity: sum(5..12) pairs")
 	end)
 
+	-- M-16's escalation path flips one value from "glyph" to "sprite". Before 2026-11-08 there were two
+	-- literals -- `PIP_SOURCE` in the return and `pipSource` inside TABLES -- so flipping one left the
+	-- renderer drawing sprites while `audit` went on asserting the distinctness of four codepoints. The
+	-- gate would have stayed green over an unchecked renderer. They are now one local; this is the drift
+	-- test for that, and it is the reason the single-literal shape cannot be quietly undone.
+	t.test("the renderer's PIP_SOURCE and the audited TABLES.pipSource are the same value (M-16)", function()
+		t.equal(
+			Faces.PIP_SOURCE,
+			Faces.TABLES.pipSource,
+			"CardFace draws by Faces.PIP_SOURCE and audit judges Faces.TABLES.pipSource: a split lets the greyscale gate check an asset nobody draws"
+		)
+		-- Non-vacuity: the assertion above is only meaningful if the value is one the renderer branches
+		-- on at all. CardFace tests `== "sprite"` and otherwise draws the glyph.
+		t.truthy(
+			Faces.PIP_SOURCE == "glyph" or Faces.PIP_SOURCE == "sprite",
+			`PIP_SOURCE must be "glyph" or "sprite", got {Faces.PIP_SOURCE}`
+		)
+	end)
+
 	t.test("all 50 faces have a distinct identity key and a distinct drawn asset (D-24)", function()
 		local problems, visited = Faces.audit(Faces.TABLES)
 		t.deepEqual(problems, {})
@@ -117,7 +136,12 @@ return function(t: Test.Runner)
 
 	t.test("MUTATION: pointing two pip ids at the same drawn asset turns the gate red", function()
 		-- Every silhouette stays distinct: only the asset the renderer draws collides.
+		-- Each arm sets `pipSource` EXPLICITLY. Inheriting the shipped value made this test red the
+		-- moment M-16's escalation flipped PIP_SOURCE to "sprite" -- the glyph-collision arm cannot see a
+		-- glyph collision while the audit is judging sprites. The header's promise is that `audit` stays
+		-- green under either value, so no test here may depend on which one ships.
 		local sameGlyph = tablesCopy()
+		sameGlyph.pipSource = "glyph"
 		sameGlyph.pip.diamond.glyph = sameGlyph.pip.heart.glyph
 		local problems = Faces.audit(sameGlyph)
 		t.truthy(hasProblem(problems, "duplicate drawn asset:"), describe(problems))
@@ -127,6 +151,7 @@ return function(t: Test.Runner)
 
 		-- The mirror: identical sprite rects, distinct glyphs.
 		local sameSprite = tablesCopy()
+		sameSprite.pipSource = "glyph"
 		sameSprite.pip.club.sprite = deepCopy(sameSprite.pip.spade.sprite)
 		t.deepEqual(Faces.audit(sameSprite), {}, "glyphs differ, so glyph source must be clean")
 		sameSprite.pipSource = "sprite"

@@ -60,6 +60,11 @@ export type AuditTables = {
 local MAX_RANKS = 12 -- ranks = seated seekers + 3, seats 2..9 live -> 5..12
 local COPIES = 4
 
+-- "glyph" | "sprite". THE ONLY literal: `PIP_SOURCE` in the return and `TABLES.pipSource` both read
+-- this, because two literals is how the renderer and the greyscale gate come to disagree about which
+-- asset is actually drawn -- a gate that cannot fire. `faces.spec` asserts the two stay equal.
+local PIP_SOURCE: string = "glyph"
+
 local RANK_LADDER: { string } = table.freeze({ "A", "K", "Q", "J", "10", "7", "4", "2", "5", "3", "9", "8" })
 local SUIT_OF_COPY: { string } = table.freeze({ "spade", "heart", "club", "diamond" })
 
@@ -98,7 +103,7 @@ local TABLES: AuditTables = table.freeze({
 	pip = PIP,
 	jokerModes = JOKER_MODES,
 	jokerBand = JOKER_BAND,
-	pipSource = "glyph",
+	pipSource = PIP_SOURCE,
 })
 
 local function naturalKey(rankGlyph: string, silhouette: string): string
@@ -248,9 +253,9 @@ end
 return table.freeze({
 	MAX_RANKS = MAX_RANKS,
 	JOKER_RANK = 0, -- mirrors the engine's Types.JOKER_RANK; tests/card/faces.spec is the drift test
-	-- "glyph" | "sprite". M-16 flips this to "sprite" if the glyphs fail at 16 px on a phone; `audit`
-	-- must stay green under either value. Hearts and spades are never built from rotated Frames.
-	PIP_SOURCE = "glyph",
+	-- M-16 flips the single PIP_SOURCE local above to "sprite" if the glyphs fail at 16 px on a phone;
+	-- `audit` must stay green under either value. Hearts and spades are never built from rotated Frames.
+	PIP_SOURCE = PIP_SOURCE,
 	RANK_LADDER = RANK_LADDER,
 	SUIT_OF_COPY = SUIT_OF_COPY,
 	PIP = PIP,
