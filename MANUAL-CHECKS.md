@@ -636,6 +636,12 @@ Steps: on a real notched phone in landscape, open the card table and confirm:
 2. The fan and both piles are reachable with thumbs at rest, without shifting the grip.
 3. Nothing interactive sits under the notch or the Roblox top bar, with `ScreenInsets = CoreUISafeInsets`.
 4. Set Settings > Text Size to **Largest** and confirm every status-strip string stays on **one line**.
+5. **Added 2026-11-08, carried over from M-16: confirm the four suit glyphs still render on this
+   device.** M-16 step 2 says "on a phone" and was answered in Studio on Windows, which is not the
+   same claim -- Roblox falls back per glyph to a system font, and Windows ships suit symbols where a
+   phone may not. If any pip is a blank or a box here, M-16's sprite-sheet escalation is live and
+   M-14's greyscale judgement was made against glyphs that do not ship. This step is the only place
+   that risk is caught.
 
 Record the device model, its physical resolution, and the measured status-strip width.
 
@@ -885,6 +891,29 @@ Own-action sounds are capped at `AUDIO.OWN_CAP_SECONDS = 0.12` so a long asset c
 next action, and `AUDIO.VOLUME = 0.3`. Pick short assets: a 2-second sting will be cut to 0.12s.
 
 Observed:
+
+**Steps 2 and 3 pass in Studio on `Spoons Dev` (Windows), 2026-11-08.** The probe above rendered all
+six rows:
+
+- **Step 3 PASSES.** Builder Sans **Regular and Bold both exist and are visibly distinct** -- the Bold
+  rows are clearly heavier than the Regular rows at all three sizes. No blocker to raise, and no
+  substitution was needed.
+- **Step 2 passes on presence.** All four suit codepoints render as real suit shapes at 16, 20 and 28
+  px. No blanks and no `.notdef` boxes. Spade and club are tellable apart on the 16 px row.
+- **So `PIP_SOURCE` stays `"glyph"` and no sprite sheet is needed.** The escalation path stays
+  available and tested but is not being walked.
+
+**Caveat, deliberately left open: this was desktop, and the step says "on a phone".** Roblox falls
+back **per glyph** to a system font when the chosen family lacks one, and Windows ships suit symbols
+(Segoe UI Symbol) where a phone may not. Whether what rendered is Builder Sans's own glyph or a
+Windows fallback is **undetermined** -- the screenshot cannot settle it, and a per-glyph fallback is
+device-dependent by nature. A desktop pass therefore does not license the phone claim. **M-12 step 5
+now carries that re-check**, because M-12 is the only row that puts the real UI on real glass. If the
+pips fail there, the sprite escalation is live and M-14 was judged against glyphs that do not ship.
+
+**Step 1 (audio) is the only part of M-16 still open.** All three ids remain `""`, which is a passing
+state under this row's own Expected ("ids supplied **or deliberately left silent**") -- but it has to
+be a decision, not an oversight, so this box stays unticked until it is made.
 
 - [ ] M-16 signed off: <name> <date>
 

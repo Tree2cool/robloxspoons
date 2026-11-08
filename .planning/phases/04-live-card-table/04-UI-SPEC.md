@@ -393,10 +393,10 @@ The UI checker returned **VERIFIED / APPROVED** with nine non-blocking FLAGs. Di
 | V-25 mobile min target size | UNVERIFIED | 48 is the project's own floor; do not cite 44 as platform fact |
 | V-26 disable default controls | UNVERIFIED | Confirm `PlayerModule:GetControls():Disable()` hides the thumbstick/jump and `Enable()` restores it |
 | V-27 `ContextActionService` / gamepad `SelectedObject` | UNVERIFIED | Confirm, or drop the gamepad column |
-| Font availability (BuilderSans Regular/Bold) | UNVERIFIED | Check in Studio. **No fallback exists** — `Enum.Font.Gotham*` was removed and maps to Montserrat (04-RESEARCH.md), so unavailability is a blocker, not a substitution |
+| Font availability (BuilderSans Regular/Bold) | **RESOLVED 2026-11-08 (M-16 step 3)** | Both weights exist and render visibly distinct at 16/20/28 in Studio. No blocker; no substitution made |
 | `GuiService.PreferredTextSize` at "Largest" | **NEW, from 04-RESEARCH.md** | The accessibility setting scales text even when `TextScaled = false`, so it can overflow the single-line status strip. Every strip string must be measured at the **Largest** setting, not just the default — this compounds F4 below |
-| Suit pip rendering (glyph vs sprite) | OPEN | Test glyphs on a phone; else owner-uploaded sprite (human gate) |
-| Landscape lock | HUMAN GATE | Creator Dashboard setting; `MANUAL-CHECKS.md` + `NEEDS_HUMAN.md` |
+| Suit pip rendering (glyph vs sprite) | **NARROWED 2026-11-08 (M-16 step 2)** | `PIP_SOURCE` stays `"glyph"`: all four codepoints render as suit shapes at 16/20/28, spade vs club tellable at 16. **Still open for the device half** — this was Studio on Windows, and the question was "on a phone". Roblox falls back per glyph to a system font, so a Windows pass may be Segoe UI Symbol rather than Builder Sans and need not hold on glass. **M-12 step 5** carries the re-check; the sprite escalation stays built and tested |
+| Landscape lock | **DONE 2026-11-08 (M-15)** | Not a Creator Dashboard setting as written here: `StarterGui.ScreenOrientation = LandscapeSensor`, set in Studio on `Spoons Dev`. Rojo 7.7.1 can also set it via `$properties` (measured) |
 | Audio asset ids (sting, draw, pass) | HUMAN GATE | Owner-supplied; missing = silent |
 | Real-phone pass | REQUIRED | Thumb reach, safe areas, 48 px on glass |
 
