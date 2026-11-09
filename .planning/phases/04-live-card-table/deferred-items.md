@@ -314,3 +314,20 @@ Items Phase 4 deliberately left for pre-launch. They were scattered across plan 
   Supported Devices stays a Dashboard setting and belongs to **UX-06**.
 - **Owner:** Phase 8 (UX-06: "supported devices and orientation are set explicitly with console and
   VR disabled").
+
+### D-04-34 — The greyscale gate is blind to rotation collisions
+- **What:** `Faces.audit` establishes pip distinctness by comparing silhouette **strings**, so
+  `"spade" ~= "heart"` passes no matter what the renderer's 180-degree mirror does to the drawn shape.
+  M-14's desk half (2026-11-09) observed that an inverted heart reads as a spade silhouette in the
+  mirrored corner index, and an inverted spade as a heart.
+- **Why it slipped through:** the ranks ARE rotation-safe, and deliberately so -- `RANK_LADDER` holds
+  no 6, so a rotated 9 cannot be misread. That reasoning was never carried across to the pips, where
+  unlike the 6 **both** colliding suits ship.
+- **Status:** observed, **not adjudicated**. The owner passed M-14's desk half without closing this.
+  Whether it misleads depends on whether the inverted rank glyph beside the pip reads as "this is the
+  mirrored corner", which a screenshot cannot settle.
+- **The fix, if it is one:** rotate the rank glyph but not the pip. The point reflection still reads
+  correctly and the suit collision disappears. `mirror.group.Rotation = 180` in `CardFace.new` would
+  become a rotation on the rank label alone.
+- **Owner:** M-12 (the phone half of M-14 rides with it). If confirmed there, it is a Phase 4 defect
+  to fix, not a Phase 8 carry.

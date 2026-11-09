@@ -645,10 +645,18 @@ Steps: on a real notched phone in landscape, open the card table and confirm:
    phone may not. If any pip is a blank or a box here, M-16's sprite-sheet escalation is live and
    M-14's greyscale judgement was made against glyphs that do not ship. This step is the only place
    that risk is caught.
+6. **Added 2026-11-09, carried over from M-14 (D-04-34): does a rotated heart read as a spade?**
+   M-14's desk half passed but left this open. The mirrored corner index inverts the pip, and heart
+   and spade swap silhouettes under 180 degrees -- a collision `Faces.audit` cannot see, because it
+   compares silhouette strings. Lift a heart and read its bottom-right corner: if you doubt the suit
+   it is a **Phase 4 defect**, and the fix is to rotate the rank glyph but not the pip.
+7. **M-14's desk half is done; its phone half is steps 5 and 6 above.** M-14's Expected is "on both
+   surfaces", so **signing M-12 without doing 5 and 6 leaves M-14 unsignable** and the device session
+   has to be repeated. Judge the pips while the phone is already in your hand.
 
 Record the device model, its physical resolution, and the measured status-strip width.
 
-**Expected:** all four hold. A tight-but-passing strip is recorded with its measured width so a later copy change has a
+**Expected:** all seven hold. A tight-but-passing strip is recorded with its measured width so a later copy change has a
 baseline.
 
 **Blocking: yes for Phase 4's close.**
@@ -933,7 +941,37 @@ not be a fix.
 
 Observed:
 
-- [ ] M-14 signed off: <name> <date>
+**Desk half PASSED on `Spoons Dev`, 2026-11-09.** All 50 faces rendered in computed greyscale at the
+design 72 x 92 through the real `CardFace`. Against the three things this row names:
+
+- **Spade versus club passes** -- the predicted hardest pair. The club's three lobes separate cleanly
+  from the spade's solid point even at the 16 px index pip. No enlargement to 20 and no thickening of
+  the club silhouette is needed.
+- **The overlapped strip row passes.** All four suits are nameable from the corner index alone, which
+  is the real viewing condition: under a right neighbour only 60 of a card's 72 px show.
+- **All 12 ranks are legible**, including the 5/3/9/8 group `RANK_LADDER` deliberately loads last, and
+  both jokers are distinct by band text *and* by the barred star.
+
+**Greyscale behaved exactly as the luma gate measured**, which is a real cross-check rather than a
+coincidence: the heart and diamond rows render mid-grey (red -> 78) while the spade and club rows stay
+near-black (24), both well clear of the face at 240. Colour carries no identity, as D-24 requires.
+
+**OPEN, raised by this check and not adjudicated: the mirrored corner index inverts the pip, and a
+rotated heart reads as a spade silhouette** (and a rotated spade as a heart). The ranks are
+rotation-safe and the spec says why -- `RANK_LADDER` contains **no 6**, so a rotated 9 cannot be
+misread. The same reasoning was never applied to the pips, and unlike the 6, **both** colliding suits
+ship. `Faces.audit` cannot see this: it compares silhouette *strings*, so `"spade" ~= "heart"` passes
+regardless of what 180 degrees does to the drawn shape. The automated D-24 gate is rotation-blind by
+construction. Whether it misleads in play depends on whether the inverted rank glyph beside it reads
+as "this is the mirrored corner, flip it", which a screenshot cannot settle.
+**Carried to the phone half.** If it misleads there, the fix is to rotate the rank glyph but not the
+pip: the point-reflection still reads correctly and the suit collision goes away. Recorded as
+**D-04-34**.
+
+**The phase half is outstanding.** This row's Expected is "on both surfaces", so M-14 is NOT signed
+until the pips are judged on a real phone -- which rides along with M-12 (see M-12 step 5).
+
+- [ ] M-14 signed off: <name> <date> -- desk half passed 2026-11-09; awaiting the phone half with M-12
 
 ---
 
