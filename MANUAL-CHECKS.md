@@ -722,7 +722,10 @@ which is the whole of what you are judging below. Nothing here is left for a hum
 
 **The grid.** Paste into the Studio **command bar**, press **Play (F5)**, look, press **Stop**, then
 **delete `StarterGui.M14Probe`** (`default.project.json` does not mount `StarterGui`, so Rojo will not
-clean it up). Maximise the window first: the grid is 1056 x 684 px.
+clean it up). Maximise the window first: the grid is 1056 x 532 px. It has to fit the **viewport**, not the screen --
+with the script editor open a Studio window has roughly 650 px of viewport, which is why the strip row
+sits beside the jokers on row 5 rather than below the grid. Below the grid needed 660 px and was drawn
+off-screen, so the single most important row of this probe was silently missed on the first two runs.
 
 ```lua
 -- M-14 probe. Set to false to see the same grid in shipped colour.
@@ -785,10 +788,16 @@ end
 
 -- The overlapped case: under a right neighbour only the 60-wide strip shows, and the corner index is
 -- all of it. Four copies of one rank, which is the four-of-a-kind the game is played for.
-local stripY = Y0 + 5 * (D.CARD_H + GAP_Y) + 24
+-- It sits BESIDE the jokers on row 5, not below the grid. Below the grid needs 660 px of viewport and
+-- a Studio window with the script editor open has about 650, so the single most important row of this
+-- probe was drawn off-screen and silently missed. Row 5 has ten empty columns; use them.
+local stripRow, stripCol = 5, 4
 for copy = 1, 4 do
 	local inst = place(1, copy, nil, 1, 1)
-	inst.Position = UDim2.fromOffset(X0 + (copy - 1) * D.STEP + D.CARD_W / 2, stripY + D.CARD_H / 2)
+	inst.Position = UDim2.fromOffset(
+		X0 + (stripCol - 1) * (D.CARD_W + GAP_X) + (copy - 1) * D.STEP + D.CARD_W / 2,
+		Y0 + (stripRow - 1) * (D.CARD_H + GAP_Y) + D.CARD_H / 2
+	)
 	inst.ZIndex = 10 + copy
 end
 
