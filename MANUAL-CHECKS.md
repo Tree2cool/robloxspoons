@@ -748,6 +748,11 @@ end
 local gui = Instance.new("ScreenGui")
 gui.Name = "M14Probe"
 gui.IgnoreGuiInset = true
+-- MUST be explicit. CardFace puts every card root at ZIndex 20 (applyStyle's else branch, because this
+-- probe never calls moveToSlot so slotRef is nil) while the labels inside stay at the default 1. Under
+-- Global behaviour every label would draw UNDERNEATH every card background and all 50 cards come out
+-- blank. Sibling makes a child always draw above its own parent, which is what the real Hud relies on.
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = game.StarterGui
 local bg = Instance.new("Frame")
 bg.Size = UDim2.fromScale(1, 1)
@@ -785,6 +790,23 @@ for copy = 1, 4 do
 	local inst = place(1, copy, nil, 1, 1)
 	inst.Position = UDim2.fromOffset(X0 + (copy - 1) * D.STEP + D.CARD_W / 2, stripY + D.CARD_H / 2)
 	inst.ZIndex = 10 + copy
+end
+
+-- Diagnostics: measure rather than eyeball. If a face looks wrong, these numbers say why.
+local probeCard = bg:FindFirstChild("Card")
+if probeCard then
+	print(`ZIndexBehavior = {gui.ZIndexBehavior.Name}  (Sibling is required; Global blanks every card)`)
+	print(
+		`card AbsoluteSize = {probeCard.AbsoluteSize}  (design is {D.CARD_W} x {D.CARD_H}; a bigger number means you are judging legibility at the wrong size)`
+	)
+	print(`card root ZIndex = {probeCard.ZIndex}`)
+	for _, d in probeCard:GetDescendants() do
+		if d:IsA("TextLabel") and d.Text ~= "" then
+			print(
+				`  {d.Name}: text={d.Text} z={d.ZIndex} size={d.AbsoluteSize} visible={d.Visible} alpha={d.TextTransparency}`
+			)
+		end
+	end
 end
 
 -- Greyscale is COMPUTED here, not post-processed. ColorCorrectionEffect is a 3D-scene effect and
@@ -865,6 +887,16 @@ print(
 
 **It uses the real `CardFace` renderer**, not a redrawing of the faces, so what you judge is what
 ships. It asserts `scale == 1` up front, so a card is exactly its design 72 x 92.
+
+**`ZIndexBehavior` must be `Sibling`, and the probe sets it explicitly.** First run, every one of the
+50 cards came out blank. `applyStyle`'s else branch puts each card root at `ZIndex = 20` -- this probe
+never calls `moveToSlot`, so `slotRef` is nil and the "Idle with a slot" branch is not taken -- while
+the labels inside stay at the default 1. Under `Global` behaviour every label draws **underneath**
+every card background. The real Hud never hit this because it relies on `Sibling`, where a child
+always draws above its own parent. Roblox's default for `Instance.new("ScreenGui")` could not be
+checked against primary docs (`create.roblox.com` is DNS-blocked), so the probe states it rather than
+assuming it. The probe also prints the card's `AbsoluteSize`: if it is not 72 x 92 you are judging
+legibility at the wrong size and the result does not count.
 
 **Greyscale is computed in the probe, not post-processed.** The steps above say
 `ColorCorrectionEffect.Saturation = -1`, but that is a 3D-scene effect and **whether it touches a
