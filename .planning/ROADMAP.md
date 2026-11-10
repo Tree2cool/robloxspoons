@@ -208,7 +208,7 @@ these: `.planning/phases/02-card-engine-and-pacing-simulator/02-G1-REPORT.md`.
   4. A player can still read how full the other seats are well enough to know whether they are about to be one of the two who get nothing (CARD-13), with the "X is out" callouts intact (D-40)
   5. Completing four of a kind still reads as a starting gun (CARD-17): overlay gone in the same frame, controls back instantly, the avatar already running while the flourish plays around it (D-30's ordering is unchanged)
   6. The card engine, the server shell, the net layer and the seat hold are **untouched** — this phase replaces a renderer, not a game
-**Plans**: TBD
+**Plans**: 10 (see the Plans list below)
 **UI hint**: yes
 **Research**: YES. 3D-to-screen hit testing with a locked camera, deterministic on-screen card size across viewports, mobile cost of per-card 3D geometry or ViewportFrames, and hand/arm animation sourcing (new asset work with no prior phase). Re-check V-25 (the 48 px floor) and V-34 against the new render path.
 
@@ -216,8 +216,24 @@ these: `.planning/phases/02-card-engine-and-pacing-simulator/02-G1-REPORT.md`.
 
 **What it costs.** `CardFace`, `CardHand`, `CardPiles` and `Layout` are replaced. **M-12 and M-14's desk half are invalidated** — M-14 was signed against flat 72 x 92 faces. M-11 and M-13's timing survive untouched. Hand animations are new asset work in no prior phase's scope.
 
+**Plans:** 10 plans in 7 waves. **Wave 0 is a spike and it gates every other wave:** the docs do not
+settle how two `AlwaysOnTop` SurfaceGuis on different Parts order against each other, and a fan whose
+layering is wrong is not a fan. Routes A and B share every geometric number, so the phase proceeds on
+a provisional route behind one constant with one read site; M-18 settles it, and if it selects route B
+then M-23 (lighting independence) goes live because scene lighting returns and the machine-gated
+4.5:1 luma floor stops describing what the player sees.
+
 Plans:
-- [ ] TBD (run /gsd-plan-phase 04.1 to break down)
+- [ ] 04.1-01-PLAN.md — the layering spike, the route seam, the HAND/CAMERA config and every new MANUAL-CHECKS row, written before any renderer code (wave 0, gates all)
+- [ ] 04.1-02-PLAN.md — `Projection.luau`: the pure pinhole model, the four-step transform order (F4) and the 48 px proof re-derived (wave 1)
+- [ ] 04.1-03-PLAN.md — the locked camera: lock/release as Controls effects with one release site, `CardCamera`, and the camera discipline gate (wave 1)
+- [ ] 04.1-04-PLAN.md — `viewportFrom` from two documented `GetInsetArea` calls (F1), and `Layout` gives up the hand and re-anchors the chrome (wave 2)
+- [ ] 04.1-06-PLAN.md — the face tree extracted unchanged, `CardCarrier` as an anonymous Part plus a PlayerGui SurfaceGui, and the T1/T2 privacy scans (wave 2)
+- [ ] 04.1-05-PLAN.md — `CardHud` on the new recipe, the plate removed, the single pixel-to-GUI conversion, and the forbidden-coordinate-API gate (wave 3)
+- [ ] 04.1-07-PLAN.md — `CardHand` rewritten: the 3D fan, the 2D hit buttons, every motion path, and the no-gating gate (D-50) (wave 4)
+- [ ] 04.1-08-PLAN.md — the depth rail: `Rail.luau` pure, its layout slot, the view, and F5/F6/F7 fixed (wave 4)
+- [ ] 04.1-09-PLAN.md — the wiring, and the git-asserted proof that the frozen set is frozen (wave 5)
+- [ ] 04.1-10-PLAN.md — the three Studio probes with their own non-vacuity, and one controlled pre/post budget measurement (wave 6)
 
 ### Phase 5: Hunt, Anti-ESP, Claim and Scoring
 **Goal**: A seeker who completes four of a kind can hunt server-hidden spoons that cheat clients cannot read, claim one without races, and be scored correctly, closing the loop into a playable vertical slice
