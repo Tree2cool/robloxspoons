@@ -19,6 +19,18 @@ local function naive(seconds: number, perSecond: number): number
 	return math.ceil(seconds * perSecond)
 end
 
+-- Phase 04.1 added nested tables (HAND, CAMERA), so the key check needs a dotted path rather than one index.
+local function at(root: any, path: string): any
+	local node: any = root
+	for part in string.gmatch(path, "[^%.]+") do
+		if node == nil then
+			return nil
+		end
+		node = node[part]
+	end
+	return node
+end
+
 local function withinCeiling(seconds: number, perSecond: number, convert: (number, number) -> number): boolean
 	-- The product is compared with a 1e-6 tolerance because the IEEE product of a decimal can sit a
 	-- few ulp BELOW the true value (0.29 * 100 = 28.999999999999996) and the real conversion
@@ -103,15 +115,92 @@ return function(t: Test.Runner)
 			{ "STALL_CUE_SECONDS", 5.0 },
 			{ "STALL_REPEAT_SECONDS", 30.0 },
 			{ "SWEEP_HZ", 10 },
+			-- Phase 04.1 (plan 04.1-01): the first-person hand and its camera. Dotted paths, resolved by `at`.
+			{ "HAND.STUDS_PER_DESIGN_UNIT", 1 / 40 },
+			{ "HAND.CARD_STUDS.WIDTH", 1.8 },
+			{ "HAND.CARD_STUDS.HEIGHT", 2.3 },
+			{ "HAND.CARD_STUDS.THICKNESS", 0.05 },
+			{ "HAND.STEP_STUDS", 1.5 },
+			{ "HAND.LIFT_STUDS", 0.4 },
+			{ "HAND.ROLL_STEP_DEG", 4 },
+			{ "HAND.LEAN_DEG", 12 },
+			{ "HAND.DEPTH_STEP_STUDS", 0.05 },
+			{ "HAND.OFFSET_STUDS.X", 0 },
+			{ "HAND.OFFSET_STUDS.Y", -2.2 },
+			{ "HAND.OFFSET_STUDS.Z", -6.5 },
+			{ "HAND.CANVAS_SCALE", 3 },
+			-- LAYERING_ROUTE IS DELIBERATELY NOT PINNED TO A VALUE HERE, and that is not an omission. It is the
+			-- PROVISIONAL answer to an unsigned manual check (M-18), and pinning it would mean that the moment
+			-- the owner photographs the spike and flips the route, this suite goes RED -- so the gate would
+			-- punish the correct action and the promised "a wrong answer costs ONE constant" would become a
+			-- two-file edit. Its legality is asserted, by tests/card/layering_contract.spec.luau case 1, which
+			-- accepts either legal value. MEASURED: this was found by running the plan's mandated mutation 2
+			-- (route = "Depth" alone) and seeing THIS case fail while layering_contract stayed green.
+			{ "HAND.PIP_MIN_PX", 14 },
+			{ "HAND.GLYPH_MIN_PX", 17 },
+			{ "HAND.HIT_FLOOR_MARGIN_PX", 52 },
+			{ "CAMERA.FOV_DEGREES", 70 },
+			{ "CAMERA.EYE_RISE_STUDS", 2.5 },
+			{ "CAMERA.PITCH_DEGREES", -18 },
+			{ "CAMERA.MIN_FULL_HEIGHT", 360 },
+			{ "CAMERA.ASPECT_MIN", 4 / 3 },
+			{ "CAMERA.ASPECT_MAX", 21 / 9 },
+			{ "TWEEN.CARD_MOVE", 0.18 },
 		}
 		local seen = 0
 		local card = Card :: any
 		for _, pair in expected do
-			t.equal(card[pair[1]], pair[2], `Config.Card.{pair[1]}`)
+			t.equal(at(card, pair[1]), pair[2], `Config.Card.{pair[1]}`)
 			seen += 1
 		end
 		print(`  config keys checked: {seen}`)
-		t.truthy(seen >= 12, "the config lock ran over too few keys to prove anything")
+		t.truthy(seen >= 35, "the config lock ran over too few keys to prove anything")
+
+		-- The three invariants that are RELATIONS rather than values. A relation is what survives a tuning pass:
+		-- if someone retunes a stud number and these break, the question "did you mean to change the other one?"
+		-- is asked by the suite rather than by a reviewer who happened to look.
+		--
+		-- 1. The 72:92 ratio is what keeps every Phase 4 design token valid at the new size.
+		t.truthy(
+			math.abs(Card.HAND.CARD_STUDS.WIDTH / Card.HAND.CARD_STUDS.HEIGHT - 72 / 92) < 1e-9,
+			`card stud ratio {Card.HAND.CARD_STUDS.WIDTH / Card.HAND.CARD_STUDS.HEIGHT} is not 72:92`
+		)
+		-- 2. The studs are exact divisions of the design units, not independent numbers. MEASURED, because this
+		--    is IEEE arithmetic and not algebra: `60 * (1/40) == 1.5` and `16 * (1/40) == 0.4` are both EXACTLY
+		--    true, while `92 * (1/40)` is 2.3000000000000003 and is NOT equal to 2.3. So the two that can be
+		--    asserted exactly are asserted exactly, and the card height is asserted to within an ulp with the
+		--    reason written down -- rather than all three being given a tolerance that hides which is which.
+		t.equal(Card.HAND.STEP_STUDS, 60 * Card.HAND.STUDS_PER_DESIGN_UNIT, "STEP_STUDS must be 60 design units")
+		t.equal(Card.HAND.LIFT_STUDS, 16 * Card.HAND.STUDS_PER_DESIGN_UNIT, "LIFT_STUDS must be 16 design units")
+		t.equal(Card.HAND.CARD_STUDS.WIDTH, 72 * Card.HAND.STUDS_PER_DESIGN_UNIT, "card width is 72 design units")
+		t.truthy(
+			math.abs(Card.HAND.CARD_STUDS.HEIGHT - 92 * Card.HAND.STUDS_PER_DESIGN_UNIT) < 1e-12,
+			string.format(
+				"card height is 92 design units: 92/40 = %.17g, config says %.17g",
+				92 * Card.HAND.STUDS_PER_DESIGN_UNIT,
+				Card.HAND.CARD_STUDS.HEIGHT
+			)
+		)
+		-- 3. CARD_MOVE is the existing SEND value, recorded so a later edit to one is visibly a decision about
+		--    the other (D-51; Config/Card.luau header point 8).
+		t.equal(Card.TWEEN.CARD_MOVE, Card.TWEEN.SEND, "CARD_MOVE is SEND; changing one is a decision about both")
+		-- The route's VALUE is not locked (see the note in the list above); that it is one of the two legal
+		-- values is. A typo here would otherwise reach the carrier as a silent third route.
+		t.truthy(
+			Card.HAND.LAYERING_ROUTE == "AlwaysOnTop" or Card.HAND.LAYERING_ROUTE == "Depth",
+			`LAYERING_ROUTE must be "AlwaysOnTop" or "Depth", got "{tostring(Card.HAND.LAYERING_ROUTE)}"`
+		)
+		-- The derived arc radius is NEVER stored: a second constant is how two numbers come to disagree.
+		t.equal((Card.HAND :: any).ARC_RADIUS, nil, "the arc radius must be derived, never stored")
+		t.equal((Card.HAND :: any).RADIUS_STUDS, nil, "the arc radius must be derived, never stored")
+		print(
+			string.format(
+				"  derived arc radius = %.4f studs (STEP_STUDS / (2 sin(ROLL_STEP_DEG/2))), end dip at hand 5 = %.4f",
+				Card.HAND.STEP_STUDS / (2 * math.sin(math.rad(Card.HAND.ROLL_STEP_DEG) / 2)),
+				(Card.HAND.STEP_STUDS / (2 * math.sin(math.rad(Card.HAND.ROLL_STEP_DEG) / 2)))
+					* (1 - math.cos(math.rad(2 * Card.HAND.ROLL_STEP_DEG)))
+			)
+		)
 		t.truthy(
 			Card.FLOURISH_DISPLAY_ORDER < Card.HAND_DISPLAY_ORDER,
 			"the flourish must never sit above the hand (checker FLAG F8)"
