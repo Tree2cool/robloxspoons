@@ -298,16 +298,23 @@ function CardService.new(deps: Deps): CardService
 	end
 
 	local function startRound(_self: CardService): boolean
+		-- Each refusal SAYS SO. These three returned a bare `false` until 2026-11-10, when a round that
+		-- would not start cost a Studio session to diagnose from the outside: nothing distinguished "a
+		-- round is already running" from "too few players" from "the map is short of seat poses", and
+		-- M-11, M-13 and M-17 all need a seated player before they can begin.
 		if cardTable ~= nil then
+			deps.onTelemetry("start_round_refused_already_running", {})
 			return false
 		end
 		local players = Players:GetPlayers()
 		if #players < 3 then
+			deps.onTelemetry("start_round_refused_too_few_players", { players = #players })
 			return false
 		end
 		local poses = deps.seatPoses()
 		-- Seekers only: the first player hides and plays no cards (amendment A3).
 		if #poses < #players - 1 then
+			deps.onTelemetry("start_round_refused_too_few_poses", { poses = #poses, needed = #players - 1 })
 			return false
 		end
 
