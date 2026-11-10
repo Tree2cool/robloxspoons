@@ -81,6 +81,10 @@ COMPLETE, FOUND-08 PARTIAL.
 
 ## Accumulated Context
 
+### Roadmap Evolution
+
+- Phase 04.1 inserted after Phase 4: first-person card presentation, camera locked on the player's own 3D cards in hand (URGENT — owner decision 2026-11-10, replaces Phase 4's 2D overlay; M-12 and M-14's desk half invalidated)
+
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.

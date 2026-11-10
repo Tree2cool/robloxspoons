@@ -16,6 +16,7 @@ Every Roblox platform claim in the research is unverified against primary docs (
 - [x] **Phase 2: Card Engine and Pacing Simulator** - Pure headless card ring, fuzz suite, and the simulator gate that decides jokers-as-wilds versus blockers
 - [x] **Phase 3: Placement Rules, Map Pipeline and Validator** - Shared placement rules and a validator that runs every default spot through them (parallel with Phase 2)
 - [ ] **Phase 4: Live Card Table** - Server card shell, prediction/reconcile, AFK auto-pass, and the PC and mobile card UI (parallel with Phase 5)
+- [ ] **Phase 04.1: First-Person Card Presentation** - (INSERTED) Camera locked on the player's own 3D cards in hand; replaces Phase 4's 2D overlay
 - [ ] **Phase 5: Hunt, Anti-ESP, Claim and Scoring** - Server-only spoon data, per-client reveal, atomic claim, scoring ledger, round end (parallel with Phase 4; ends at the vertical-slice gate)
 - [ ] **Phase 6: Hide Phase, Match Lifecycle and Churn** - Free placement UI, parkour room, full match flow, joiners/leavers, scoreboard and podium
 - [ ] **Phase 7: Content and Monetization** - Two independent tracks: five maps (7a) and the cosmetic catalog, shop, persistence and VIP (7b)
@@ -195,6 +196,28 @@ edge-case path. The simulator's clock is float seconds while the shipped clock i
 (Non-Negotiable Rule 5), so round at the boundary. And the start-up ramp is real: ~8.3s at N=10 against a 4.6s
 median time-to-first-completion at N=3, so far seats need a "waiting for cards" affordance. Evidence for all of
 these: `.planning/phases/02-card-engine-and-pacing-simulator/02-G1-REPORT.md`.
+
+### Phase 04.1: First-Person Card Presentation (INSERTED)
+**Goal**: The card phase is played from the seated player's own point of view — the camera locked on their own cards, the cards themselves 3D objects held in the avatar's hands with draw and pass animations, the table and the other players visible behind — without losing any guarantee the flat overlay was providing
+**Depends on**: Phase 4
+**Requirements**: CARD-02, CARD-13, CARD-15, CARD-17, CARD-19, UX-01, UX-02, UX-03, UX-04 (re-met, not newly met: Phase 4 met them against the 2D overlay this phase replaces)
+**Success Criteria** (what must be TRUE):
+  1. A seated player sees their own hand as 3D cards held in front of them, selects with one tap and passes with a second (CARD-02), and the fumbled double-tap behaves exactly as D-03 already decided
+  2. Every card's on-screen hit target measures **>= 48 physical px on a real phone** — computable because the camera is locked, which is the whole reason this presentation is viable (UX-01, UX-03)
+  3. All 50 faces remain nameable in greyscale at the new rendered size, on desk and on glass: identity still comes from `(rankGlyph, pipShape)` and never from colour (CARD-19, D-24)
+  4. A player can still read how full the other seats are well enough to know whether they are about to be one of the two who get nothing (CARD-13), with the "X is out" callouts intact (D-40)
+  5. Completing four of a kind still reads as a starting gun (CARD-17): overlay gone in the same frame, controls back instantly, the avatar already running while the flourish plays around it (D-30's ordering is unchanged)
+  6. The card engine, the server shell, the net layer and the seat hold are **untouched** — this phase replaces a renderer, not a game
+**Plans**: TBD
+**UI hint**: yes
+**Research**: YES. 3D-to-screen hit testing with a locked camera, deterministic on-screen card size across viewports, mobile cost of per-card 3D geometry or ViewportFrames, and hand/arm animation sourcing (new asset work with no prior phase). Re-check V-25 (the 48 px floor) and V-34 against the new render path.
+
+**Why this exists.** Phase 4 shipped a 2D `ScreenGui` hand overlay, decided as D-26 and D-27 on the grounds that a 3D card's on-screen size depends on camera framing and so the 48 px touch floor could not be asserted. **Locking the camera removes that objection**: a fixed camera makes each card's screen rect a computable, stable number, so the floor is assertable again. The owner confirmed on 2026-11-10 that the locked-camera first-person view is the intended game, having seen the reasoning. D-14 already required a locked camera during the card phase; this changes where it points and what the cards are made of.
+
+**What it costs.** `CardFace`, `CardHand`, `CardPiles` and `Layout` are replaced. **M-12 and M-14's desk half are invalidated** — M-14 was signed against flat 72 x 92 faces. M-11 and M-13's timing survive untouched. Hand animations are new asset work in no prior phase's scope.
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 04.1 to break down)
 
 ### Phase 5: Hunt, Anti-ESP, Claim and Scoring
 **Goal**: A seeker who completes four of a kind can hunt server-hidden spoons that cheat clients cannot read, claim one without races, and be scored correctly, closing the loop into a playable vertical slice

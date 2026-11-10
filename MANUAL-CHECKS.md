@@ -34,6 +34,20 @@ would mean for the requirement it carries:
 Requirements UX-01, UX-02, UX-03 and UX-04 are **not met by any plan**; they are met only by these rows. Do not run
 `requirements.mark-complete` for Phase 4.
 
+> **⚠ PHASE 04.1 SUPERSEDES PART OF THIS FILE (owner decision 2026-11-10).** The card phase is being
+> rebuilt as a first-person view: the camera locked on the player's own cards, the cards themselves 3D
+> objects in the avatar's hands. That replaces the 2D `ScreenGui` hand overlay Phase 4 shipped.
+>
+> **Do not spend a device session on M-12, or on M-14's phone half, until 04.1 ships.** Both measure
+> the overlay that is being replaced. **M-14's desk half, signed 2026-11-09, is invalidated** — it
+> judged flat 72 x 92 faces and the faces will no longer be flat. The 50-face vocabulary, the
+> greyscale identity rule and the machine-gated luma floor all survive; only the rendered size and
+> geometry change, so M-14 is re-run rather than re-designed.
+>
+> **M-11 and M-13 are unaffected and worth doing now.** M-11 tests control hiding and the server-side
+> avatar hold, neither of which knows what the cards are drawn with; M-13's prediction timing is the
+> same, though its visuals will change. M-11 is still the highest-risk row in the phase.
+
 How to use this file:
 
 - Do the checks in any order, except M-04 first if you want M-03 and M-06 to run against the dev experience.
