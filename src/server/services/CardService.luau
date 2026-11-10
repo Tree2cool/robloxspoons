@@ -61,6 +61,11 @@ assert(
 	"AUTO_PASS_DECI exceeds the locked ceiling"
 )
 
+-- How long watchCharacter waits for a spawning character's PrimaryPart before giving up, in frames.
+-- About ten seconds at 60 Hz: long enough for a slow join, short enough that a stuck one is reported
+-- rather than waited on forever.
+local PRIMARY_PART_FRAMES = 600
+
 -- The one clock expression (same form as RoundDriver.makeScheduler, so the two agree by construction).
 -- Main.server.luau reads it from here rather than writing os.clock() a second time.
 local function nowDeci(): number
@@ -240,13 +245,41 @@ function CardService.new(deps: Deps): CardService
 	end
 
 	-- A respawn hands back a fresh humanoid; the core re-applies the freeze only for a held player.
+	--
+	-- CharacterAdded IS NOT ENOUGH, and assuming it was cost a Studio session on 2026-11-10. It fires
+	-- when the character model is PARENTED, which is before `PrimaryPart` is assigned, and `pivotTo`
+	-- refuses a character with no PrimaryPart. A player seated inside that window took a hold that
+	-- deferred, and nothing retried it, because the one event that would have was already spent:
+	--   CharacterAdded (held is nil, returns) -> startRound -> hold (no PrimaryPart, deferred) -> nothing
+	-- The seeker was frozen and Scriptable but never moved to its seat, so it stood loose on the map
+	-- while the server believed it was seated. So wait for the PART, not the event. Bounded, and it
+	-- says so if it gives up rather than leaving a seat silently unfilled.
 	local function watchCharacter(player: Player)
-		table.insert(
-			connections,
-			player.CharacterAdded:Connect(function()
-				seatHold:onCharacterAdded(player.UserId)
+		local function onCharacter(character: Model)
+			seatHold:onCharacterAdded(player.UserId)
+			if character.PrimaryPart ~= nil then
+				return
+			end
+			task.spawn(function()
+				for _ = 1, PRIMARY_PART_FRAMES do
+					if character.Parent == nil then
+						return
+					end
+					if character.PrimaryPart ~= nil then
+						seatHold:onCharacterAdded(player.UserId)
+						return
+					end
+					task.wait()
+				end
+				deps.onTelemetry("seat_hold_no_primary_part", { playerId = player.UserId })
 			end)
-		)
+		end
+		table.insert(connections, player.CharacterAdded:Connect(onCharacter))
+		-- A character that already exists has no CharacterAdded left to fire for it.
+		local existing = player.Character
+		if existing ~= nil then
+			onCharacter(existing)
+		end
 	end
 	for _, player in Players:GetPlayers() do
 		watchCharacter(player)

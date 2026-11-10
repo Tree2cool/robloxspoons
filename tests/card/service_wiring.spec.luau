@@ -144,6 +144,46 @@ local function sweepProblems(raw: string): ({ string }, number)
 	return problems, #body
 end
 
+-- The 2026-11-10 seat race. CharacterAdded fires when the character model is PARENTED, before
+-- PrimaryPart is assigned, and the adapter's pivotTo refuses a character with no PrimaryPart. A player
+-- seated inside that window took a hold that deferred with nothing left to retry it, stayed frozen and
+-- Scriptable, and never reached its seat. Found in a live Studio session, not by any test: the pure
+-- core is fully covered because its effects are injected, and NOTHING automated touches this adapter.
+-- So the gate is a scan of watchCharacter, and says so.
+local function primaryPartProblems(raw: string): ({ string }, number)
+	local body =
+		slice(lex.stripComments(raw), "local function watchCharacter", "\n\tfor _, player in Players:GetPlayers()")
+	local problems: { string } = {}
+	if body == "" then
+		table.insert(problems, "watchCharacter not found")
+		return problems, 0
+	end
+	if at(body, "PrimaryPart") == nil then
+		table.insert(
+			problems,
+			"watchCharacter never mentions PrimaryPart: a hold taken before it is set can never be retried"
+		)
+	end
+	-- A mention is not a retry. It must call back into the core AFTER waiting.
+	if at(body, "task.wait") == nil then
+		table.insert(problems, "watchCharacter does not wait for the part to appear")
+	end
+	local _, calls = string.gsub(body, "seatHold:onCharacterAdded", "")
+	if calls < 2 then
+		table.insert(problems, `watchCharacter re-applies the hold {calls} time(s); the deferred case needs a second`)
+	end
+	-- "= player.Character", not "player.Character": the latter is a PREFIX of player.CharacterAdded on
+	-- the Connect line, so the loose form matched the mutant and the gate could not fire. Caught by
+	-- running the mutation, not by reading the check.
+	if at(body, "= player.Character") == nil then
+		table.insert(
+			problems,
+			"watchCharacter ignores an already-existing character, which has no CharacterAdded left to fire"
+		)
+	end
+	return problems, #body
+end
+
 return function(t: Test.Runner)
 	local raw = fs.readFile(SERVICE_PATH)
 
@@ -277,5 +317,34 @@ return function(t: Test.Runner)
 		end
 		t.equal(seen, #mutants, "every mutant seen")
 		print(`service_wiring IN-03: sweep body {size} chars, {seen}/{#mutants} mutants seen, twin green`)
+	end)
+
+	t.test("watchCharacter waits for PrimaryPart, not just CharacterAdded (the 2026-11-10 seat race)", function()
+		local problems, size = primaryPartProblems(raw)
+		t.deepEqual(problems, {}, "clean control: the real watchCharacter must be green")
+		t.truthy(size > 200, `non-vacuity: scanned a {size}-char body, so the slice really found it`)
+
+		-- TWIN with no defect: an identity edit through the same plumbing stays green.
+		t.deepEqual(
+			primaryPartProblems(replaceOnce(raw, "local function watchCharacter", "local function watchCharacter")),
+			{},
+			"twin: an identity edit of the real source is clean"
+		)
+
+		-- MUTATION: delete the wait. A mention of PrimaryPart with no wait is not a retry.
+		local noWait = string.gsub(raw, "task%.wait%(%)", "local _ = 0")
+		t.truthy(#primaryPartProblems(noWait) > 0, "MUTATION: watchCharacter stops waiting for the part")
+
+		-- MUTATION: drop back to a single re-apply.
+		local onceOnly = replaceOnce(
+			raw,
+			"seatHold:onCharacterAdded(player.UserId)\n\t\t\tif character.PrimaryPart",
+			"if character.PrimaryPart"
+		)
+		t.truthy(#primaryPartProblems(onceOnly) > 0, "MUTATION: only one re-apply left")
+
+		-- MUTATION: ignore a character that already exists.
+		local noExisting = string.gsub(raw, "local existing = player%.Character", "local existing = nil")
+		t.truthy(#primaryPartProblems(noExisting) > 0, "MUTATION: an already-spawned character is ignored again")
 	end)
 end
