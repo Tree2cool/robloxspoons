@@ -1,6 +1,6 @@
 # Manual Checks (D-04)
 
-Phases 1 to 4 produced everything the automated chain can verify. These seventeen checks need Roblox Studio, the
+Phases 1 to 4 produced everything the automated chain can verify. These twenty-three checks need Roblox Studio, the
 Creator Hub, a real phone or a real playtest, which the build container does not have. Each check is owned by the
 phase that raised it:
 M-01 to M-06 belong to Phase 1 (**Phase 1 closes only when those boxes are ticked**), M-07 to Phase 2's pacing
@@ -16,6 +16,13 @@ Studio nor a phone, so these rows are the phase's real evidence rather than a fo
 before any UI wave was executed, so that nothing device-dependent can be ticked by a machine. M-11 is the
 highest-risk row in the phase. Silence is
 not success: `lune run scripts/verify.luau` prints every unticked check after a green run.
+
+**M-18 to M-23 belong to Phase 04.1 (First-Person Cards), and all six are blocking for its close.** They were
+written by plan 04.1-01 — the Wave 0 spike — **before a single line of the new renderer existed**, for the same
+reason Phase 4's rows were written in plan 04-02: four of this phase's six ROADMAP success criteria are
+device-dependent, and a row written after the code it judges is a row a machine can be tempted to tick. Nothing in
+M-18..M-23 was ticked by the plan that wrote them, and `scripts/verify.luau` prints all six as unsigned. **M-18 is
+the one that gates the others**: it settles what a card physically is (see the Phase 04.1 close block below).
 
 **Phase 4 close block (written by plan 04-20; nothing below is ticked, and no machine may tick it).**
 Phase 4 is **not complete** until M-11, M-12, M-13, M-14, M-15 and M-17 are signed by a human. What a failure of each
@@ -38,15 +45,56 @@ Requirements UX-01, UX-02, UX-03 and UX-04 are **not met by any plan**; they are
 > rebuilt as a first-person view: the camera locked on the player's own cards, the cards themselves 3D
 > objects in the avatar's hands. That replaces the 2D `ScreenGui` hand overlay Phase 4 shipped.
 >
-> **Do not spend a device session on M-12, or on M-14's phone half, until 04.1 ships.** Both measure
-> the overlay that is being replaced. **M-14's desk half, signed 2026-11-09, is invalidated** — it
-> judged flat 72 x 92 faces and the faces will no longer be flat. The 50-face vocabulary, the
-> greyscale identity rule and the machine-gated luma floor all survive; only the rendered size and
-> geometry change, so M-14 is re-run rather than re-designed.
+> **UPDATED 2026-11-10 by plan 04.1-01. M-12 and M-14 are no longer deferred: they are RE-RUN AGAINST THE
+> NEW RENDER, and both rows below now carry those steps.** The earlier wording said "do not spend a device
+> session on M-12, or on M-14's phone half, until 04.1 ships", which was right while 04.1 was unplanned and is
+> now stale — the phase is planned, its geometry is in `Config/Card.luau`, and both rows have been rewritten
+> to judge the 3D hand rather than the retired overlay. **M-14's desk half, signed 2026-11-09, is invalidated**
+> — it judged flat 72 x 92 faces and the faces are no longer flat. The 50-face vocabulary, the greyscale
+> identity rule and the machine-gated luma floor all survive; only the rendered size and geometry change, so
+> M-14 is re-run rather than re-designed. **Neither row may be signed against a screenshot of the Phase 4
+> overlay.**
+>
+> **The new rows for this phase are M-18 to M-23**, at the bottom of this file, with the close block below.
 >
 > **M-11 and M-13 are unaffected and worth doing now.** M-11 tests control hiding and the server-side
 > avatar hold, neither of which knows what the cards are drawn with; M-13's prediction timing is the
 > same, though its visuals will change. M-11 is still the highest-risk row in the phase.
+
+**Phase 04.1 close block (written by plan 04.1-01, the Wave 0 spike; nothing below is ticked, and no machine may
+tick it).**
+Phase 04.1 is **not complete** until **M-18, M-19, M-20, M-21 and M-22** are signed by a human, **plus M-23 if and
+only if `Card.HAND.LAYERING_ROUTE` is `"Depth"`**, **plus the re-runs of M-12 and M-14** recorded in those rows
+against the 3D hand. What a failure of each would mean for the requirement it carries:
+
+| Row | Blocking | Carries | A failure means |
+|-----|----------|---------|-----------------|
+| M-18 | yes (gates the phase's geometry) | CARD-19, UX-01, D-47, D-48 | the fan's layering is not what the spec assumed. A right-hand card does not cover its left neighbour, so the corner index — the only part of a covered card a player can see — is drawn by the wrong neighbour and the overlap reads as noise. **A fan whose layering is wrong is not a fan.** Remedy: flip `Card.HAND.LAYERING_ROUTE` to `"Depth"` (one constant, one read site) and make M-23 live. If route Depth also fails, route C is a BLOCKER to raise with the owner, not an overnight edit — see `.planning/phases/04.1-first-person-cards/04.1-LAYERING-DECISION.md` |
+| M-19 | yes | UX-01, D-43, D-47, D-52, U5 | the pure `Projection` module does not describe what the engine draws, so **every hit rect and the whole 48 px proof are derived from geometry that is not on screen** — the precise failure D-47 exists to prevent. A notched device is required: a zero-inset device cannot separate the two candidate inset origins |
+| M-20 | yes (largest new risk) | CARD-13, D-45, D-46, U1, U2 | a hand is readable by someone other than its owner, which is CLAUDE.md rule 3 broken at the surface it was written for. The planted-carrier step must be seen to FIRE first: a privacy gate that has never failed is not evidence |
+| M-21 | yes | UX-02, UX-04, D-30, D-41, D-43, U8, U9 | the camera does not come back, or something else rewrites it mid-lock. A player whose camera never releases cannot hunt, which loses the whole second stage of the round, not a frame of polish |
+| M-22 | yes | D-54, U7 | the 3D hand costs more than the 2D overlay it replaces on a real low-end phone. The A/B is the point: "slower than the lobby" is not the question. Escalation order is `CANVAS_SCALE` 3 → 2, then corner-index-only on non-selected cards. **Never** buy frame time with a Phase 4 geometry number |
+| M-23 | **yes, only if `LAYERING_ROUTE == "Depth"`** | CARD-19, D-24 | the documented `LightInfluence = 0` behaviour does not hold on the shipping engine, so scene lighting modulates the face colours and the machine-gated 4.5:1 luma floor stops describing what the player sees. `tests/card/layering_contract.spec.luau` asserts this row exists and is blocking whenever the route is `"Depth"`, so the obligation cannot be dropped silently |
+| M-12 (re-run) | yes | UX-01, UX-03, CARD-13 | targets are not 48 physical px at the new rendered size, the fan or a pile is out of thumb reach, or a suit glyph does not render on the device |
+| M-14 (re-run) | yes | CARD-19, D-24 | two faces are not distinguishable in greyscale at the new rendered size. The desk half signed 2026-11-09 does **not** transfer |
+
+**Requirements UX-01, UX-02, UX-03 and UX-04 are still not met by any plan** — Phase 04.1 does not change that.
+Do not run `requirements.mark-complete` for them on the strength of a green suite.
+
+### Phase 04.1 dispositions recorded here because they change what a row may be signed against
+
+**F10 — the supported viewport floor moves, and it is a regression that has to be said out loud.** The 48 px hit
+floor now binds at about **fullscreen height 313**, so Phase 04.1's supported floor is **fullscreen height 360**
+where Phase 4's was **safe height 300**. Below 360 the floor is **reported, not claimed**: the camera lock prints
+the measured value and the UI still runs, but no row in this file may be signed as evidence of a 48 px guarantee
+on such a device. `Card.CAMERA.MIN_FULL_HEIGHT = 360` is that number, and it is the only place it lives.
+
+**F12 — selection and the AFK pulse now share the card-face stroke. Precedence: SELECTION WINS.** A selected card
+keeps the static accent stroke at `STROKE.SELECTED` thickness and does **not** pulse; the AFK pulse runs on the
+**non-selected** cards. Reason: D-24 requires selection to be readable without colour (lift **and** thickness), and
+a pulsing accent on the selected card would make "selected" and "about to be forced" the same picture. If the AFK
+pulse and the stall cue are both live, **AFK (accent) wins over stall (neutral)**, because AFK is the one with a
+deadline. The accent-use list stays at exactly five entries; this adds none.
 
 How to use this file:
 
@@ -692,12 +740,37 @@ Steps: on a real notched phone in landscape, open the card table and confirm:
    surfaces", so **signing M-12 without doing 5 and 6 leaves M-14 unsignable** and the device session
    has to be repeated. Judge the pips while the phone is already in your hand.
 
+**RE-RUN FOR PHASE 04.1 (added 2026-11-10 by plan 04.1-01). THIS ROW NOW JUDGES THE 3D HAND.** Steps 1 to 3
+above were written against the 2D `ScreenGui` overlay, which Phase 04.1 retires. They are **not deleted** — they
+are the same three claims — but they must be measured at the **new rendered size**, and steps 5 and 6 carry
+forward **unchanged** because they are properties of the glyphs, not of the renderer. Steps 8 to 11 replace the
+measurement procedure of 1 to 3; do them instead of, not as well as, the overlay versions:
+
+8. **Every card's hit target measures >= 48 physical px on glass at the new rendered size**, and so do the left
+   and right pile panels (which are still 2D and still 84 x 96 design units). The card targets are the invisible
+   `TextButton`s on the projected rects, not the cards: measure the **buttons**. Do this at the device's native
+   resolution and record the fullscreen height, because the floor binds at about fullscreen height 313 and the
+   supported floor is 360 (see the F10 disposition near the top of this file).
+9. **Thumb reach, at rest, without shifting the grip: all five fan slots and both piles.** The fan now sits in
+   world space 6.5 studs ahead and 2.2 studs below the eye, so its screen position is set by `Card.HAND` and
+   `Card.CAMERA`, not by a layout rectangle. If a slot is out of reach the fix is `HAND.OFFSET_STUDS` — which
+   is a `Projection` input, so **changing it re-opens the 48 px proof and M-19 must be re-run.** Say so in the
+   Observed note rather than silently nudging the number.
+10. **Nothing interactive sits under the notch or the Roblox top bar.** M-19's debug-overlay check now covers
+    this **by arithmetic rather than by eye** (projected quad outlines against the hit rects on a notched
+    device), so this step is the human cross-check of a machine result, not the primary evidence. If the two
+    disagree, M-19 is the one that is wrong.
+11. **Record the device model, its native resolution, its fullscreen height, and the measured status-strip
+    width.** The strip is still 2D and still capped at `STRIP_MAX_CHARS = 34`; step 4 (Largest text on one
+    line) is unchanged and still applies.
+
 Record the device model, its physical resolution, and the measured status-strip width.
 
-**Expected:** all seven hold. A tight-but-passing strip is recorded with its measured width so a later copy change has a
-baseline.
+**Expected:** steps 4, 5, 6 and 8 to 11 all hold (steps 1 to 3 are superseded by 8 to 10 and are kept only to
+show what the claim was). A tight-but-passing strip is recorded with its measured width so a later copy change has
+a baseline.
 
-**Blocking: yes for Phase 4's close.**
+**Blocking: yes for Phase 4's close AND for Phase 04.1's close.**
 
 Observed:
 
@@ -733,16 +806,46 @@ Observed:
 **Why manual:** the automated test proves face-key injectivity, not human legibility. Legibility at fan size is a
 judgement about a rendered image.
 
-Steps: render the fan-size corner index of all 12 ranks x 4 copies, plus the joker in both modes, in a grid with
-`ColorCorrectionEffect.Saturation = -1`, at the reference viewport **and** on a real phone. A reviewer must be able to
-name each rank and copy. Also measure glyph-versus-face luma contrast for both the black and the red pip.
+Steps: render the fan-size corner index of all 12 ranks x 4 copies, plus the joker in both modes, in a grid, at the
+reference viewport **and** on a real phone. A reviewer must be able to name each rank and copy. Also measure
+glyph-versus-face luma contrast for both the black and the red pip.
 
 **Spade versus club at 16 px is the expected hardest pair.** If they are not reliably distinguishable, enlarge the pip
 to 20 or thicken the club silhouette. Never lean on colour.
 
 **Expected:** all 50 faces named correctly in greyscale by someone who did not build them, on both surfaces.
 
-**Blocking: yes for Phase 4's close.**
+**Blocking: yes for Phase 4's close AND for Phase 04.1's close.**
+
+**RE-RUN FOR PHASE 04.1 (added 2026-11-10 by plan 04.1-01; D-53). THE PASS BAR AND THE JUDGEMENT ARE UNCHANGED;
+WHAT IS RENDERED CHANGES.** Four things are different and nothing else is:
+
+1. **The grid renders through the real 3D path** — the `SurfaceGui` carrier on the card Part, at the shipped
+   `CANVAS_SCALE`, with the shipped lean and roll — **at 640x360 and 844x390**, the two supported viewports
+   where the pip is smallest (14 px floor; measured 15.5 px at 640x360). A grid drawn as flat 2D frames does not
+   count, because foreshortening is exactly what shrank the pip.
+2. **Greyscale is COMPUTED IN THE PROBE with Rec. 709 luma, and `ColorCorrectionEffect` is never used.** The
+   original step above named the effect; **that drive is withdrawn** (UI check F15). This phase's own
+   `04.1-DEBT-RECHECK.md` records that a `ViewportFrame` renders **no post-processing** and that the effect
+   cannot be relied on for card UI, and whether it reaches an `AlwaysOnTop` SurfaceGui is unknown — that
+   surface bypasses the normal 3D path by design. **A probe that silently fails to desaturate shows the reviewer
+   the COLOURED faces, which pass easily: the check would be vacuous in exactly the direction that hides the
+   defect it exists to find.** Phase 4's probe already computes luma itself (see the code block below); reuse it.
+3. **The probe carries a `SUIT_RED` control swatch that must read mid-grey. If the swatch is still red the run is
+   VOID**, whatever the faces looked like. This is the probe's own non-vacuity check, and it is not optional: it
+   is the only thing standing between "the faces were legible" and "the desaturation never happened".
+4. **Slots 1 and 5 must be examined, not only the middle.** Lean and roll only ever *reduce* a card's projected
+   size (by `cos`), and the end cards carry the most roll, so **the end pair's pips are the smallest in the
+   hand**. A grid of centred cards can pass while the rolled ends fail — the same trap the Wave 0 layering probe
+   builds five cards to avoid.
+
+**The desk half signed 2026-11-09 is INVALIDATED and does not transfer.** It judged flat 72 x 92 faces rendered by
+the 2D `CardFace` path into a `ScreenGui`. Phase 04.1's faces are on a `SurfaceGui` canvas, foreshortened by a
+12-degree lean and up to 8 degrees of roll, at a size set by viewport height rather than by a scale clamp. The
+observation below is kept as the record of what was true of the overlay; **it is not evidence about the 3D hand.**
+
+**The executable probe for this re-run arrives in plan 04.1-10**, when the path it has to render exists. This row
+is written now, by the Wave 0 spike, precisely so it cannot be ticked early.
 
 **HOW TO DO IT (added 2026-11-08; the steps above are unchanged).**
 
@@ -1009,7 +1112,7 @@ pip: the point-reflection still reads correctly and the suit collision goes away
 **The phase half is outstanding.** This row's Expected is "on both surfaces", so M-14 is NOT signed
 until the pips are judged on a real phone -- which rides along with M-12 (see M-12 step 5).
 
-- [ ] M-14 signed off: <name> <date> -- desk half passed 2026-11-09; awaiting the phone half with M-12
+- [ ] M-14 signed off: <name> <date> -- the 2026-11-09 desk half is INVALIDATED by Phase 04.1 (flat faces); re-run both halves through the 3D path
 
 ---
 
@@ -1261,3 +1364,259 @@ for since Phase 2. Run them together.
 Observed:
 
 - [ ] M-17 signed off: <name> <date>
+
+---
+
+# Phase 04.1 (First-Person Cards) — M-18 to M-23
+
+Written by plan 04.1-01, the Wave 0 spike, on 2026-11-10, **before any renderer file in this phase existed**.
+None of them is ticked, and no machine may tick one. See the Phase 04.1 close block near the top of this file for
+what a failure of each would mean. The UI-SPEC proposed letters for five of these; the mapping is recorded so a
+reader of `04.1-UI-SPEC.md` can find the row: **M-18 = E, M-19 = A, M-20 = C, M-21 = F, M-22 = D**; M-23 has no
+letter because it did not exist until the layering decision created it.
+
+---
+
+## M-18 (CARD-19, UX-01 / D-47, D-48, U3) Card layering order: which of the three routes ships
+
+**Why manual:** no primary Roblox doc answers it. `SurfaceGui.AlwaysOnTop` is documented only as "always renders
+on top of 3D content", and `ZOffset` as layering "in relation to others **on the same face**" (re-verified against
+`SurfaceGui.md` on 2026-11-10, and the page adds that changing `ZOffset` "does not visually 'lift' or 'sink' a
+SurfaceGui from the surface"). **Neither sentence covers two `AlwaysOnTop` SurfaceGuis on different Parts.** If
+`AlwaysOnTop` bypasses depth testing then the shipped 0.05-stud depth step is meaningless and `ZOffset = slot` is
+the wrong mechanism; if it does not, the depth step is the mechanism and `ZOffset` is noise. This is a photograph,
+not a theorem, and the build container has no Studio. **This row gates the phase's geometry: it settles what a
+card physically is.**
+
+**Read first:** `.planning/phases/04.1-first-person-cards/04.1-LAYERING-DECISION.md`. It holds the three routes,
+each route's cost, the one-sentence decision rule and the provisional route. Do not re-derive the question.
+
+Steps, in Studio on `Spoons Dev`:
+
+1. Open the **command bar**, paste the whole of **`scripts/dev/spike-layering.luau`**, and run it. It builds
+   **five** overlapping cards per route — five, not three, because the worst adjacent pair in a real fan is at
+   the rolled end and three centred cards can pass while slots 4 and 5 fail — at the real geometry read out of
+   `Card.HAND` and `Card.CAMERA`, with a large slot numeral on each card so a photograph is self-labelling. It
+   prints the decision rule and the route the config currently names.
+2. **Photograph all three route groups** from the probe's camera pose. Attach or describe the three images in the
+   Observed note; a verdict with no image is not evidence.
+3. **Apply the decision rule, which is one sentence:** with five overlapping cards whose only difference is slot
+   index, **does the right-hand card's edge cover the left-hand card's, at every adjacent pair?** Answer it
+   separately for route A and route B. Check **all four** adjacent pairs, including 4/5.
+4. **For route A, record whether the hand is ever occluded by table geometry or by the avatar. It must not be** —
+   that is one of route A's two reasons for existing.
+5. **For route B, record whether the hand is occluded by the probe's opaque slab, which sits between the camera
+   and the fan.** It **may** be: that is route B's named cost, not a bug in the probe. Answer it explicitly.
+6. **Record which route ships**, and say so in `04.1-LAYERING-DECISION.md` as well as here.
+7. **Delete `workspace.SpikeLayering` and `PlayerGui.SpikeLayering`** afterwards (`default.project.json` mounts
+   neither, so Rojo will not clean them up).
+
+**Expected, as a decision tree, so the answer cannot be left ambiguous:**
+
+- **Covered under route A** → ship **A**. `Card.HAND.LAYERING_ROUTE` already reads `"AlwaysOnTop"`; nothing
+  changes. M-23 stays NOT APPLICABLE.
+- **Not covered under A, covered under B, and nothing occluded under B** → ship **B**. Set
+  `Card.HAND.LAYERING_ROUTE = "Depth"`, flip the two surface assignments at the carrier's single creation site,
+  and **M-23 becomes live and blocking** — `tests/card/layering_contract.spec.luau` fails the build if the route
+  is `"Depth"` and the M-23 row is missing, so this cannot be forgotten.
+- **Not covered under A, covered under B, but a card IS occluded under B** → **STOP. This is a BLOCKER to raise
+  with the owner, not an overnight flip.** The remedy is to move `HAND.OFFSET_STUDS`, which is an input to
+  `Projection`, so it re-opens the 48 px proof, the fan-to-pile gap and the containment margin — all of which
+  must be re-run and re-read (M-19 with them).
+- **Covered under neither** → **STOP and raise route C with the owner.** Route C is a BLOCKER-grade rewrite, not
+  a fallback: vanilla Roblox `GuiObject`s have **no shear or skew**, so a perspective quad is not drawable as a
+  rotated rectangle. See the decision doc.
+
+**Nothing about what the layering actually does is claimed by any automated test in this repo.** The suite gates
+the contract *around* the route — that the route is one of two legal values, has exactly one read site, and drags
+M-23 with it when it is `"Depth"`. **The route's correctness is this row and nothing else.**
+
+**Blocking: yes for Phase 04.1's close.** The shipped route is provisional until this is signed.
+
+Observed:
+
+- [ ] M-18 signed off: <name> <date>
+
+---
+
+## M-19 (UX-01 / D-43, D-47, D-52, U5, U6) `Projection` conformance and the inset origin
+
+**Why manual:** the pure `Projection` module is a pinhole model written so the 48 px floor can be a headless
+assertion. **Whether it agrees with the engine's own camera is not something the model can check about itself**,
+and the inset origin — whether `WorldToViewportPoint`'s (0,0) is the fullscreen top-left or the device safe
+area's — is left ambiguous by the docs (U5). A wrong origin moves every hit rect by the notch width on exactly
+the devices where that matters.
+
+Steps, in Studio on `Spoons Dev`, during a real card phase:
+
+1. **Conformance.** For every card in a 5-card hand, project **all 8 corners** (4 at rest, 4 lifted) with the
+   real `Camera:WorldToViewportPoint` and compare against `Projection`'s output. **Each corner must agree within
+   1 px.** Do it at **three viewport sizes**, including the smallest supported (640x360) and one 4:3.
+2. **Inset origin.** Record `GuiService:GetInsetArea(Enum.ScreenInsets.CoreUISafeInsets)` and the card
+   `ScreenGui`'s `AbsolutePosition`/`AbsoluteSize`, and confirm the pinned option (b) origin is the one the
+   engine uses. A disagreement here is a one-line fix in the lock and a re-run of step 1.
+3. **The debug-overlay check, and it must be on a NOTCHED phone.** Turn on the debug overlay: pure quad outlines
+   at **2 px**, hit buttons filled at **30% opacity**. At **all five slots**, outline and button must be
+   coincident **within 2 px**. **A zero-inset device does not satisfy this row** — it cannot distinguish the two
+   candidate origins, which is the whole reason the step exists. Say which device was used.
+
+**Expected:** all 8 corners of all 5 cards within 1 px of `Projection` at all three viewport sizes; the inset
+origin confirmed; overlay and buttons coincident within 2 px at all five slots on a notched device. Record the
+largest observed error in pixels, not just "passed".
+
+**Blocking: yes for Phase 04.1's close.**
+
+Observed:
+
+- [ ] M-19 signed off: <name> <date>
+
+---
+
+## M-20 (CARD-13 / D-45, D-46, U1, U2) The privacy probe: no hand is readable by anyone but its owner
+
+**Why manual:** this is the phase's **largest new risk** and the only check that can falsify U1 and U2 for real.
+The headless specs (T1, T2) gate the *code* — that carriers are parented into `workspace.CurrentCamera`, that no
+builder takes a rank parameter. They cannot prove what the engine replicates. Only a running server and a second
+real client can.
+
+Steps, in Studio, 2-player local server, during a real card phase:
+
+1. **PLANT A DECOY FIRST AND WATCH THE PROBE FIRE.** Before trusting anything: create a `Part` named
+   **`CardSlot`** under `workspace`, give it an attribute whose value is a rank (any entry of
+   `Faces.RANK_LADDER`, or an integer 1..12), and run the probe. **It must report the planted carrier.** If it
+   does not, the probe is broken and every later "clean" result is worthless. **A privacy gate that has never
+   been seen to fail is not evidence.** Record the firing output verbatim, then delete the decoy.
+2. **The server scan, which is the authoritative one.** A *server* script, at 1 Hz for the whole round, walks
+   `Workspace`, `ReplicatedStorage` **and every `Players/*/PlayerGui`** and asserts: **zero** instances named
+   `CardSlot`; **zero** instances carrying any attribute, `StringValue` or `IntValue` whose value is a rank glyph
+   or a 1..12 rank; **zero** `SurfaceGui`/`TextLabel` descendants anywhere on the server's tree containing a rank
+   glyph or a pip codepoint. `Players/*/PlayerGui` is not optional: **U2 is a claim about client-created
+   `PlayerGui` descendants, and a scan that never visits `PlayerGui` cannot falsify it** (UI check F3).
+3. **The second-client scan**, from the other client, over its own `Workspace` **and over
+   `Players/<the other player>/PlayerGui`**. This is the cheat client's view. Same three assertions.
+4. **Repeat step 3 in M-11's cheat-client cell**, so the hunt-phase and card-phase views are checked by the same
+   method and one session covers both.
+
+**Expected:** step 1 FIRES on the planted carrier (recorded verbatim); steps 2 and 3 find nothing for a whole
+round at 1 Hz; step 4 agrees. Any hit at all is a CLAUDE.md rule 3 violation and a phase BLOCKER.
+
+**Blocking: yes for Phase 04.1's close.**
+
+Observed:
+
+- [ ] M-20 signed off: <name> <date>
+
+---
+
+## M-21 (UX-02, UX-04 / D-30, D-41, D-43, U8, U9) Camera release on every path, and nothing else rewriting a Scriptable camera
+
+**Why manual:** "the default camera scripts take control back cleanly from `Scriptable` with no snap" is U8 and no
+page states it; "nothing else rewrites a Scriptable camera mid-round" is U9 and is a property of the whole running
+place, not of this phase's files. **A player whose camera never releases cannot hunt**, which loses the second
+stage of the round — not a frame of polish.
+
+Steps, in Studio on `Spoons Dev`:
+
+1. **Release on all four paths**, one at a time: (a) your own `Completed`, (b) `RoundEnd` while you still hold
+   cards, (c) removal/bench (AFK strike-out or forced removal), (d) disconnect and rejoin.
+2. On each, confirm **`CameraType` and `FieldOfView` return to the values SAVED AT LOCK**, not to the literals
+   `Custom`/70. Print both before the lock and after the release and compare.
+3. Confirm **no snap** on any of the four, and **no surviving tween**: zero tweens may outlive the lock (D-41).
+   A card Part or `SurfaceGui` still present one frame after release is a failure.
+4. **Respawn mid-round** (reset character while seated) and confirm the lock holds and the hand survives. The
+   camera origin is derived from `CardTable.SeatSpec`, never from `Head`/`PrimaryPart` (D-42), so a respawn must
+   not move it.
+5. **Confirm nothing else moves the camera during the lock.** Watch `Camera.CFrame` and `CameraSubject` for the
+   whole card phase; a single unexplained write is U9 falsified and a BLOCKER to raise.
+
+**Expected:** 1 to 5 hold. Record the saved-versus-restored values for both properties on all four paths.
+
+**Blocking: yes for Phase 04.1's close.**
+
+Observed:
+
+- [ ] M-21 signed off: <name> <date>
+
+---
+
+## M-22 (D-54, U7) Mobile frame cost, as an A/B against the 2D overlay it replaces
+
+**Why manual:** frame cost on a real low-end phone is not derivable from the repo, and `U7` (the cost of six
+`AlwaysOnTop` SurfaceGuis on low-end mobile) has no documented figure — the `ViewportFrame` page makes no
+statement about render cost either, which is why that route could not be chosen on evidence.
+
+**It is an A/B, and that is the fix for UI check F11.** The first draft compared the card phase against the lobby,
+which confounds "this costs too much" with "the lobby is cheap". **The real question is whether the 3D hand costs
+more than the 2D overlay it replaces**, so the same three measurements are taken on the **Phase 4 commit** as
+well.
+
+Steps, on a **named** low-end phone (the Phase 8 target device list does not exist yet, so name the device in the
+result; a result with no device name is not a result):
+
+1. Record **median frame time and 1% low frame time over 30 s** for each of: **(a)** lobby, **(b)** card phase,
+   hand of 5, idle, **(c)** card phase during a **10-tap burst**.
+2. **Repeat all three on the Phase 4 commit's 2D overlay** (check out the Phase 4 tag, build, run on the same
+   device, same session if possible).
+3. Report **all six numbers either way**, pass or fail. D-54 is not discharged by a verdict; it is discharged by
+   measurements from a named device.
+
+**Pass bar — INVENTED, and said to be invented** (Open Question 9; no device list or baseline exists): **(b)**
+median within **20%** of **(a)**, and **(c)** 1% low **>= 30 fps**. The owner or Phase 8 may replace this bar; the
+numbers are reported regardless.
+
+**If it fails, the escalation order is fixed:** `CANVAS_SCALE` 3 → 2 first (the pip drops below the texel-density
+line above 720p, which is acceptable on a small screen), then render only the corner index on non-selected cards
+with the selected card at full face. **Never change a Phase 4 geometry number to buy frame time.**
+
+**Expected:** six numbers recorded with the device named, and the A/B comparison stated in one sentence.
+
+**Blocking: yes for Phase 04.1's close.**
+
+Observed:
+
+- [ ] M-22 signed off: <name> <date>
+
+---
+
+## M-23 (CARD-19 / D-24) Lighting independence of the card faces — LIVE ONLY IF `Card.HAND.LAYERING_ROUTE == "Depth"`
+
+**APPLICABILITY.** **If `Card.HAND.LAYERING_ROUTE` is `"AlwaysOnTop"` this row is NOT APPLICABLE and says so:**
+`AlwaysOnTop = true` is documented to make colours "match how they appear inside a `ScreenGui`" and to treat
+`LightInfluence` as though it were 0, so scene lighting cannot reach the faces and there is nothing to photograph.
+**At the time this row was written the route is `"AlwaysOnTop"`, so the row is NOT APPLICABLE and is not
+blocking.** It exists unticked anyway, because the route is **provisional until M-18 is signed** and
+`tests/card/layering_contract.spec.luau` fails the build if the route is ever set to `"Depth"` while this row is
+missing. That gate is why choosing route Depth cannot silently drop this obligation.
+
+**Why manual (when live):** route B (`AlwaysOnTop = false`) restores ordinary depth testing, and with it scene
+lighting. Lighting that modulates the face colours would stop the machine-gated **4.5:1** luma floor from
+describing what the player sees — the floor is honest *because* the authored colours are what render. The
+mitigation is one property, set under **both** routes at the carrier's single creation site: **`LightInfluence =
+0`**, documented (re-verified `SurfaceGui.md`, 2026-11-10) as "setting it to 0 means that the lighting has no
+effect". **Whether a documented behaviour holds on the shipping engine build is not a thing a doc can settle.**
+
+Steps, in Studio on `Spoons Dev`, with the route set to `"Depth"`:
+
+1. **Photograph the same hand under the map's brightest and darkest lighting.** Change `Lighting` only — same
+   hand, same slots, same viewport, same camera pose.
+2. **Confirm the faces are IDENTICAL.** If they are, the row passes on the documented behaviour and you are done.
+   Also confirm `Brightness` is still at its default **1** on the carrier's `SurfaceGui`: with `LightInfluence =
+   0`, `Brightness` is documented as the factor by which the container's light is scaled, so a non-default
+   `Brightness` would reintroduce exactly the modulation this row exists to rule out.
+3. **FALLBACK, if the two photographs differ:** the documented behaviour does not hold on this engine build, and
+   the small check is not enough. Do the full one — **re-measure both pips' contrast against the face on the
+   CAPTURED PIXELS, at both lighting extremes, against 4.5:1.** Use WCAG relative luminance, as
+   `renderer_discipline.spec` does on the authored colours (measured there: black 15.53:1, red **4.78:1** — red
+   clears the floor by 0.28, so there is almost no headroom for lighting to eat).
+4. **If the fallback measurement drops either pip below 4.5:1, that is a BLOCKER**, not a tuning task: the D-24
+   greyscale identity rule and CARD-19 both rest on that floor. Raise it with the owner.
+
+**Expected:** with the route at `"Depth"`, the two photographs are indistinguishable and `Brightness` is 1; or,
+failing that, both pips measure >= 4.5:1 on captured pixels at both extremes. With the route at `"AlwaysOnTop"`,
+this row reads NOT APPLICABLE and is not blocking.
+
+**Blocking: yes, if and only if `Card.HAND.LAYERING_ROUTE == "Depth"`.**
+
+Observed:
+
+- [ ] M-23 signed off: <name> <date>
