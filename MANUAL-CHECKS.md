@@ -585,6 +585,30 @@ acceptable.
 
 **Blocking: yes for Phase 4's close.** It is the phase's highest-risk row.
 
+**BEFORE YOU START — read this, it cost an evening on 2026-11-10 and changes the setup.**
+
+**You cannot do M-11 solo.** `Main.server.luau` starts a round only at `#Players:GetPlayers() >= 3`,
+so Play Solo never seats anyone and there is nothing to test. Use **Test tab -> Clients and Servers
+-> Players: 3 (or 4) -> Start**. Four is better: the first player is the HIDER and is never seated
+(`for i = 2, #players`), so three players gives only two seats and less slack before AFK strikes.
+
+**Keep the table alive.** AFK is an 8 s ceiling and three strikes removes a seat. Two idle windows
+will end the round out from under you about 24 s in — which looks exactly like a broken hold.
+
+**A seat-hold race was found and fixed that night.** `CharacterAdded` fires when the character model
+is PARENTED, which is before `PrimaryPart` is assigned, and `pivotTo` refuses a character with no
+`PrimaryPart`. A player seated inside that window took a hold that deferred with nothing left to
+retry it: frozen and `Scriptable`, but never moved to its seat, so it stood loose on the map while
+the server believed it was seated. Fixed in `CardService.watchCharacter` (waits for the part, not
+the event) and gated in `service_wiring.spec`. **If you still see a seeker loose on the map, that is
+a NEW defect, not the old one — say so.**
+
+**Reading the server Output is how you tell a hold apart from a release.** Telemetry now prints its
+payload, so `seat_hold_deferred playerId=-3` names the player, and `seat_released playerId=-2` fires
+whenever a hold actually goes away. A seat released 24 s into a round is AFK strikes working
+correctly; a hold that never applied prints nothing at all. Those two look identical from inside the
+game and completely different in the log.
+
 **Server hold (plan 04-15).** The server sets `Dev*MovementMode = Scriptable`, a zeroed humanoid and a `PivotTo` on seating
 (assumption A2, unverified; whether this holds anything is what these rows find out). Record each on its own line, under
 **both** `PlayerScriptsUseInputActionSystem` settings:
