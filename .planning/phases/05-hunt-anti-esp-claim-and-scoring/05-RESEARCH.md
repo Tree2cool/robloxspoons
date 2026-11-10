@@ -43,7 +43,7 @@ Also out of scope: hider placement UI, hide phase, match lifecycle, scoreboard/p
 
 | ID | Description | Research Support |
 |----|-------------|------------------|
-| HUNT-01 | Hidden positions only server-side, never Instance/attribute/value | `SpoonRegistry` plain tables in a pure core; reveal-only local visuals; leak gate modeled on privacy.spec; source scans on the adapter; manual replication audit M-18 |
+| HUNT-01 | Hidden positions only server-side, never Instance/attribute/value | `SpoonRegistry` plain tables in a pure core; reveal-only local visuals; leak gate modeled on privacy.spec; source scans on the adapter; manual replication audit M-24 |
 | HUNT-02 | Position learned only within glint range with clear LoS | Pure `Visibility` sweep (distance prefilter, then injected LoS), 5 Hz, transition-only messages |
 | HUNT-03 | Client prompt, server re-validates | Client-created ProximityPrompt -> `Claim` manifest intent -> server decides |
 | HUNT-04 | Exactly one claimant | Single synchronous handler, `claimedBy` write, no yield; same-instant test |
@@ -56,7 +56,7 @@ Also out of scope: hider placement UI, hide phase, match lifecycle, scoreboard/p
 
 ## Summary
 
-Hold every spoon as a plain Luau record (`{ id, x, y, z, claimedBy, foundDeci }`) inside a pure core (`HuntTable`) that is the only owner of hidden data. Nothing hidden is ever an Instance, attribute or Value. A 5 Hz adapter tick feeds the core each hunting seeker's eye position; the core pre-filters by squared distance (25 studs), calls an injected line-of-sight closure for survivors only (the adapter wraps ONE `Workspace:Raycast` with `RespectCanCollide = true`), diffs against that seeker's previous visible set, and emits `SpoonVisible` / `SpoonHidden` only for transitions. Worst case is 10 players, 8 spoons: at most about 9 hunters x 8 spoons = 72 pairs, 360 distance checks per second, and at most 360 raycasts per second (far fewer in practice, since the prefilter discards pairs beyond 25 studs). That cost is acceptable [ASSUMED: no Roblox doc gives a Raycast cost figure; M-22 measures it with the MicroProfiler].
+Hold every spoon as a plain Luau record (`{ id, x, y, z, claimedBy, foundDeci }`) inside a pure core (`HuntTable`) that is the only owner of hidden data. Nothing hidden is ever an Instance, attribute or Value. A 5 Hz adapter tick feeds the core each hunting seeker's eye position; the core pre-filters by squared distance (25 studs), calls an injected line-of-sight closure for survivors only (the adapter wraps ONE `Workspace:Raycast` with `RespectCanCollide = true`), diffs against that seeker's previous visible set, and emits `SpoonVisible` / `SpoonHidden` only for transitions. Worst case is 10 players, 8 spoons: at most about 9 hunters x 8 spoons = 72 pairs, 360 distance checks per second, and at most 360 raycasts per second (far fewer in practice, since the prefilter discards pairs beyond 25 studs). That cost is acceptable [ASSUMED: no Roblox doc gives a Raycast cost figure; M-28 measures it with the MicroProfiler].
 
 The claim path is pinned by the debt re-check: the client's own prompt fires, the client sends `Claim { spoonId }` through the existing typed gateway (an ordinary rate-limited manifest kind), and one synchronous server function checks entitlement, range and plausibility, writes `claimedBy`, queues events, then publishes. The `spoonId` is an opaque per-round id, and the server additionally requires that the spoon is currently in the claimant's visible set, so a cheat client cannot claim by guessing ids. Scoring is a pure module and a pure ledger. Because the unit is the decisecond, **find points equal remaining deciseconds exactly** (10 points per second x 0.1 s per deci = 1 per deci), which removes a whole class of rounding bugs.
 
@@ -285,14 +285,14 @@ Not a rename/refactor/migration phase. Omitted.
 Line 202: `t.equal(seen, 14, "2 intents x 7 forbidden keys must all have run")`. With Claim it is 3 x 7 = 21, and the `realValidators()` helper and the loose-validator mutants (lines 230-248) enumerate Draw and Pass explicitly. The plan must update them deliberately. Note `Claim` carries `spoonId`, which is not in `FORBIDDEN_KEYS = {seat,to,target,index,hand,slot,userId}`; add `pos`, `position`, `x`, `y`, `z` to the forbidden list so the gate also proves the client cannot send a position (a client-stated position is exactly what the server must never trust).
 
 ### F5. Root-point versus eye-point geometry (needs a human check)
-Placement.luau: "the server knows only the HumanoidRootPart position and adds these offsets to it." But the validator models the root at `REACH_HEIGHT = 2.5` above the floor and the eye at `EYE_HEIGHT = 4.0` above the floor (`cellH + eyeHeight`, `cellH + reachHeight`). A real R15 root sits roughly 3 studs above the floor [ASSUMED: HipHeight page text was not fully read; V-19 is MEDIUM]. Adding `EYE_HEIGHT` (4.0) to the root position would put the eye about 7 above the floor, which sees over every 6.5 ledge the validator treats as occluding. Recommendation: `eye = root + Vector3.new(0, EYE_HEIGHT - REACH_HEIGHT, 0)` (= root + 1.5), a pure `Visibility.eyeOf(root, cfg)`. Because `REACH_HEIGHT` is already modelled below a real root (reject-biased), the real eye lands about 0.5 above the modelled one, a small error in the permissive direction for LoS; M-23 measures it. See O2.
+Placement.luau: "the server knows only the HumanoidRootPart position and adds these offsets to it." But the validator models the root at `REACH_HEIGHT = 2.5` above the floor and the eye at `EYE_HEIGHT = 4.0` above the floor (`cellH + eyeHeight`, `cellH + reachHeight`). A real R15 root sits roughly 3 studs above the floor [ASSUMED: HipHeight page text was not fully read; V-19 is MEDIUM]. Adding `EYE_HEIGHT` (4.0) to the root position would put the eye about 7 above the floor, which sees over every 6.5 ledge the validator treats as occluding. Recommendation: `eye = root + Vector3.new(0, EYE_HEIGHT - REACH_HEIGHT, 0)` (= root + 1.5), a pure `Visibility.eyeOf(root, cfg)`. Because `REACH_HEIGHT` is already modelled below a real root (reject-biased), the real eye lands about 0.5 above the modelled one, a small error in the permissive direction for LoS; M-29 measures it. See O2.
 
 ## Common Pitfalls
 
 ### Pitfall 1: The ray hits a player, not a wall
 **What goes wrong:** with `RespectCanCollide = true`, characters (CanCollide true) block sight; the seeker's own root is hit at distance 0, so no spoon is ever visible, or spoons flicker as players cross the line.
 **Why:** the default group collides with everything.
-**How to avoid:** Pattern 2 (`CollisionGroup = "Players"`, group non-collidable with itself). Test live (M-22). Fallback: rebuild an `ExcludeInstances` list of character models each tick (10 entries).
+**How to avoid:** Pattern 2 (`CollisionGroup = "Players"`, group non-collidable with itself). Test live (M-28). Fallback: rebuild an `ExcludeInstances` list of character models each tick (10 entries).
 **Warning signs:** zero reveals in a 2-player test; reveals that vanish when a teammate stands between.
 
 ### Pitfall 2: Registering collision groups at runtime is costly and one-shot
@@ -380,7 +380,7 @@ local function onSpoonHidden(p: { id: number })
     local part = views[p.id]; if part then part:Destroy(); views[p.id] = nil end
 end
 ```
-[CITED: ProximityPrompt page: works parented to a BasePart in the workspace; client events fire in LocalScripts. A client-created prompt's `Triggered` exists only on that client (debt re-check V-22).] Whether a client-created instance's prompt UI renders and fires on touch devices is [ASSUMED] and is manual check M-19.
+[CITED: ProximityPrompt page: works parented to a BasePart in the workspace; client events fire in LocalScripts. A client-created prompt's `Triggered` exists only on that client (debt re-check V-22).] Whether a client-created instance's prompt UI renders and fires on touch devices is [ASSUMED] and is manual check M-25.
 
 ### Visibility core
 ```lua
@@ -438,13 +438,13 @@ PhysicsService:CollisionGroupSetCollidable(GROUP, GROUP, true)
 - VERIFIED: `RaycastParams.RespectCanCollide` behaviour (uses CanCollide in favour of CanQuery); default NOT stated on the page (matches 05-DEBT-RECHECK V-18). `CollisionGroup` semantics (ignores parts in groups not colliding with the given group; default group "Default" if omitted). Reusing one RaycastParams is sanctioned. `Raycast(origin, direction, params)`: the direction magnitude is the ray length, so the direction must be the full vector to the target. Pages: RaycastParams datatype and WorldRoot class, last_updated 2026-11-10T00:40Z.
 - VERIFIED: data model fact that a client-created Instance is client-local (standard; also the premise of V-22).
 - ASSUMED: ~360 raycasts/s worst case is cheap; per-ray cost not documented. ASSUMED: ending the ray 0.05 studs short of the spoon avoids self-grazing a surface (validator uses an inflate of `GEOM_EPSILON` the other way, graze = blocked; trims differ by design, both bias is tiny).
-- HUMAN: M-22 (validated graybox spots are visible from open sightlines and hidden behind walls in live play; compares validator vs runtime), M-23 (eye offset), MicroProfiler look at the 5 Hz tick with 10 clients.
+- HUMAN: M-28 (validated graybox spots are visible from open sightlines and hidden behind walls in live play; compares validator vs runtime), M-29 (eye offset), MicroProfiler look at the 5 Hz tick with 10 clients.
 
 ### 2. Claim (D-05..D-08)
 - VERIFIED: `Player:GetNetworkPing()` returns round-trip latency in seconds, server-callable, thread-safe [CITED: Player page]. ProximityPrompt properties used (`MaxActivationDistance`, `RequiresLineOfSight` default behaviour: camera-to-object clear path, parent excluded) [CITED: ProximityPrompt page].
 - ASSUMED: `GetNetworkPing()` is a smoothed enough estimate; clamp it to `[0, RTT_CLAMP = 0.5]` s so neither a spoofed slow link nor a spike widens the slack unboundedly (the ping is server-measured, so a client cannot forge it, but a deliberately laggy client can raise it; the clamp bounds that, and `walkSpeed` is read from the server humanoid, never the payload).
 - ASSUMED: server-known root position lags (V-23, left as a measurement row). First-pass values live in `Config/Hunt.luau`: `SPEED_SLACK = 1.5` (horizontal speed up to 1.5 x WalkSpeed per 4 Hz sample, vertical ignored so falls and jumps do not trip it), `STRIKES_TO_ESCALATE = 3`. Escalation in Phase 5 is log-only (`warn` through RejectThrottle and a telemetry event), matching D-07 "log and escalate on repeats" without kicking anybody; Phase 8 decides the action.
-- HUMAN: M-19 (client-created prompt appears and fires on phone and PC), M-20 (two clients, same spoon, one winner, loser silent).
+- HUMAN: M-25 (client-created prompt appears and fires on phone and PC), M-26 (two clients, same spoon, one winner, loser silent).
 
 ### 3. Scoring (D-13..D-16)
 - VERIFIED by reading source: `RoundLifecycle` ends exactly once, marks ended before `onEnded`, deadline exclusive (F1, Pitfall 5). `CardService.nowDeci` is the exported clock.
@@ -454,10 +454,10 @@ PhysicsService:CollisionGroupSetCollidable(GROUP, GROUP, true)
 ### 4. Spectating and collisions (D-10..D-12)
 - VERIFIED: PhysicsService/WorldRoot API, 32-group limit and server-only registration (05-DEBT-RECHECK V-21), `BasePart.CollisionGroup` is a string property (max 100 characters), non-replicated property that the engine replicates through a private property internally [CITED: BasePart page]. Official character-collision sample matches Pattern 3's assign-on-descendant approach.
 - ASSUMED: "no character" for a spectator. What `Character:Destroy()` does under `CharacterAutoLoads = true` (immediate respawn or not) is NOT verified, and `LoadCharacter` is deprecated, so Phase 5 should not delete characters. See O3.
-- HUMAN: M-21 (finished player gets a free camera, cannot leave the map bounds, sees no spoons even standing where a hunter sees one).
+- HUMAN: M-27 (finished player gets a free camera, cannot leave the map bounds, sees no spoons even standing where a hunter sees one).
 
 ### 5. Cost
-Pairs: hunters x unclaimed spoons. 10 players = 1 hider + 9 seekers, 8 spoons, so at most 72 pairs per tick, 360 pair-checks per second at 5 Hz. Distance prefilter first (`dx*dx + dy*dy + dz*dz <= GLINT^2`, no sqrt), then one ray only for in-range, not-already-confirmed pairs. A seeker already seeing a spoon still pays one ray per tick to detect loss; a typical map (21 spots spread over a graybox) will have a fraction of the 72 pairs in 25 studs. Compare D-04: per-frame is 4800/s. [ASSUMED: acceptable; M-22 measures.] Not recommended: spatial hashing, LoS caching across ticks, multi-ray. An optional cheap optimisation if the profile asks: skip the ray for pairs where the seeker has not moved more than 0.25 studs since the last confirmed result.
+Pairs: hunters x unclaimed spoons. 10 players = 1 hider + 9 seekers, 8 spoons, so at most 72 pairs per tick, 360 pair-checks per second at 5 Hz. Distance prefilter first (`dx*dx + dy*dy + dz*dz <= GLINT^2`, no sqrt), then one ray only for in-range, not-already-confirmed pairs. A seeker already seeing a spoon still pays one ray per tick to detect loss; a typical map (21 spots spread over a graybox) will have a fraction of the 72 pairs in 25 studs. Compare D-04: per-frame is 4800/s. [ASSUMED: acceptable; M-28 measures.] Not recommended: spatial hashing, LoS caching across ticks, multi-ray. An optional cheap optimisation if the profile asks: skip the ray for pairs where the seeker has not moved more than 0.25 studs since the last confirmed result.
 
 ## Privacy gate design (HUNT-01, modeled on `tests/card/privacy.spec`)
 
@@ -467,15 +467,15 @@ Pairs: hunters x unclaimed spoons. 10 players = 1 hider + 9 seekers, 8 spoons, s
 3. **No standing list / no resend.** Stationary seeker, 100 ticks: exactly one `SpoonVisible` per visible spoon. Moving in and out: one show, one hide per crossing.
 4. **Spectator / non-hunter / hider** receive zero reveals at the same position as a hunter who receives one.
 5. **Mutation set** (injected broken publishers/wrappers through the SAME checking helper): broadcasts `SpoonVisible` to all (must fire), sends a full spoon list in `SpoonsRemaining` (must fire), resends every tick (must fire the resend gate), spectator inherits visibility (must fire). Plus a no-defect twin that reads green.
-6. **The replication audit itself** (criterion 1) cannot run in Lune: that is manual check M-18, a command-bar script run on a CLIENT in a live 2-player session that walks `Workspace`, `ReplicatedStorage`, `ReplicatedFirst`, `StarterGui`, `Lighting` and `Players.LocalPlayer` descendants and reports any Instance, attribute or ValueBase whose name matches `spoon` (case-insensitive) or whose position is within 0.5 studs of a hidden spoon position (positions listed from a server-side debug print gated behind a Studio-only flag, removed in the same commit). The honest split for the requirements table: HUNT-01 is machine-proved for the core and the adapter source, and human-proved for the live audit.
+6. **The replication audit itself** (criterion 1) cannot run in Lune: that is manual check M-24, a command-bar script run on a CLIENT in a live 2-player session that walks `Workspace`, `ReplicatedStorage`, `ReplicatedFirst`, `StarterGui`, `Lighting` and `Players.LocalPlayer` descendants and reports any Instance, attribute or ValueBase whose name matches `spoon` (case-insensitive) or whose position is within 0.5 studs of a hidden spoon position (positions listed from a server-side debug print gated behind a Studio-only flag, removed in the same commit). The honest split for the requirements table: HUNT-01 is machine-proved for the core and the adapter source, and human-proved for the live audit.
 
 ## Assumptions Log
 
 | # | Claim | Section | Risk if Wrong |
 |---|-------|---------|---------------|
-| A1 | 360 raycasts/s at the worst case is acceptable server cost | Summary, Cost | Tick hitches at 10 players; mitigation is the movement-delta skip, M-22 measures |
-| A2 | Real R15 root height is about 3 studs above floor; eye = root + 1.5 matches the validator's eye | F5 | LoS disagrees with the validator by a few tenths; spoons visible over ledges; M-23 |
-| A3 | `CollisionGroup = "Players"` on the ray makes it ignore characters when Players is non-colliding with itself | Pattern 2 | Players block sight; fallback `ExcludeInstances` list; M-22 |
+| A1 | 360 raycasts/s at the worst case is acceptable server cost | Summary, Cost | Tick hitches at 10 players; mitigation is the movement-delta skip, M-28 measures |
+| A2 | Real R15 root height is about 3 studs above floor; eye = root + 1.5 matches the validator's eye | F5 | LoS disagrees with the validator by a few tenths; spoons visible over ledges; M-29 |
+| A3 | `CollisionGroup = "Players"` on the ray makes it ignore characters when Players is non-colliding with itself | Pattern 2 | Players block sight; fallback `ExcludeInstances` list; M-28 |
 | A4 | Pre-registered/booted collision group via `pcall(RegisterCollisionGroup)` is idempotent enough; Rojo cannot declare groups | Pitfall 2 | Group missing or duplicate error on restart; pcall contains it |
 | A5 | A client-created ProximityPrompt renders and fires on touch devices | Code Examples | HUNT-03 unusable on mobile; fallback is a client-drawn tap button that sends the same `Claim` intent |
 | A6 | Hysteresis 3 studs and 2-tick LoS-loss debounce | Pattern 3 | Flicker or sluggish hide; tuning |
@@ -491,7 +491,7 @@ Pairs: hunters x unclaimed spoons. 10 players = 1 hider + 9 seekers, 8 spoons, s
 | # | Question | Default taken (conservative) | Needs owner? |
 |---|----------|------------------------------|--------------|
 | O1 | Where does `GLINT_RANGE` live: new `Config/Hunt.luau`, or an 11th constant in `Placement.luau` (bumping the lock spec's "ten")? | New `Config/Hunt.luau` beside it; no existing spec touched; cross-file invariant tested | No, but reversible by one edit |
-| O2 | Eye offset from the root: `EYE_HEIGHT - REACH_HEIGHT` (+1.5) or `EYE_HEIGHT` (+4.0)? | +1.5, to match the validator's model | Human check M-23 settles it with a live measurement |
+| O2 | Eye offset from the root: `EYE_HEIGHT - REACH_HEIGHT` (+1.5) or `EYE_HEIGHT` (+4.0)? | +1.5, to match the validator's model | Human check M-29 settles it with a live measurement |
 | O3 | Spectator "no character" literally, or parked character? | Parked (WalkSpeed 0 via a tiny adapter effect, not deleted) with a Scriptable client camera; Phase 6 owns `CharacterAutoLoads`/`LoadCharacterAsync` | Yes, soft: D-11 reads "no character" |
 | O4 | Is the hider a spectator during the Phase 5 stub? | Yes (receives `Spectate` at hunt start, no reveals) | No |
 | O5 | What does a seeker who never completes four of a kind get at round end? | No bonus, no hunt, no reveals; they simply end with 0 | Phase 6 scoreboard decides display |
@@ -506,7 +506,7 @@ Pairs: hunters x unclaimed spoons. 10 players = 1 hider + 9 seekers, 8 spoons, s
 | lune | running `tests/run.luau` | no (this sandbox) | n/a | CI only; the planner's tasks must not claim local green |
 | selene / stylua / luau-lsp / rojo | verify chain | no (this sandbox) | n/a | CI only |
 | create.roblox.com docs via `scripts/dev/roblox-doc.sh` | research | yes | pages dated 2026-11-10 | none needed |
-| Roblox Studio (2-player local server) | M-18..M-23 | not checkable here | n/a | human step; Gate G3 is not closable without it |
+| Roblox Studio (2-player local server) | M-24..M-29 | not checkable here | n/a | human step; Gate G3 is not closable without it |
 
 **Missing with no fallback:** Studio for the manual checks (they are human steps by design).
 
@@ -526,18 +526,18 @@ Pairs: hunters x unclaimed spoons. 10 players = 1 hider + 9 seekers, 8 spoons, s
 | Req ID | Behavior | Test Type | Automated Command | File Exists? |
 |--------|----------|-----------|-------------------|-------------|
 | HUNT-01 | No hidden position in any message to non-entitled user; adapter creates no Instance/attribute | unit + source scan | `lune run tests/run.luau -- --filter hunt/privacy` | Wave 0 |
-| HUNT-01 live | Client replication audit | manual | M-18 | Wave 0 (MANUAL-CHECKS.md) |
+| HUNT-01 live | Client replication audit | manual | M-24 | Wave 0 (MANUAL-CHECKS.md) |
 | HUNT-02 | Range 25, LoS via injected closure, prefilter proof, hysteresis, transition-only | unit | `-- --filter hunt/visibility` | Wave 0 |
 | HUNT-03 | Claim intent in Manifest with exactKeys; client prompt only in client file | unit + source scan | `-- --filter net/manifest` and `hunt/wiring` | manifest spec exists (count 14 -> 21) |
 | HUNT-04 | Two same-instant claims: one winner; mutant with a yield between check and write fires | unit | `-- --filter hunt/claim` | Wave 0 |
 | HUNT-05 | `SpoonsRemaining` count on change only, all audience, no positions | unit | `-- --filter hunt/privacy` | Wave 0 |
-| HUNT-06 | Adapter sets the pair non-collidable at start and back at end; assigns on CharacterAdded and DescendantAdded | source scan + M-21 | `-- --filter hunt/wiring` | Wave 0 |
-| HUNT-07 | Spectator set membership, bounds payload, no reveals | unit + M-21 | `-- --filter hunt/privacy` | Wave 0 |
+| HUNT-06 | Adapter sets the pair non-collidable at start and back at end; assigns on CharacterAdded and DescendantAdded | source scan + M-27 | `-- --filter hunt/wiring` | Wave 0 |
+| HUNT-07 | Spectator set membership, bounds payload, no reveals | unit + M-27 | `-- --filter hunt/privacy` | Wave 0 |
 | HUNT-08 | Reach rejection at threshold +- epsilon; rtt slack widens; speed sampler strikes; silent | unit | `-- --filter hunt/plausibility` | Wave 0 |
 | SCORE-01..04 | The ROADMAP vectors and derived hider vectors | unit | `-- --filter hunt/scoring` | Wave 0 |
 | SCORE-05 | End on last claim, end on Timeout, end publishes before clear, exactly once | unit | `-- --filter hunt/round_end` | Wave 0 |
 | FOUND-05 | `Scoring` has no import path to cosmetics (fixture exists; add a real-file check that Scoring's closure is clean) | guard | `lune run scripts/ci/check-guards.luau` | exists |
-| Gate G3 | Full loop with 3-10 clients/bots, auto-fill | manual + sim | M-24 | Wave 0 |
+| Gate G3 | Full loop with 3-10 clients/bots, auto-fill | manual + sim | M-30 | Wave 0 |
 
 ### Mutation discipline (repo convention)
 Each gate gets: clean control, non-vacuity count, no-defect twin, and a mutation of the REAL source (in-memory edit through the same checker) that must fire. Required mutants: remove `RespectCanCollide` from `HuntService` source; use `Completed.rank` as place; publish before mutate in claim; clear before publish in finish; iterate all players instead of hunters; remove the prefilter (the `los` call count rises above the pair bound); `GetServerTimeNow` in `foundDeci`; broadcast `SpoonVisible` to all; add a yield between check and write.
@@ -545,12 +545,12 @@ Each gate gets: clean control, non-vacuity count, no-defect twin, and a mutation
 ### Sampling Rate
 - **Per task commit:** `lune run tests/run.luau -- --filter hunt`
 - **Per wave merge:** full `lune run tests/run.luau` plus `check-guards`
-- **Phase gate:** full `lune run scripts/verify.luau` green, then M-18..M-24 signed by a human
+- **Phase gate:** full `lune run scripts/verify.luau` green, then M-24..M-30 signed by a human
 
 ### Wave 0 Gaps
 - [ ] `tests/hunt/` (scoring, visibility, claim, plausibility, privacy, round_end, wiring specs)
 - [ ] `tests/harness/HuntRecording.luau` (twin of RecordingPublisher)
-- [ ] `MANUAL-CHECKS.md` rows M-18..M-24, written BEFORE execution as Phase 4 did (next free id is M-18; last used is M-17): M-18 replication audit, M-19 client prompt on phone and PC, M-20 two-client race, M-21 collisions + spectator, M-22 validator-vs-live LoS + MicroProfiler, M-23 eye/root offset, M-24 Gate G3 session
+- [ ] `MANUAL-CHECKS.md` rows M-24..M-30, written BEFORE execution as Phase 4 did (next free id is M-24; last used is M-17): M-24 replication audit, M-25 client prompt on phone and PC, M-26 two-client race, M-27 collisions + spectator, M-28 validator-vs-live LoS + MicroProfiler, M-29 eye/root offset, M-30 Gate G3 session
 - [ ] `tests/net/manifest.spec.luau` updated for Claim (count 14 -> 21 and forbidden list extended)
 - [ ] `tests/card/deci_lock.spec.luau` re-run (must still pass: HuntService adds no `os.clock`)
 
@@ -571,7 +571,7 @@ Each gate gets: clean control, non-vacuity count, no-defect twin, and a mutation
 ### Known Threat Patterns
 | Pattern | STRIDE | Standard Mitigation |
 |---------|--------|---------------------|
-| Reading spoon positions from the DataModel (ESP) | Information disclosure | No hidden Instance; reveal-only messages; gates + M-18 |
+| Reading spoon positions from the DataModel (ESP) | Information disclosure | No hidden Instance; reveal-only messages; gates + M-24 |
 | Injecting a `SpoonVisible`-like claim by guessing ids | Spoofing/Tampering | Visible-set entitlement; opaque shuffled ids |
 | Teleport to a spoon and claim | Tampering | Reach check with rtt slack; 4 Hz speed sampler; strikes |
 | Claim flood | Denial of service | Per-(user,intent) bucket; throttled log |

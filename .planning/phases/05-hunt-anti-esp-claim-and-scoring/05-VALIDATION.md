@@ -90,7 +90,7 @@ comment-stripped **source scans**. The rule:
 | **Per task commit** | scoped `stylua`/`selene` + `lune run tests/run.luau -- --root tests/hunt` |
 | **Per plan** | the above + any sibling spec the plan edits (`tests/net/manifest`, `tests/card/netguard`, `tests/card/renderer_discipline`, `tests/card/deci_lock`) |
 | **Per wave (barrier)** | `stylua --check src scripts tests && selene src scripts tests && lune run scripts/ci/check-guards.luau && lune run tests/run.luau` |
-| **Phase gate** | full `lune run scripts/verify.luau` (14 steps) green, then M-18..M-24 signed by a human |
+| **Phase gate** | full `lune run scripts/verify.luau` (14 steps) green, then M-24..M-30 signed by a human |
 
 ---
 
@@ -99,25 +99,25 @@ comment-stripped **source scans**. The rule:
 | Req | Behaviour | Type | Command | Owning plan(s) |
 |-----|-----------|------|---------|----------------|
 | HUNT-01 | no position to a non-entitled user; adapter and client create nothing readable | unit + source scan | `--root tests/hunt` (`privacy`, `service_wiring`, `client_discipline`) | 04, 09, 12, 15, 16, 17 |
-| HUNT-01 **live** | client DataModel replication audit | **manual** | **M-18** | 02 |
+| HUNT-01 **live** | client DataModel replication audit | **manual** | **M-24** | 02 |
 | HUNT-02 | 25-stud prefilter, injected LoS, hysteresis, transition-only | unit | `--root tests/hunt` (`visibility`) | 07, 09 |
-| HUNT-02 **live** | validator-vs-runtime sight, teammate occlusion, raycast cost | **manual** | **M-22** (+ **M-23** eye offset) | 02 |
+| HUNT-02 **live** | validator-vs-runtime sight, teammate occlusion, raycast cost | **manual** | **M-28** (+ **M-29** eye offset) | 02 |
 | HUNT-03 | `Claim` schema; prompt only in client source; server re-validates | unit + source scan | `--root tests/net`, `--root tests/hunt` | 03, 11, 12, 16 |
-| HUNT-03 **live** | client-created prompt on phone and PC | **manual** | **M-19** | 02 |
+| HUNT-03 **live** | client-created prompt on phone and PC | **manual** | **M-25** | 02 |
 | HUNT-04 | two same-instant claims, one winner; no yield in the shipped claim | unit + source scan | `--root tests/hunt` (`claim` CL-01, CL-22) | 06, 12 |
-| HUNT-04 **live** | two clients, one spoon | **manual** | **M-20** | 02 |
+| HUNT-04 **live** | two clients, one spoon | **manual** | **M-26** | 02 |
 | HUNT-05 | count on change, audience all, no position | unit | `--root tests/hunt` (`privacy`, `routing`) | 04, 09, 15 |
 | HUNT-06 | collision pair set at start and restored at end; group on add/descendant/existing | source scan | `--root tests/hunt` (`service_wiring` WR-H05) | 14, 17 |
-| HUNT-06 **live** | avatars pass through each other all round | **manual** | **M-21** | 02 |
+| HUNT-06 **live** | avatars pass through each other all round | **manual** | **M-27** | 02 |
 | HUNT-07 | spectator set membership; bounds payload; zero reveals | unit + source scan | `--root tests/hunt` (`privacy`, `client_discipline` CD-05) | 09, 13, 15, 16 |
-| HUNT-07 **live** | free camera, bounded, sees nothing | **manual** | **M-21** | 02 |
+| HUNT-07 **live** | free camera, bounded, sees nothing | **manual** | **M-27** | 02 |
 | HUNT-08 | reach threshold ±ε, rtt slack and its clamp, strikes, silence | unit | `--root tests/hunt` (`plausibility`) | 08, 12 |
 | SCORE-01 | 1000 then −100 per place, from the core's OWN place counter | unit | `--root tests/hunt` (`scoring`, `hunt_table` case 1) | 05, 09, 18 |
 | SCORE-02 | find points = remaining deci, arrival read once, deadline exclusive | unit | `--root tests/hunt` (`scoring`, `claim` CL-13/14) | 05, 12 |
 | SCORE-03 | zero find, bonus kept | unit | `--root tests/hunt` (`scoring` case 3, `round_end` case 5) | 05, 12 |
 | SCORE-04 | hider = 4000 × mean survived fraction of a fixed 300 s, integer | unit | `--root tests/hunt` (`scoring` cases 10-15) | 05, 12 |
 | SCORE-05 | end on last claim or at the cap, exactly once, publish before clear | unit + source scan | `--root tests/hunt` (`round_end`) | 12, 18 |
-| **Gate G3** | the full loop with 3-10 clients | **manual** | **M-24** | 02 |
+| **Gate G3** | the full loop with 3-10 clients | **manual** | **M-30** | 02 |
 
 **Criterion 3 is the one ROADMAP criterion a machine can close completely.** Its four worked examples
 are exact integer vectors over shipped config in `tests/hunt/scoring.spec.luau`. Criteria 1 and 5
@@ -131,7 +131,7 @@ cannot be closed by any machine in this repo.
       `leak` switch
 - [ ] `tests/hunt/` directory; discovered automatically by `tests/run.luau`. **A spec that registers
       nothing FAILS**, so no placeholder files
-- [ ] `MANUAL-CHECKS.md` rows **M-18..M-24 written before any hunt code** (plan 05-02), plus the
+- [ ] `MANUAL-CHECKS.md` rows **M-24..M-30 written before any hunt code** (plan 05-02), plus the
       `NEEDS_HUMAN.md` index rows including **D-17**
 - [ ] `src/shared/Config/Hunt.luau` + its lock spec (plan 05-01) — every number this phase tunes
 - [ ] Existing-gate edits, each **owned** by a plan and each with a mutant:
@@ -221,17 +221,17 @@ record both the wrong needle and the fix. Those records are the most valuable ro
 
 | Row | Carries | Blocking | What no machine here can do |
 |---|---|---|---|
-| **M-18** | HUNT-01 live, criterion 1 | **yes (highest risk)** | read a live client's DataModel |
-| **M-19** | HUNT-03, A5 | yes | render a prompt on a touch device |
-| **M-20** | HUNT-04, HUNT-08, D-08 | yes | two real clients racing |
-| **M-21** | HUNT-06, HUNT-07, A10 | yes | two avatars colliding; a spectator's view |
-| **M-22** | HUNT-02, A1, A3, V-18, V-34 | yes | compare validator sight to runtime sight; MicroProfiler |
-| **M-23** | HUNT-02, A2, V-19 | no | measure a real R15 root height |
-| **M-24** | criterion 5, **Gate G3** | yes | the vertical slice |
+| **M-24** | HUNT-01 live, criterion 1 | **yes (highest risk)** | read a live client's DataModel |
+| **M-25** | HUNT-03, A5 | yes | render a prompt on a touch device |
+| **M-26** | HUNT-04, HUNT-08, D-08 | yes | two real clients racing |
+| **M-27** | HUNT-06, HUNT-07, A10 | yes | two avatars colliding; a spectator's view |
+| **M-28** | HUNT-02, A1, A3, V-18, V-34 | yes | compare validator sight to runtime sight; MicroProfiler |
+| **M-29** | HUNT-02, A2, V-19 | no | measure a real R15 root height |
+| **M-30** | criterion 5, **Gate G3** | yes | the vertical slice |
 
 **No requirement in this phase is met *only* by a human row** — every one has a machine-proved half.
 But **HUNT-01's live half, HUNT-03's touch half and Gate G3 are**, so
-`requirements.mark-complete` must not run for Phase 5 before M-18, M-19 and M-24 are signed.
+`requirements.mark-complete` must not run for Phase 5 before M-24, M-25 and M-30 are signed.
 
 **Files with no behavioural machine coverage at all** (source scans only; Lune cannot load them):
 `src/server/services/HuntService.luau`, `src/client/ui/HuntClient.luau`,
@@ -257,4 +257,4 @@ _Filled in by plan 05-19. Nothing below is signed._
 - [ ] Wave barriers all green
 - [ ] Mutation ledger complete, with source-edit and in-spec totals reported separately
 - [ ] `05-VALIDATION-RESULTS.md` written, divergences recorded
-- [ ] M-18, M-19, M-20, M-21, M-22, M-24 signed by a human
+- [ ] M-24, M-25, M-26, M-27, M-28, M-30 signed by a human

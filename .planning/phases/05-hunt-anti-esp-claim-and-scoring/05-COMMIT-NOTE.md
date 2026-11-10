@@ -35,3 +35,33 @@ git add .planning/phases/04.1-first-person-cards/   # not -A
 disjoint paths AND disjoint staging. The disjoint-paths half was planned for and held — no file was
 ever written by both. The staging half was not considered at all, and `-A` silently crosses every
 boundary the path discipline was protecting.
+
+---
+
+## A second concurrency defect: both phases claimed the same M-numbers
+
+**Found 2026-11-10, before Phase 5 executed.** Phase 04.1 and Phase 5 were planned in parallel by
+two agents. Each read `MANUAL-CHECKS.md`, saw seventeen rows, and allocated "the next free ids"
+starting at **M-18**. Neither could see the other's plans, because neither existed yet when the
+other was read.
+
+- 04.1 **wrote** M-18..M-23 into `MANUAL-CHECKS.md` when its wave 0 executed.
+- Phase 5's nineteen plans **intended to write** M-18..M-24.
+
+Six numbers collided. Had Phase 5 executed, its wave-1 plan would either have overwritten six of
+04.1's rows or produced duplicate headings — and `verify.luau` parses those rows by name, so the
+damage would have surfaced as a confusing parse result rather than as a conflict.
+
+**Fixed by renumbering Phase 5 to M-24..M-30** across 18 files (the plans plus PATTERNS, RESEARCH
+and VALIDATION), descending so no mapping collided mid-pass. 04.1's rows are untouched; it executed
+first and owns the lower block.
+
+**This is the same root cause as the `git add -A` incident above**, and that is the point worth
+keeping. Two agents sharing a repository need disjoint *paths*, disjoint *staging*, and disjoint
+**identifier allocations**. The first was planned for and held. The second was not considered. The
+third was not considered either — and unlike staging, nothing in git would have caught it: both
+plan sets were internally consistent, passed their own validators, and passed a plan check.
+
+**The general rule:** when two agents allocate from a shared numbering space, the allocation must
+be made by whoever can see both, or reserved in advance. "Take the next free id" is only safe when
+exactly one party is taking.

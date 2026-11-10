@@ -69,7 +69,7 @@ All paths are relative to `/home/user/robloxspoons`. Line numbers were read on 2
 | `tests/net/manifest.spec.luau` (EDIT) | test | itself | exact |
 | `tests/card/deci_lock.spec.luau` (RE-RUN, maybe EDIT) | test | itself, lines 203-233 | exact |
 | `scripts/ci/zones.luau` (EDIT, optional) | config | itself | exact |
-| `MANUAL-CHECKS.md` (EDIT: M-18..M-24) | docs | M-11..M-17 block, lines 7-32 | exact |
+| `MANUAL-CHECKS.md` (EDIT: M-24..M-30) | docs | M-11..M-17 block, lines 7-32 | exact |
 
 ---
 
@@ -155,7 +155,7 @@ Hunt kinds (Research privacy-gate section): `SpoonVisible {id,x,y,z}` owner, `Sp
 
 **Return-a-list, publish elsewhere** (IdleClock.luau:23-24 guarantee 6 + 49-52 `Command` union): `Visibility.step(...)` returns `{ shown, hidden }` and mutates its own `visible[userId][spoonId]` state. It publishes nothing. `HuntTable.tick` publishes after the step returns.
 
-**Exports a predicate written once:** IdleClock exports `legal`. `Visibility` should export `eyeOf(root, cfg)` once (Research F5: `root + (EYE_HEIGHT - REACH_HEIGHT)` default, M-23 settles it) so both the sweep and its spec call the same function.
+**Exports a predicate written once:** IdleClock exports `legal`. `Visibility` should export `eyeOf(root, cfg)` once (Research F5: `root + (EYE_HEIGHT - REACH_HEIGHT)` default, M-29 settles it) so both the sweep and its spec call the same function.
 
 **Injected closure counted by the spec:** the `los` closure is a dep, as `onTelemetry` is in `StallDetector`. The spec counts calls and asserts the prefilter proof: `los` is NOT called for any pair beyond `GLINT_RANGE` (Research Visibility core). Mutation: remove the prefilter, `los` call count rises above the pair bound.
 
@@ -373,7 +373,7 @@ Copy the explanatory comment style (Manifest.luau:40-45): state that `spoonId` i
 
 **Discipline of the client file** is gated by the same method as `tests/card/renderer_discipline.spec.luau` (1328 lines; header lines 1-17: "src/client/ui cannot be loaded by Lune ... this gates the DISCIPLINE rather than the behaviour ... That is a weak kind of gate and it says so") and `tests/card/round_end.spec.luau` (the `ENDER`/`VIEW_HEAD` anchored-slice trick, lines 18-22, to avoid a `slice` landing in the wrong function). Required hunt scans: prompt created only inside the `SpoonVisible` handler; `:Destroy()` in the `SpoonHidden` handler; receive handler body has no `task.wait`, `:Wait(`, `WaitForChild`, `InvokeServer`; the spectate camera sets `CameraType = Enum.CameraType.Scriptable` and clamps to the bounds payload.
 
-**Device-dependent items stay manual**: client-created prompt renders and fires on a phone (M-19, assumption A5; fallback is a client-drawn tap button sending the same `Claim`), spectate bounds (M-21).
+**Device-dependent items stay manual**: client-created prompt renders and fires on a phone (M-25, assumption A5; fallback is a client-drawn tap button sending the same `Claim`), spectate bounds (M-27).
 
 **Guard note:** Do NOT add `HuntClient` to `guardedNamePrefixes`. Phase 4 already reasoned this through (zones.luau:35-49): guarded roots also get R3, whose `os.` needle trips on `pos.X`. D-18 means the glint has no cosmetic seam anyway, so there is nothing to protect.
 
@@ -414,7 +414,7 @@ Copy the explanatory comment style (Manifest.luau:40-45): state that `spoonId` i
 
 **What NOT to copy:** the engine-state hashing and the `Livelock` hijack (lines 220-260). Hunt has no hash.
 
-**Honest split recorded in the requirements table:** HUNT-01 is machine-proved for the core and the adapter source, human-proved for the live replication audit (M-18). The spec's header must say so, as `service_wiring.spec` says what it does not prove.
+**Honest split recorded in the requirements table:** HUNT-01 is machine-proved for the core and the adapter source, human-proved for the live replication audit (M-24). The spec's header must say so, as `service_wiring.spec` says what it does not prove.
 
 #### `tests/hunt/service_wiring.spec.luau` (adapter source scan)
 
@@ -499,14 +499,14 @@ See trap 7. `deci_lock.spec.luau:203-233` is re-run, not edited, unless `HuntSer
 
 ---
 
-### `MANUAL-CHECKS.md` (EDIT: M-18..M-24, written BEFORE execution)
+### `MANUAL-CHECKS.md` (EDIT: M-24..M-30, written BEFORE execution)
 
 **Analog:** the Phase 4 block (MANUAL-CHECKS.md lines 7-32). Rows were written in plan 04-02, "before any UI wave was executed, so that nothing device-dependent can be ticked by a machine". Copy:
 - the lead paragraph that assigns each check to a phase and states which are blocking;
 - the sentence "Silence is not success: `lune run scripts/verify.luau` prints every unticked check after a green run.";
 - the close-block table `| Row | Blocking | Carries | A failure means |` with a concrete consequence per row;
 - the sentence "nothing below is ticked, and no machine may tick it".
-Next free id is M-18 (last used M-17, per Research Wave 0). Rows from Research: M-18 replication audit (command-bar script on a CLIENT in a 2-player session, walks `Workspace`, `ReplicatedStorage`, `ReplicatedFirst`, `StarterGui`, `Lighting`, `Players.LocalPlayer`; its Studio-only debug print of spoon positions is removed in the same commit), M-19 client prompt on phone and PC, M-20 two-client race, M-21 collisions + spectator, M-22 validator-vs-live LoS + MicroProfiler, M-23 eye/root offset, M-24 Gate G3 session. State for each what a failure means and whether it blocks. Also note the Verification Debt rows touched (V-18, V-21, V-22; V-23, V-34 left as measurement rows) and that nothing here upgrades a claim's confidence without a primary-source re-fetch.
+Next free id is M-24 (last used M-17, per Research Wave 0). Rows from Research: M-24 replication audit (command-bar script on a CLIENT in a 2-player session, walks `Workspace`, `ReplicatedStorage`, `ReplicatedFirst`, `StarterGui`, `Lighting`, `Players.LocalPlayer`; its Studio-only debug print of spoon positions is removed in the same commit), M-25 client prompt on phone and PC, M-26 two-client race, M-27 collisions + spectator, M-28 validator-vs-live LoS + MicroProfiler, M-29 eye/root offset, M-30 Gate G3 session. State for each what a failure means and whether it blocks. Also note the Verification Debt rows touched (V-18, V-21, V-22; V-23, V-34 left as measurement rows) and that nothing here upgrades a claim's confidence without a primary-source re-fetch.
 
 The new-file `NEEDS_HUMAN.md` row pattern (Phase 4 touched it) follows the same "written before execution" rule.
 
@@ -579,7 +579,7 @@ end,
 
 | File / concern | Role | Data Flow | Reason | Nearest structural precedent |
 |---|---|---|---|---|
-| Spectator free-roaming camera (client) | component | event-driven | no `CurrentCamera`/`Scriptable` camera code exists in `src/client` | Research Open Question O3 and manual check M-21; keep the decision (bounds clamp, no reveals) server-side as a membership test |
+| Spectator free-roaming camera (client) | component | event-driven | no `CurrentCamera`/`Scriptable` camera code exists in `src/client` | Research Open Question O3 and manual check M-27; keep the decision (bounds clamp, no reveals) server-side as a membership test |
 | `PhysicsService` collision-group boot registration | service | one-shot | no `PhysicsService` use anywhere in `src/` | Research "Collision group adapter" snippet; wrap in `pcall` (Pitfall 2); structure after `watchCharacter` for the assignment half |
 | `Workspace:Raycast` line-of-sight closure | utility (adapter) | request-response | the validator models LoS in pure geometry (`Obb.segmentHits`, `MapValidator`), no runtime ray exists | Research Pattern 2. `Obb.segmentHits` stays the validator's; do not add a second sight model in Lua (Don't-Hand-Roll) |
 | Client-created `ProximityPrompt` | component | event-driven | no prompt or local-Instance reveal exists | Research Code Examples (`HuntClient`); A5 fallback is a tap button sending the same `Claim` |
