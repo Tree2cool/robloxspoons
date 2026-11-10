@@ -18,6 +18,7 @@ Every Roblox platform claim in the research is unverified against primary docs (
 - [ ] **Phase 4: Live Card Table** - Server card shell, prediction/reconcile, AFK auto-pass, and the PC and mobile card UI (parallel with Phase 5)
 - [ ] **Phase 04.1: First-Person Card Presentation** - (INSERTED) Camera locked on the player's own 3D cards in hand; replaces Phase 4's 2D overlay
 - [ ] **Phase 5: Hunt, Anti-ESP, Claim and Scoring** - Server-only spoon data, per-client reveal, atomic claim, scoring ledger, round end (parallel with Phase 4; ends at the vertical-slice gate)
+- [ ] **Phase 05.1: First-Person Hunt Camera** - (INSERTED) The hunt played from the seeker's own eyes; owner decision 2026-11-10
 - [ ] **Phase 6: Hide Phase, Match Lifecycle and Churn** - Free placement UI, parkour room, full match flow, joiners/leavers, scoreboard and podium
 - [ ] **Phase 7: Content and Monetization** - Two independent tracks: five maps (7a) and the cosmetic catalog, shop, persistence and VIP (7b)
 - [ ] **Phase 8: Parity, Hardening and Soft Launch** - Device matrix, soak and anti-exploit audit, telemetry, economy review, cold-start decision
@@ -275,6 +276,27 @@ Plans:
 - [ ] 05-19-PLAN.md — the phase gate: the mutation ledger, the honest requirement split, the owner checkpoint (wave 6, not autonomous)
 **UI hint**: yes
 **Research**: YES. Client-created pickup affordance on a local-only visual, server-known position lag, time source precision for deciseconds, collision groups. Re-check V-21, V-22, V-23, V-30. Open Question 7 (hider-score denominator) is CONFIRMED by the owner: a fixed 300 s denominator, unfound spoons counting as the full 300, on the same timeline as find points. Recorded in SCORE-04. Open Question 10 (movement thresholds) first-pass here, tuned in Phase 8.
+
+### Phase 05.1: First-Person Hunt Camera (INSERTED)
+**Goal**: The hunt is played from the seeker's own eyes — searching a space, spotting a glint and claiming a spoon all read better in first person than over the shoulder — without weakening the anti-ESP model, the claim validation or mobile playability
+**Depends on**: Phase 5 (the glint, line-of-sight and claim model must exist before a camera can be designed around them), Phase 04.1 (the card phase's locked-camera work is the nearest precedent)
+**Requirements**: HUNT-02, HUNT-03, HUNT-08, UX-01, UX-02, UX-03 (re-met for the hunt, not newly met)
+**Success Criteria** (what must be TRUE):
+  1. A seeker hunts in first person, and the glint reads as a thing you find by sweeping a space rather than a thing that appears on a HUD — the PROJECT.md test is "actually sweeping a space, not spotting a glow from across the map"
+  2. The pickup affordance is reachable and readable in first person on a phone, still meeting the >= 48 px floor (UX-01, UX-03), with the prompt still client-created and the server still the only authority (HUNT-03)
+  3. First person does not widen what a seeker can see: the reveal is still range plus line of sight evaluated server-side from the eye, and the client still learns a position only while entitled to it (HUNT-02). **A camera change must not become a visibility change**
+  4. Movement, jumping and ledges in the parkour map remain playable in first person on both PC and a phone — this is the criterion most likely to fail and the reason the phase exists separately
+  5. The plausibility check (HUNT-08) still holds when the camera no longer shows the body: head position, eye height and the server-known root must stay consistent, since D-07's slack term is derived from them
+**Plans**: TBD
+**UI hint**: yes
+**Research**: YES. `Player.CameraMode = LockFirstPerson` versus a scripted camera; what first person does to the documented character-collision and ledge behaviour; mobile first-person movement controls (the thumbstick is still the mechanism and the hunt does NOT hide controls, unlike the card phase); motion-sickness and FOV defaults; and whether the eye used for the line-of-sight ray should become the camera's eye rather than `EYE_HEIGHT` above the root. Re-check V-23 (server-known position lag) against a first-person camera, and M-29 (the eye/root offset row Phase 5 writes).
+
+**Why this is its own phase.** The owner asked for a first-person game; the card phase answered that in Phase 04.1, where locking the camera is what rescued the 48 px touch guarantee. **None of that reasoning transfers here.** The hunt is free movement across a map with ledges and corners, so first person is a separate decision with its own costs — peripheral vision while jumping, motion sickness on mobile, and an interaction with the glint and line-of-sight model that decides whether a spoon can be seen at all. Phase 5 therefore ships the standard camera (its D-17) and carries a tripwire that FAILS if a `CameraMode`/`firstperson` seam appears, so nothing can drift into first person by accident: it has to be this phase.
+
+**Best sequenced after Gate G3**, the first time the full loop runs end to end. Two minutes of playing the real hunt will settle questions about feel that neither planning nor research can.
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 05.1 to break down)
 
 ### Phase 6: Hide Phase, Match Lifecycle and Churn
 **Goal**: A full match of 3 to 10 players runs end to end: players hide, play and rotate fairly, joiners and leavers never break the round, and the match ends with a correct winner

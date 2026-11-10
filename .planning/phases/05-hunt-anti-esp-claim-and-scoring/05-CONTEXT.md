@@ -118,8 +118,14 @@ does not spend a question on them:
 
 ### OPEN - OWNER (new questions, answered conservatively)
 
-- **D-17: The hunt keeps the standard Roblox camera. This phase does NOT make the hunt first
-  person.** The owner said "the game should be first person", then clarified it as the card phase,
+- **D-17: RESOLVED BY THE OWNER, 2026-11-10 — "First person, its own phase."** The hunt keeps the
+  standard Roblox camera **in this phase**, and a first-person hunt is now **Phase 05.1**, with its
+  own goal, five success criteria and a research flag. This is no longer a declined preference or
+  an open question: it is scheduled work with a home.
+  **The tripwire in 05-16 (`CD-05`) becomes MORE important, not less** — it fails if a
+  `CameraMode`/`firstperson` seam appears in Phase 5. Now that another phase owns this, a seam
+  drifting in here would silently pre-empt that phase's design rather than merely exceed scope.
+  The original reasoning, kept because Phase 05.1 inherits it: The owner said "the game should be first person", then clarified it as the card phase,
   where the argument was fully worked through and the 48 px objection resolved by locking the
   camera. **None of that reasoning transfers to the hunt**, which is free movement across a parkour
   map where a forced first-person camera is a significant and separate playability decision. Phase

@@ -97,6 +97,7 @@ not derived from it.
 
 ### Roadmap Evolution
 
+- Phase 05.1 inserted after Phase 5: first-person hunt camera (owner decision 2026-11-10, "First person, its own phase" — resolves Phase 5's D-17, which now points here; Phase 5's CD-05 tripwire protects it)
 - Phase 04.1 inserted after Phase 4: first-person card presentation, camera locked on the player's own 3D cards in hand (URGENT — owner decision 2026-11-10, replaces Phase 4's 2D overlay; M-12 and M-14's desk half invalidated)
 
 ### Decisions
