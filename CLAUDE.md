@@ -78,11 +78,20 @@ that already had none.
 
 Five Roblox documentation hosts were DNS-blocked during research
 (`create.roblox.com`, `devforum.roblox.com`, `robloxapi.github.io`,
-`madstudioroblox.github.io`, `jsdotlua.github.io`). **Every Roblox platform claim in the
+`madstudioroblox.github.io`, `jsdotlua.github.io`), so **every Roblox platform claim in the
 research is unverified against primary docs.** Each phase's research step must begin by
 re-checking the rows of the Verification Debt table in `.planning/research/SUMMARY.md`
 that name that phase, and must record what was confirmed or changed. Do not upgrade a
 claim's confidence without re-fetching the primary source.
+
+**UPDATE 2026-11-10: the docs ARE reachable, so the debt is payable.** Only local DNS is
+blocked — the agent proxy resolves independently, which is why `WebFetch` fails with
+`ENOTFOUND` and `curl` succeeds. **Fetch with `scripts/dev/roblox-doc.sh`, never a hand-rolled
+curl**: a wrong path returns HTTP 200 with a Next.js app shell instead of a 404, so a bad fetch
+looks like a good one and floods context with markup. The script refuses anything that is not
+real markdown. See `.planning/research/DOC-ACCESS.md`. The rule above is unchanged — re-check
+per phase, with that phase's question in hand, and record it. The difference is that a re-check
+can now end in an answer instead of in "still unreachable".
 
 ## Platform Constraints
 
