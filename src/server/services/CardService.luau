@@ -229,7 +229,13 @@ function CardService.new(deps: Deps): CardService
 		seatHold:hold(playerId, pose)
 	end
 	-- One generic release for completion, bench and disconnect (idempotent in the core).
+	-- It reports, because a hold that silently goes away looks exactly like a hold that never applied.
+	-- The core cannot report it: seathold.spec asserts an exact telemetry list, so the line goes here,
+	-- at the one place every release route passes through.
 	local function releaseAvatar(playerId: number)
+		if seatHold:isHeld(playerId) then
+			deps.onTelemetry("seat_released", { playerId = playerId })
+		end
 		seatHold:release(playerId)
 	end
 

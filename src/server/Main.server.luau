@@ -126,8 +126,17 @@ cardService = CardService.new({
 	onCompleted = function(seat, playerId, rank)
 		print(`[Spoons] seat {seat} (player {playerId}) completed rank {rank}`)
 	end,
-	onTelemetry = function(name, _data)
-		print(`[Spoons] telemetry {name}`)
+	-- The DATA, not just the name. It was dropped until 2026-11-10, when `seat_hold_deferred` told us a
+	-- hold had deferred but not WHOSE, and a Studio session went on guessing which of three players it
+	-- meant. Every telemetry payload in this phase is a flat table of numbers, so this stays one line
+	-- per event. Sorted, so two runs are diffable.
+	onTelemetry = function(name, data)
+		local parts: { string } = {}
+		for key, value in data do
+			table.insert(parts, `{key}={value}`)
+		end
+		table.sort(parts)
+		print(`[Spoons] telemetry {name} {table.concat(parts, " ")}`)
 	end,
 	seatPoses = function()
 		return mapSpec.cardTable.seats
