@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Phase 4 reviewed + verified (20/20 plans, 871 tests, status human_needed); NOT closed - M-11..M-17 unsigned; both owner decisions settled (D-39 AFK, D-40 callout scope); only the device matrix remains
-last_updated: "2026-11-07T00:00:00.000Z"
-last_activity: 2026-11-07
+stopped_at: Phase 04.1 WAVE 0 COMPLETE (plan 04.1-01, the layering spike). 879 tests, verify 14/14. Waves 1+ (plans 02-10) are unblocked. NOT closed - M-18..M-23 written and unsigned; Card.HAND.LAYERING_ROUTE is PROVISIONAL until M-18
+last_updated: "2026-11-10T00:00:00.000Z"
+last_activity: 2026-11-10
 progress:
   total_phases: 8
   completed_phases: 3
@@ -25,12 +25,22 @@ See: .planning/PROJECT.md (updated 2026-11-02)
 
 ## Current Position
 
-Phase: 4 (Live Card Table) — **context gathered, 0 plans**
-Plan: 0 of TBD
-Status: Ready to plan Phase 4 (or Phase 5 — the roadmap pairs them)
-Last activity: 2026-11-05
+Phase: **04.1 (First-Person Cards)** — 10 plans planned, **WAVE 0 EXECUTED**
+Plan: 1 of 10 (`04.1-01-PLAN.md`, the Wave 0 layering spike) — COMPLETE
+Status: Waves 1+ unblocked. Next action: execute plans 02-10 per the phase's wave map
+Last activity: 2026-11-10
 
-Progress: [░░░░░░░░░░] 0% of Phase 4 — Phases 1, 2 and 3 complete (37/37 plans, Gates G1 and G2 passed)
+Progress: [█░░░░░░░░░] 10% of Phase 04.1 (1/10 plans) — Phases 1, 2 and 3 complete; Phase 4 executed
+(20/20 plans) but NOT closed, M-11..M-17 unsigned
+
+**Phase 04.1 Wave 0 result, and the one thing it deliberately does not claim.** Plan 04.1-01 shipped
+the manual rows (M-18..M-23, unticked), `04.1-LAYERING-DECISION.md`, the committed Studio probe
+`scripts/dev/spike-layering.luau`, the `scripts/dev/scan.luau` source scanner, `Card.HAND`/`Card.CAMERA`
+and `tests/card/layering_contract.spec.luau`. **The Studio observation was NOT made** — there is no
+Studio in the build container and M-18 is a human check. `Card.HAND.LAYERING_ROUTE = "AlwaysOnTop"` is
+**PROVISIONAL**. Routes A and B share every geometric number, so the other nine plans may proceed; a
+flip after M-18 costs one constant and two property assignments, unless route B is chosen AND occlusion
+is observed, which is a BLOCKER (see the decision doc).
 
 **Phase 4 context:** `.planning/phases/04-live-card-table/04-CONTEXT.md` (33 decisions, all eight
 gray areas discussed). Full Q&A audit trail in `04-DISCUSSION-LOG.md`.
@@ -64,7 +74,11 @@ COMPLETE, FOUND-08 PARTIAL.
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 04.1 | 1 of 10 | ~95 min | ~95 min |
+
+**This table is incomplete and says so rather than implying otherwise:** phases 1-4's plan durations
+were never recorded here, so the 04.1 row is the only measured one and the velocity figures above are
+not derived from it.
 
 **Recent Trend:**
 
@@ -90,6 +104,10 @@ COMPLETE, FOUND-08 PARTIAL.
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- [04.1-01]: `Card.HAND.LAYERING_ROUTE` is one constant with exactly ONE read site in `src/`; routes A and B share every geometric number, so the Studio answer costs one edit and no geometry. Provisional until M-18.
+- [04.1-01]: a permanent gate asserts a manual row EXISTS and is BLOCKING, never that it is still unticked — a gate that goes red when the owner signs the row punishes the correct action. Found by the plan's own no-defect twin; `config_lock` had pinned the route's value and did exactly that.
+- [04.1-01]: `scripts/dev/scan.luau` is the shell-callable comment-stripped scanner. It exists because mandated file headers legitimately NAME the tokens their own gates forbid, so a raw `grep` gate is unexecutable. Any gate using it must say which it scans (code, never comments; string literals kept).
+- [04.1-01]: under route Depth, `LightInfluence = 0` is necessary but NOT sufficient — `Brightness` must also stay at its default 1. New finding from re-verifying `SurfaceGui.md` 2026-11-10; written into M-23 step 2.
 - [Roadmap]: Engine-first. Pure card engine and pacing simulator (Phase 2) precede all UI and networking; Gate G1 sits inside Phase 2.
 - [Roadmap]: Parallel pairs are Phase 2 with Phase 3, and Phase 4 with Phase 5; they merge at Gate G3 (vertical slice) before breadth work.
 - [Roadmap]: Map contract (MAP-01) lands in Phase 1, validator (MAP-02, MAP-03) in Phase 3 after placement rules; the five maps (Phase 7a) wait on Gate G2.
@@ -274,6 +292,22 @@ rows below (Phases 5, 6 and 7) are untouched and still open.
 
 ### Blockers/Concerns
 
+- **M-18 is unsigned, so `Card.HAND.LAYERING_ROUTE` is PROVISIONAL** (plan 04.1-01). The Studio
+  observation needs the owner: paste `scripts/dev/spike-layering.luau` into the command bar, photograph
+  all three route groups, apply the one-sentence rule in
+  `.planning/phases/04.1-first-person-cards/04.1-LAYERING-DECISION.md`, and record the verdict in M-18
+  **and** in the decision doc. **If route B is chosen AND a card is occluded, that is a BLOCKER, not a
+  flip:** the remedy moves `HAND.OFFSET_STUDS`, which is a `Projection` input, so the 48 px proof, the
+  fan-to-pile gap and the containment margin all re-open. Route C is a BLOCKER-grade rewrite (Roblox
+  `GuiObject`s have no shear), never a fallback.
+- **Plans 04.1-02 to 04.1-10 carry raw `grep` lines in their human-reference `<verification>` blocks
+  that cannot pass, and plan 04.1-01 is what made it so.** `04.1-03-PLAN.md:386` says
+  `grep -rn 'DiagonalFieldOfView' src   # nothing`, but `Config/Card.luau`'s header is **required by
+  plan 01** to name that identifier in order to explain why it must never be substituted. **That
+  conflict is the stated reason `scripts/dev/scan.luau` exists.** The `<automated>` verify line is the
+  gate and already calls `scan.luau`; where a `<verification>` line is a raw grep over a file whose
+  header names the token, read it as the `scan.luau code-dir` form.
+
 - **RESOLVED (Phase 2):** the former card-engine blocking entry is gone. CARD-09 (deal-time four-of-a-kind)
   and CARD-10 (which four cards leave on a joker completion) are no longer defaults awaiting a decision —
   they are asserting tests in `tests/engine/spec_lock.spec.luau`, and the runner's todo count is 0.
@@ -375,13 +409,15 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-11-05
-Stopped at: **Phase 4 context gathered.** All eight gray areas discussed; 33 decisions recorded.
-Phase 3 remains complete (11/11 plans, Gate G2 PASSED by the owner in Studio).
-Resume file: `.planning/phases/04-live-card-table/04-CONTEXT.md`
+Last session: 2026-11-10
+Stopped at: **Phase 04.1 Wave 0 complete.** Plan 04.1-01 executed in full; three per-task commits
+(`dc3fe16`, `4fddbb4`, `d97de51`). Waves 1+ (plans 02-10) are unblocked and none was started.
+Resume file: `.planning/phases/04.1-first-person-cards/04.1-01-SUMMARY.md`
 
-**Final measured state:** 657 tests passed / 0 failed / 0 todo; `verify.luau` 14/14 exit 0;
-`validate-map` ok (21 spots, 9 seats); `ISSUE_CODES` 23; MANUAL-CHECKS 8 signed, 2 unsigned.
+**Final measured state (2026-11-10):** 879 tests passed / 0 failed / 0 todo (baseline 874 + 5 new
+`layering_contract` cases); `verify.luau` all 14 automated steps pass; MANUAL-CHECKS **10 signed, 13
+unsigned** (M-18..M-23 newly written and deliberately unticked). Fourteen mutations of the real source
+were run and their observed results are in `04.1-01-SUMMARY.md`.
 
 **Next:** `/gsd-plan-phase 4`. Phase 5 (Hunt, Anti-ESP, Claim and Scoring) is equally available —
 the roadmap pairs 4 and 5 and they merge at Gate G3, the vertical slice. Phase 5 depends on Phase 3

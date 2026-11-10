@@ -223,8 +223,15 @@ a provisional route behind one constant with one read site; M-18 settles it, and
 then M-23 (lighting independence) goes live because scene lighting returns and the machine-gated
 4.5:1 luma floor stops describing what the player sees.
 
+**Progress: 1 of 10 plans executed (wave 0).** Wave 0 shipped the manual rows M-18..M-23 (unticked),
+`04.1-LAYERING-DECISION.md`, the committed Studio probe, `scripts/dev/scan.luau`, `Card.HAND` /
+`Card.CAMERA` and `tests/card/layering_contract.spec.luau`. **The Studio observation was not made and
+is not claimed:** there is no Studio in the build container and M-18 is a human check. The gate that
+keeps the consequences honest is `layering_contract.spec` case 2 — setting the route to `"Depth"`
+without the M-23 row in `MANUAL-CHECKS.md` fails the build (run as a mutation, seen to fail, reverted).
+
 Plans:
-- [ ] 04.1-01-PLAN.md — the layering spike, the route seam, the HAND/CAMERA config, the comment-stripped source scanner every later gate uses, and every new MANUAL-CHECKS row, written before any renderer code (wave 0, gates all)
+- [x] 04.1-01-PLAN.md — **EXECUTED 2026-11-10** (`04.1-01-SUMMARY.md`; commits `dc3fe16`, `4fddbb4`, `d97de51`). **Waves 1+ are unblocked.** M-18 is written and UNSIGNED, so `Card.HAND.LAYERING_ROUTE = "AlwaysOnTop"` is PROVISIONAL — the layering spike, the route seam, the HAND/CAMERA config, the comment-stripped source scanner every later gate uses, and every new MANUAL-CHECKS row, written before any renderer code (wave 0, gates all)
 - [ ] 04.1-02-PLAN.md — `Projection.luau`: the pure pinhole model, the four-step transform order (F4) and the 48 px proof re-derived (wave 1)
 - [ ] 04.1-03-PLAN.md — the locked camera: lock/release as Controls effects with one release site, `CardCamera`, and the camera discipline gate (wave 1)
 - [ ] 04.1-04-PLAN.md — `viewportFrom` from two documented `GetInsetArea` calls (F1), and `Layout` gives up the hand and re-anchors the chrome, keeping `fan`/`slots` as a `Projection`-derived shim so every wave typechecks (wave 2)
