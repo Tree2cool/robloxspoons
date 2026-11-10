@@ -245,7 +245,27 @@ Plans:
   3. Scoring matches the worked examples: 1600 find points for the 8th spoon found at 2:40 remaining; 800 bonus plus 600 find equals 1400 for the 3rd to four-of-a-kind finding at 1:00; 0 find points but a kept bonus for a seeker who finds nothing; seeker ceiling 4000
   4. The hider is scored at 4000 times the average fraction of a fixed 300 seconds their spoons survived, with unfound spoons counting as the full 300, and the round ends the instant the final spoon is claimed or at the 5:00 cap
   5. **Gate G3 (vertical slice):** on one map with 3 to 10 clients or bots, the full loop (cards, four-of-a-kind, hunt, claim, score) runs with auto-filled spoons, spoons-remaining is visible to seekers, collisions are off, and finished players can spectate
-**Plans**: TBD
+**Plans**: 19 plans in 6 waves
+Plans:
+- [ ] 05-01-PLAN.md — Config/Hunt: the fifteen constants, and the lock spec that keeps GLINT_RANGE above pickup reach (wave 1)
+- [ ] 05-02-PLAN.md — MANUAL-CHECKS M-18..M-24 written BEFORE execution, with the Phase 5 close block (wave 1)
+- [ ] 05-03-PLAN.md — the Claim intent, its bucket, and the forbidden-key gate extended to coordinates (wave 1)
+- [ ] 05-04-PLAN.md — HuntRouting: the seven kinds as frozen data, plus the HuntRecording fake (wave 1)
+- [ ] 05-05-PLAN.md — Scoring: the ROADMAP vectors as exact integers, and the one hider vector that discriminates the rounding rule (wave 1)
+- [ ] 05-06-PLAN.md — SpoonRegistry: plain records, two shuffles so an id carries no placement, claimed exactly once (wave 1)
+- [ ] 05-07-PLAN.md — Visibility: the 25-stud prefilter, the injected raycast, hysteresis and transition-only output (wave 1)
+- [ ] 05-08-PLAN.md — Plausibility: the reach check with bounded rtt slack, the speed sampler, and the oracle gate (wave 1)
+- [ ] 05-09-PLAN.md — HuntTable part 1: its OWN place counter (research F2), the sweep, spectators and removal (wave 2)
+- [ ] 05-10-PLAN.md — the Hunt remote, the hunt publisher and ClientNet.onHunt (wave 2)
+- [ ] 05-11-PLAN.md — SpoonView and RemainingHud: the client-created prompt and the count-only HUD (wave 2)
+- [ ] 05-12-PLAN.md — HuntTable part 2: the atomic claim, the stale-reveal fan-out, and round end publishing before it clears (wave 3)
+- [ ] 05-13-PLAN.md — SpectateCamera, HuntClient and the client boot; D-17 keeps the hunt third person (wave 3)
+- [ ] 05-14-PLAN.md — HuntService: one raycast with RespectCanCollide explicit, one collision group, one accumulator (wave 4)
+- [ ] 05-15-PLAN.md — privacy.spec: the anti-ESP oracle with five injected leaks and three non-vacuity counts (wave 4)
+- [ ] 05-16-PLAN.md — client_discipline.spec: six scans over three files Lune cannot load (wave 4)
+- [ ] 05-17-PLAN.md — service_wiring.spec: nine named adapter scans, twenty-nine run mutants (wave 5)
+- [ ] 05-18-PLAN.md — Main.server: the round is wired for the first time (research F1), Claim routed, rank discarded (wave 5)
+- [ ] 05-19-PLAN.md — the phase gate: the mutation ledger, the honest requirement split, the owner checkpoint (wave 6, not autonomous)
 **UI hint**: yes
 **Research**: YES. Client-created pickup affordance on a local-only visual, server-known position lag, time source precision for deciseconds, collision groups. Re-check V-21, V-22, V-23, V-30. Open Question 7 (hider-score denominator) is CONFIRMED by the owner: a fixed 300 s denominator, unfound spoons counting as the full 300, on the same timeline as find points. Recorded in SCORE-04. Open Question 10 (movement thresholds) first-pass here, tuned in Phase 8.
 
