@@ -224,15 +224,15 @@ then M-23 (lighting independence) goes live because scene lighting returns and t
 4.5:1 luma floor stops describing what the player sees.
 
 Plans:
-- [ ] 04.1-01-PLAN.md — the layering spike, the route seam, the HAND/CAMERA config and every new MANUAL-CHECKS row, written before any renderer code (wave 0, gates all)
+- [ ] 04.1-01-PLAN.md — the layering spike, the route seam, the HAND/CAMERA config, the comment-stripped source scanner every later gate uses, and every new MANUAL-CHECKS row, written before any renderer code (wave 0, gates all)
 - [ ] 04.1-02-PLAN.md — `Projection.luau`: the pure pinhole model, the four-step transform order (F4) and the 48 px proof re-derived (wave 1)
 - [ ] 04.1-03-PLAN.md — the locked camera: lock/release as Controls effects with one release site, `CardCamera`, and the camera discipline gate (wave 1)
-- [ ] 04.1-04-PLAN.md — `viewportFrom` from two documented `GetInsetArea` calls (F1), and `Layout` gives up the hand and re-anchors the chrome (wave 2)
+- [ ] 04.1-04-PLAN.md — `viewportFrom` from two documented `GetInsetArea` calls (F1), and `Layout` gives up the hand and re-anchors the chrome, keeping `fan`/`slots` as a `Projection`-derived shim so every wave typechecks (wave 2)
 - [ ] 04.1-06-PLAN.md — the face tree extracted unchanged, `CardCarrier` as an anonymous Part plus a PlayerGui SurfaceGui, and the T1/T2 privacy scans (wave 2)
 - [ ] 04.1-05-PLAN.md — `CardHud` on the new recipe, the plate removed, the single pixel-to-GUI conversion, and the forbidden-coordinate-API gate (wave 3)
-- [ ] 04.1-07-PLAN.md — `CardHand` rewritten: the 3D fan, the 2D hit buttons, every motion path, and the no-gating gate (D-50) (wave 4)
+- [ ] 04.1-07-PLAN.md — `CardHand` rewritten: the 3D fan, the 2D hit buttons, every motion path, its own call site, and the no-gating gate (D-50) (wave 4)
 - [ ] 04.1-08-PLAN.md — the depth rail: `Rail.luau` pure, its layout slot, the view, and F5/F6/F7 fixed (wave 4)
-- [ ] 04.1-09-PLAN.md — the wiring, and the git-asserted proof that the frozen set is frozen (wave 5)
+- [ ] 04.1-09-PLAN.md — the wiring, the 2D flourish deal retired in favour of the 3D hand-build, the `Layout` shim deleted with its last reader, and the git-asserted proof that the frozen set is frozen over `83517f7..HEAD` (wave 5)
 - [ ] 04.1-10-PLAN.md — the three Studio probes with their own non-vacuity, and one controlled pre/post budget measurement (wave 6)
 
 ### Phase 5: Hunt, Anti-ESP, Claim and Scoring
