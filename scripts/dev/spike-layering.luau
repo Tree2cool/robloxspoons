@@ -194,6 +194,13 @@ end
 -- ---------------------------------------------------------------------------------------------------------------
 
 local guiHost, hostNote
+-- RUN THIS *INSIDE* A RUNNING SESSION. PRESS PLAY FIRST, THEN PASTE.
+-- Pasting in edit mode and pressing Play afterwards does not work, and fails in a way that looks like the
+-- probe is broken: the cards are built in Workspace and DO survive into Play, but this script also sets a
+-- SCRIPTABLE CAMERA, and starting a session hands the camera back to the default player scripts. So the
+-- cards sit at y=400 while the player stands on the baseplate, and the screen is empty. (Measured
+-- 2026-11-10: the owner hit exactly this, and the Output carried no probe prints at all, because the prints
+-- happened in the edit-mode session that Play replaced.)
 local localPlayer = Players.LocalPlayer
 if localPlayer ~= nil then
 	guiHost = localPlayer:FindFirstChildOfClass("PlayerGui")

@@ -1379,6 +1379,16 @@ letter because it did not exist until the layering decision created it.
 
 ## M-18 (CARD-19, UX-01 / D-47, D-48, U3) Card layering order: which of the three routes ships
 
+**RUN ORDER MATTERS, AND GETTING IT WRONG LOOKS LIKE A BROKEN PROBE.** Press **Play (F5) FIRST**,
+wait for your avatar, and only **then** paste `scripts/dev/spike-layering.luau` into the command bar
+(choose the **Client** context if a dropdown is offered).
+
+Pasting in edit mode and pressing Play afterwards fails silently. The cards are built in `Workspace`
+and do survive into the session, but the probe also sets a **scriptable camera**, and starting a
+session hands the camera back to the default player scripts — so the cards sit at y=400 while you
+stand on the baseplate looking at empty sky. The Output then carries **no probe prints at all**,
+because they happened in the edit-mode session that Play replaced. Observed 2026-11-10.
+
 **Why manual:** no primary Roblox doc answers it. `SurfaceGui.AlwaysOnTop` is documented only as "always renders
 on top of 3D content", and `ZOffset` as layering "in relation to others **on the same face**" (re-verified against
 `SurfaceGui.md` on 2026-11-10, and the page adds that changing `ZOffset` "does not visually 'lift' or 'sink' a
